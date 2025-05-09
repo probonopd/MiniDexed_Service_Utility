@@ -65,3 +65,5 @@ jobs:
       with:
         artifacts: ./executables/*
         token: ${{ secrets.GITHUB_TOKEN }}
+        tag: continuous
+        commit: continuous
