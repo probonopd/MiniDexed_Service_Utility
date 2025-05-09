@@ -70,10 +70,17 @@ jobs:
         path: ./executables/
         # merge-multiple: true
 
+    - name: Zip Artifacts
+      run: |
+        for d in ./executables/*-executable; do
+          zip -r "$d.zip" "$d"
+        done
+        ls -lh ./executables/*.zip
+
     - name: Create Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: ./executables/*
+        artifacts: ./executables/*.zip
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: continuous
         commit: ${{ github.sha }}
