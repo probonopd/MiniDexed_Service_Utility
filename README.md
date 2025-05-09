@@ -22,7 +22,7 @@ It allows sending and receiving MIDI and SysEx messages, monitoring device logs,
 
 ### Syslog Panel
 
-The tool includes a syslog server for logging messages from your MiniDexed device. The syslog server is enabled by default and listens on port 514.
+The tool includes a syslog server for logging messages from your MiniDexed device. The syslog server is enabled by default and listens on port 8514.
 You need to configure your MiniDexed device to send syslog messages to the IP address of the computer running this tool.
 
 - **Syslog Server Info**: The panel displays the IP address and port on which the syslog server is listening.
