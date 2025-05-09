@@ -4,6 +4,8 @@
 
 The MiniDexed Service Utility is a graphical application for advanced interaction, testing, and updating of MiniDexed and other MIDI devices. It allows sending and receiving MIDI and SysEx messages, monitoring device logs, and updating device firmware.
 
+![image](https://github.com/user-attachments/assets/5cfe3a3e-b405-49a2-a72c-3052a35d60f9)
+
 ## Features
 
 ### MIDI Out Panel
