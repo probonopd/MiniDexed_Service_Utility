@@ -1,2 +1,5 @@
 PyQt6
 mido
+python-rtmidi
+requests
+zeroconf
