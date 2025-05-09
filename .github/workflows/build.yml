@@ -82,6 +82,5 @@ jobs:
       uses: ncipollo/release-action@v1
       with:
         artifacts: ./executables/*.zip
-        token: ${{ secrets.GITHUB_TOKEN }}
         tag: continuous
         commit: ${{ github.sha }}
