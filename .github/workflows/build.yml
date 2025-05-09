@@ -37,7 +37,7 @@ jobs:
         PYINSTALLER_UPX: 1
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.os }}-executable
         path: |
@@ -50,19 +50,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Download Windows Executable
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: windows-latest-executable
         path: ./executables/windows
     
     - name: Download macOS Executable
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: macos-latest-executable
         path: ./executables/macos
     
     - name: Download Linux Executable
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: ubuntu-latest-executable
         path: ./executables/linux
