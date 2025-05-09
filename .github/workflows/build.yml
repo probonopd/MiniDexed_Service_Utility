@@ -84,3 +84,4 @@ jobs:
         artifacts: ./executables/*.zip
         tag: continuous
         commit: ${{ github.sha }}
+        allowUpdates: true
