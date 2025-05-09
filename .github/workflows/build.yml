@@ -28,10 +28,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
+        pip install -r src/requirements.txt
 
     - name: Build Executable
       run: |
-        pyinstaller --onefile src/main.py
+        pyinstaller --onefile --name "MiniDexed Service Utility" src/main.py
       env:
         PYINSTALLER_STRIP: 1
         PYINSTALLER_UPX: 1
