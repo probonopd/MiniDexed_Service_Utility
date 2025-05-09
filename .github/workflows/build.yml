@@ -19,9 +19,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Install ALSA Development Libraries (Linux only)
+    - name: Install Libraries (Linux only)
       if: runner.os == 'Linux'
-      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev \
+        libxcb-shape0-dev \
+        libxcb-image0-dev \
+        libxkbcommon-x11-0 \
+        libxcb-icccm4-dev \
+        libxcb-xkb-dev \
+        libxcb-render-util0-dev \
+        libxcb-keysyms1-dev \
+        libxcb-cursor-dev
 
     - name: Set up Python
       uses: actions/setup-python@v4
