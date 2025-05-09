@@ -36,7 +36,7 @@ jobs:
 
     - name: Build Executable
       run: |
-        pyinstaller --onefile --name "MiniDexed Service Utility" src/main.py
+        pyinstaller --onefile --name "MiniDexed Service Utility" --noconsole --add-data "src/midi_commands:midi_commands" src/main.py
       env:
         PYINSTALLER_STRIP: 1
         PYINSTALLER_UPX: 1
