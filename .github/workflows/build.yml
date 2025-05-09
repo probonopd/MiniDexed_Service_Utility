@@ -33,6 +33,11 @@ jobs:
         libxcb-keysyms1-dev \
         libxcb-cursor-dev
 
+    - name: Install RtMidi dependencies (Windows only)
+      if: runner.os == 'Windows'
+      run: |
+        choco install rtmidi
+    
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
