@@ -19,6 +19,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Install ALSA Development Libraries (Linux only)
+      if: runner.os == 'Linux'
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
