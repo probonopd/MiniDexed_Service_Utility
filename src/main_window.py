@@ -16,7 +16,7 @@ from updater_worker import UpdaterWorker, DeviceDiscoveryWorker
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("MiniDexed Service Utility")
+        self.setWindowTitle("MiniDexed Service Tool")
         self.resize(800, 500)
         self.settings = QSettings("MIDISend", "MIDISendApp")
         self.midi_handler = MIDIHandler()
@@ -50,10 +50,24 @@ class MainWindow(QMainWindow):
                         self.ui.update_syslog_label(ip, port)
         self.log_worker.log.connect(log_to_status_and_stdout)
         self.log_worker.start()
-        self.syslog_worker = SyslogWorker()
-        self.syslog_worker.syslog_message.connect(self.ui.append_syslog)
-        self.syslog_worker.log.connect(log_to_status_and_stdout)
-        self.syslog_worker.start()
+        # Only start syslog server if port is available
+        import socket
+        SYSLOG_PORT = 8514
+        syslog_port_available = True
+        try:
+            test_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            test_sock.bind(("0.0.0.0", SYSLOG_PORT))
+            test_sock.close()
+        except OSError:
+            syslog_port_available = False
+        if syslog_port_available:
+            self.syslog_worker = SyslogWorker()
+            self.syslog_worker.syslog_message.connect(self.ui.append_syslog)
+            self.syslog_worker.log.connect(log_to_status_and_stdout)
+            self.syslog_worker.start()
+        else:
+            self.log_worker.add_message(f"Syslog port {SYSLOG_PORT} is not available. Syslog server will not start.")
+            self.syslog_worker = None
 
     def restore_last_ports(self):
         last_in = self.settings.value("last_in_port", "")

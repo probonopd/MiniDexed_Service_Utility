@@ -1,9 +1,11 @@
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QSlider, QDialogButtonBox, QHBoxLayout, QLineEdit
+from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QSlider, QDialogButtonBox, QHBoxLayout, QLineEdit, QTextEdit
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIntValidator
 import os
 import json
+import re
+from dialogs import PreferencesDialog
 
 def setup_menus(main_window):
     menubar = main_window.menuBar()

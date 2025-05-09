@@ -1,6 +1,7 @@
 from dialogs import Dialogs
 from file_utils import FileUtils
 from workers import FileLoadWorker, FileSaveWorker
+import mido
 
 class FileOps:
     def __init__(self, main_window):
@@ -62,7 +63,6 @@ class FileOps:
         if not path:
             self.main_window.ui.append_log("MIDI In save canceled.")
             return
-        import mido
         midi = mido.MidiFile()
         track = mido.MidiTrack()
         midi.tracks.append(track)

@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLabel, QSplitter, QTableView, QHeaderView
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QKeySequence
 from PyQt6.QtCore import Qt
+import re
+from dialogs import Dialogs
 
 class UiMainWindow:
     def __init__(self, main_window):
@@ -105,7 +107,6 @@ class UiMainWindow:
             self.main_window.show_status(msg)
 
     def append_syslog(self, msg):
-        import re
         line = msg.strip()
         # Try to match full line with message
         m = re.match(r'([0-9:.]+) ([<>][0-9]+) - ([0-9.]+) ([^ ]+) - - - (.*)', line)

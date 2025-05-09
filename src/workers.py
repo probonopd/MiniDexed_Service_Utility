@@ -1,6 +1,9 @@
 from PyQt6.QtCore import QThread, pyqtSignal
 import time
 import socket
+import sys
+from dialogs import Dialogs
+from file_utils import FileUtils
 
 class MIDIReceiveWorker(QThread):
     sysex_received = pyqtSignal(list)
@@ -73,20 +76,27 @@ class SyslogWorker(QThread):
         self.running = True
         self.start_time = None
     def run(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        server.bind((self.host, self.port))
-        server.settimeout(0.5)
-        self.log.emit(f"Syslog server listening on {socket.gethostbyname(socket.gethostname())}:{self.port}")
-        while self.running:
+        try:
+            server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
-                data, address = server.recvfrom(1024)
-                self.handle_message(data)
-            except socket.timeout:
-                continue
-            except Exception as e:
-                self.log.emit(f"Syslog error: {e}")
-        server.close()
-        self.log.emit("Syslog server stopped.")
+                server.bind((self.host, self.port))
+            except OSError as e:
+                return self.log.emit(f"Syslog error: {e}")
+            server.settimeout(0.5)
+            self.log.emit(f"Syslog server listening on {socket.gethostbyname(socket.gethostname())}:{self.port}")
+            while self.running:
+                try:
+                    data, address = server.recvfrom(1024)
+                    self.handle_message(data)
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    self.log.emit(f"Syslog error: {e}")
+            server.close()
+            self.log.emit("Syslog server stopped.")
+        except Exception as e:
+            Dialogs.show_error(None, "Syslog Error", str(e))
+            self.log.emit(f"Syslog error: {e}")
     def handle_message(self, data):
         message = data[2:].decode('utf-8', errors='replace').strip()
         if "Time exceeded (0)" in message:
@@ -116,11 +126,9 @@ class FileLoadWorker(QThread):
     def run(self):
         try:
             if self.file_type == 'mid':
-                from file_utils import FileUtils
                 midi = FileUtils.load_mid(self.file_path)
                 self.loaded.emit(midi, self.file_path)
             elif self.file_type == 'syx':
-                from file_utils import FileUtils
                 data = FileUtils.load_syx(self.file_path)
                 self.loaded.emit(data, self.file_path)
             else:
@@ -139,11 +147,9 @@ class FileSaveWorker(QThread):
     def run(self):
         try:
             if self.file_type == 'mid':
-                from file_utils import FileUtils
                 FileUtils.save_mid(self.file_path, self.data)
                 self.saved.emit(self.file_path)
             elif self.file_type == 'syx':
-                from file_utils import FileUtils
                 FileUtils.save_syx(self.file_path, self.data)
                 self.saved.emit(self.file_path)
             else:

@@ -1,5 +1,13 @@
 from PyQt6.QtCore import QThread, pyqtSignal
-import os, sys, tempfile, zipfile, requests, ftplib, socket, time, re
+import os
+import sys
+import tempfile
+import zipfile
+import requests
+import ftplib
+import socket
+import time
+import re
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
 class UpdaterWorker(QThread):
