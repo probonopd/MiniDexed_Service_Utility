@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-10.15, windows-2016]
+        os: [ubuntu-22.04, macos-13, windows-2019, ubuntu-22.04-arm]
 
     steps:
     - name: Checkout code
@@ -49,23 +49,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - name: Download Windows Executable
+    - name: Download Executable
       uses: actions/download-artifact@v4
       with:
-        name: windows-latest-executable
-        path: ./executables/windows
-    
-    - name: Download macOS Executable
-      uses: actions/download-artifact@v4
-      with:
-        name: macos-latest-executable
-        path: ./executables/macos
-    
-    - name: Download Linux Executable
-      uses: actions/download-artifact@v4
-      with:
-        name: ubuntu-latest-executable
-        path: ./executables/linux
+        path: ./executables/
+        # merge-multiple: true
 
     - name: Create Release
       uses: ncipollo/release-action@v1
