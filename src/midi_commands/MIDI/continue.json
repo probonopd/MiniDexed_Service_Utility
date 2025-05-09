@@ -1,0 +1,6 @@
+{
+  "name": "Continue",
+  "description": "Send Continue real-time message (no parameters).",
+  "status_byte": 251,
+  "parameters": []
+}

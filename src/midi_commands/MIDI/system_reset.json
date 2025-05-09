@@ -1,0 +1,6 @@
+{
+  "name": "System Reset",
+  "description": "Send System Reset real-time message (no parameters).",
+  "status_byte": 255,
+  "parameters": []
+}

@@ -1,0 +1,9 @@
+{
+  "name": "MIDI Time Code Quarter Frame",
+  "description": "Send MIDI Time Code Quarter Frame message.",
+  "status_byte": 241,
+  "parameters": [
+    {"name": "Message Type", "min": 0, "max": 7, "default": 0},
+    {"name": "Values", "min": 0, "max": 15, "default": 0}
+  ]
+}

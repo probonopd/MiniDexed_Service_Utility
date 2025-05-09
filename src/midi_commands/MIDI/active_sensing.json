@@ -1,0 +1,6 @@
+{
+  "name": "Active Sensing",
+  "description": "Send Active Sensing real-time message (no parameters).",
+  "status_byte": 254,
+  "parameters": []
+}

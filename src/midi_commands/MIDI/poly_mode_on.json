@@ -1,0 +1,10 @@
+{
+  "name": "Poly Mode On",
+  "description": "Poly Mode On (Control Change 127)",
+  "status_byte": 176,
+  "parameters": [
+    {"name": "Channel", "min": 1, "max": 16, "default": 1},
+    {"name": "Controller Number", "min": 127, "max": 127, "default": 127},
+    {"name": "Value", "min": 0, "max": 0, "default": 0}
+  ]
+}

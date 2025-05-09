@@ -1,0 +1,8 @@
+{
+  "name": "Song Select",
+  "description": "Send Song Select message.",
+  "status_byte": 243,
+  "parameters": [
+    {"name": "Song Number", "min": 0, "max": 127, "default": 0}
+  ]
+}

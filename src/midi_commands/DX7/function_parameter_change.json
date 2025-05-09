@@ -1,0 +1,11 @@
+{
+  "name": "DX7 Function Parameter Change",
+  "description": "Send a function parameter change to a Yamaha DX7.",
+  "status_byte": 240,
+  "parameters": [
+    {"name": "Device Number", "min": 0, "max": 15, "default": 0},
+    {"name": "Function Number", "min": 0, "max": 127, "default": 0},
+    {"name": "Value", "min": 0, "max": 127, "default": 0}
+  ],
+  "template": "F0 43 1{device_number} 03 {function_number} {value} F7"
+}

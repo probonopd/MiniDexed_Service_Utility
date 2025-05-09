@@ -1,0 +1,9 @@
+{
+  "name": "Program Change",
+  "description": "Send a Program Change message.",
+  "status_byte": 192,
+  "parameters": [
+    {"name": "Channel", "min": 1, "max": 16, "default": 1},
+    {"name": "Program Number", "min": 0, "max": 127, "default": 0}
+  ]
+}

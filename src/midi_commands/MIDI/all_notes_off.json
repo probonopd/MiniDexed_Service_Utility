@@ -1,0 +1,10 @@
+{
+  "name": "All Notes Off",
+  "description": "Send All Notes Off (Control Change 123) to a channel.",
+  "status_byte": 176,
+  "parameters": [
+    {"name": "Channel", "min": 1, "max": 16, "default": 1},
+    {"name": "Controller Number", "min": 123, "max": 123, "default": 123},
+    {"name": "Value", "min": 0, "max": 127, "default": 0}
+  ]
+}

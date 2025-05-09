@@ -1,0 +1,6 @@
+{
+  "name": "Stop",
+  "description": "Send Stop real-time message (no parameters).",
+  "status_byte": 252,
+  "parameters": []
+}

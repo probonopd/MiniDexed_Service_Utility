@@ -1,0 +1,6 @@
+{
+  "name": "Start",
+  "description": "Send Start real-time message (no parameters).",
+  "status_byte": 250,
+  "parameters": []
+}

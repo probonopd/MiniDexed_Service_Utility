@@ -1,0 +1,10 @@
+{
+  "name": "Omni Mode Off",
+  "description": "Omni Mode Off (Control Change 124)",
+  "status_byte": 176,
+  "parameters": [
+    {"name": "Channel", "min": 1, "max": 16, "default": 1},
+    {"name": "Controller Number", "min": 124, "max": 124, "default": 124},
+    {"name": "Value", "min": 0, "max": 0, "default": 0}
+  ]
+}
