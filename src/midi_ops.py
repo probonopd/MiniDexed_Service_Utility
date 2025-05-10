@@ -64,12 +64,12 @@ class MidiOps:
         self.midi_send_worker = None
         # Repeat logic
         if getattr(self, 'repeat_mid_file', False) and self.main_window.file_ops.loaded_midi:
-            self.main_window.show_status("Repeating MIDI file send...")
             if not self.main_window.midi_handler.outport:
                 from dialogs import Dialogs
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
             from workers import MidiSendWorker
+            self.main_window.show_status("Repeating MIDI file send...")
             self.midi_send_worker = MidiSendWorker(self.main_window.midi_handler.outport, self.main_window.file_ops.loaded_midi)
             self.midi_send_worker.log.connect(self.main_window.show_status)
             self.midi_send_worker.finished.connect(self.on_midi_send_finished)

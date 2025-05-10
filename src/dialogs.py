@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
 from PyQt6.QtWidgets import QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox, QTextEdit
+from PyQt6.QtWidgets import QPushButton, QHBoxLayout
 from PyQt6.QtCore import Qt
 import sys
 
@@ -53,6 +54,24 @@ class PreferencesDialog(QDialog):
         )
         explanation.setMinimumHeight(120)
         layout.addWidget(explanation)
+        # Add Clear application data button and explanation
+        clear_layout = QHBoxLayout()
+        clear_btn = QPushButton("Clear application data")
+        clear_layout.addWidget(clear_btn)
+        clear_layout.addWidget(QLabel("Deletes all cached voices and settings. Use this if you want to reset the app or free up disk space."))
+        layout.addLayout(clear_layout)
+        def clear_app_data():
+            import shutil
+            import os
+            from PyQt6.QtWidgets import QMessageBox
+            cache_dir = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser('~/.local/share'), 'MiniDexed_Service_Utility')
+            try:
+                if os.path.exists(cache_dir):
+                    shutil.rmtree(cache_dir)
+                QMessageBox.information(self, "Application Data Cleared", "All cached voices and settings have been deleted.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to clear application data: {e}")
+        clear_btn.clicked.connect(clear_app_data)
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)

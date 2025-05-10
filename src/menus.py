@@ -298,9 +298,13 @@ def setup_menus(main_window):
         main_window.voice_browser_dialog = None
     def show_patch_browser():
         if main_window.voice_browser_dialog is not None:
-            main_window.voice_browser_dialog.raise_()
-            main_window.voice_browser_dialog.activateWindow()
-            return
+            # Check if the dialog was closed but not dereferenced
+            if not main_window.voice_browser_dialog.isVisible():
+                main_window.voice_browser_dialog = None
+            else:
+                main_window.voice_browser_dialog.raise_()
+                main_window.voice_browser_dialog.activateWindow()
+                return
         from voice_browser import VoiceBrowser
         dlg = VoiceBrowser(main_window)
         main_window.voice_browser_dialog = dlg
