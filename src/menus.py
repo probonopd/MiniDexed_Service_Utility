@@ -40,6 +40,7 @@ def setup_menus(main_window):
     repeat_mid_action.setCheckable(True)
     repeat_mid_action.setChecked(main_window.settings.value("repeat_mid_file", False, type=bool))
     file_menu.addAction(repeat_mid_action)
+    main_window.repeat_action = repeat_mid_action  # Make accessible for repeat logic
     def on_repeat_mid_toggled(checked):
         main_window.settings.setValue("repeat_mid_file", checked)
         main_window.midi_ops.repeat_mid_file = checked

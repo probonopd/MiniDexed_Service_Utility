@@ -62,8 +62,10 @@ class MidiOps:
     def on_midi_send_finished(self):
         self.main_window.show_status("Finished sending MIDI file.")
         self.midi_send_worker = None
-        # Repeat logic
-        if getattr(self, 'repeat_mid_file', False) and self.main_window.file_ops.loaded_midi:
+        # Repeat logic: check if the Repeat menu entry is checked
+        repeat_action = getattr(self.main_window, 'repeat_action', None)
+        repeat_enabled = repeat_action.isChecked() if repeat_action else False
+        if repeat_enabled and self.main_window.file_ops.loaded_midi:
             if not self.main_window.midi_handler.outport:
                 from dialogs import Dialogs
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")

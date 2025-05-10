@@ -46,6 +46,32 @@ class VoiceDownloadWorker(QThread):
         except Exception as e:
             self.finished.emit([], self.voice_name, e)
 
+class VoiceJsonDownloadWorker(QThread):
+    finished = pyqtSignal(dict, str, object)  # json_data, voice_name, error
+    def __init__(self, url, voice_name):
+        super().__init__()
+        self.url = url
+        self.voice_name = voice_name
+    def run(self):
+        try:
+            cache_dir = get_cache_dir()
+            os.makedirs(cache_dir, exist_ok=True)
+            url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
+            cache_path = os.path.join(cache_dir, url_hash + '.json')
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    json_data = json.load(f)
+                self.finished.emit(json_data, self.voice_name, None)
+                return
+            resp = requests.get(self.url)
+            resp.raise_for_status()
+            json_data = resp.json()
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f)
+            self.finished.emit(json_data, self.voice_name, None)
+        except Exception as e:
+            self.finished.emit({}, self.voice_name, e)
+
 class VoiceBrowser(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -60,6 +86,9 @@ class VoiceBrowser(QDialog):
         layout.addWidget(self.search_box)
         self.list_widget = QListWidget(self)
         layout.addWidget(self.list_widget)
+        self.bank_label = QLabel(self)
+        self.bank_label.setText("")
+        layout.addWidget(self.bank_label)
         controls_layout = QHBoxLayout()
         self.channel_combo = QComboBox(self)
         self.channel_combo.addItems([str(i) for i in range(1, 17)] + ["Omni"])
@@ -76,6 +105,7 @@ class VoiceBrowser(QDialog):
         self.search_box.textChanged.connect(self.filter_voices)
         self.send_button.clicked.connect(self.send_voice)
         self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
+        self.list_widget.itemClicked.connect(self.on_voice_clicked)
         self.search_box.setMinimumWidth(0)
         self.list_widget.setMinimumWidth(0)
         self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -203,6 +233,33 @@ class VoiceBrowser(QDialog):
             self.set_status(f"Could not access main window Out area: {e}", error=True)
             if hasattr(mw, 'show_status'):
                 mw.show_status(f"Could not access main window Out area: {e}")
+
+    def on_voice_clicked(self, item):
+        idx = self.list_widget.currentRow()
+        if idx < 0 or idx >= len(self.filtered_voices):
+            self.bank_label.setText("")
+            return
+        voice = self.filtered_voices[idx]
+        sig = voice.get('signature')
+        if not sig:
+            self.bank_label.setText("")
+            return
+        json_url = f"https://patches.fm/patches/dx7/{sig[:2]}/{sig}.json"
+        self.bank_label.setText("Loading bank info...")
+        self.json_worker = VoiceJsonDownloadWorker(json_url, voice['name'])
+        self.json_worker.finished.connect(self.on_json_downloaded)
+        self.json_worker.start()
+
+    def on_json_downloaded(self, json_data, voice_name, error):
+        if error or not json_data:
+            self.bank_label.setText("Source: (not available)")
+            return
+        bank = json_data.get('BANK', '(unknown)')
+        author = json_data.get('AUTHOR', '(unknown)')
+        # Remove .syx/.SXY suffix from bank name
+        if isinstance(bank, str):
+            bank = bank.removesuffix('.syx').removesuffix('.SXY').removesuffix('.SYX').removesuffix('.sxy')
+        self.bank_label.setText(f"Source: Bank {bank} by {author}")
 
 # For standalone testing
 if __name__ == "__main__":
