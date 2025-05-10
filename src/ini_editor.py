@@ -223,27 +223,29 @@ FIELD_TOOLTIPS = {
     'DAWControllerEnabled': "1: Enable Arturia DAW controller mode.",
 }
 
-CATEGORY_MAP = {
-    'System Options': 'Sound',
-    'Sound device': 'Sound',
-    'MIDI': 'MIDI',
-    'LCD': 'Display',
-    'HD44780 LCD': 'Display',
-    'SSD1306 LCD': 'Display',
-    'ST7789 LCD': 'Display',
-    'GPIO Button Navigation': 'Buttons',
-    'GPIO Program/Bank/TG Selection': 'Buttons',
-    'Timeouts': 'Buttons',
-    'MIDI Button Navigation': 'Buttons',
-    'KY-040 Rotary Encoder': 'Buttons',
-    'Network': 'Network',
-    'Debug': 'Debug',
-    'Performance': 'Other',
-    'Arturia': 'Other',
-    'USB Connectivity': 'Other',
-    '': 'Other',
-    'General': 'Other',
-}
+def categorize_section(section, section_keys=None):
+    # If any key in the section contains 'Button', assign to Buttons
+    if section_keys and any('button' in k.lower() for k in section_keys):
+        return "Buttons"
+    s = section.lower()
+    if 'midi button' in s:
+        return "Buttons"
+    if any(k in s for k in ["sound", "system", "dac", "engine", "volume"]):
+        return "Sound"
+    if "midi" in s:
+        return "MIDI"
+    if any(k in s for k in ["lcd", "display", "oled", "hd44780", "ssd1306", "st7789"]):
+        return "Display"
+    if any(k in s for k in ["button", "timeout", "encoder", "navigation"]):
+        return "Buttons"
+    if "network" in s or "ftp" in s or "dhcp" in s:
+        return "Network"
+    if "debug" in s or "profile" in s:
+        return "Debug"
+    if any(k in s for k in ["performance", "arturia", "usb", "general"]):
+        return "Other"
+    return None
+
 CATEGORY_ORDER = ['Sound', 'MIDI', 'Display', 'Buttons', 'Network', 'Debug', 'Other']
 
 class IniEditorDialog(QDialog):
@@ -266,10 +268,17 @@ class IniEditorDialog(QDialog):
         self._parse_ini(ini_text)
         layout = QVBoxLayout(self)
         tabs = QTabWidget(self)
-        # Group sections by category
+        # Group sections by improved category logic
         category_sections = {cat: [] for cat in CATEGORY_ORDER}
         for section in self.section_order:
-            cat = CATEGORY_MAP.get(section, 'Other')
+            # Gather all keys in this section
+            section_keys = []
+            for idx in self.section_map[section]:
+                linetype, data = self.lines[idx]
+                if linetype == 'setting':
+                    key = data[0]
+                    section_keys.append(key)
+            cat = categorize_section(section, section_keys) or 'Other'
             category_sections[cat].append(section)
         for cat in CATEGORY_ORDER:
             if not category_sections[cat]:
@@ -281,22 +290,26 @@ class IniEditorDialog(QDialog):
                 group_layout = QVBoxLayout(group)
                 for idx in self.section_map[section]:
                     linetype, data = self.lines[idx]
+                    row = QHBoxLayout()
                     if linetype == 'setting':
                         key, value, comment, orig = data
-                        row = QHBoxLayout()
                         label = QLabel(key)
                         label.setToolTip(FIELD_TOOLTIPS.get(key, comment))
                         widget = self._make_widget(key, value)
                         self.widgets[key] = widget
                         row.addWidget(label)
                         row.addWidget(widget)
-                        group_layout.addLayout(row)
-                    elif linetype == 'comment':
-                        comment_lbl = QLabel(data)
-                        comment_lbl.setStyleSheet("color: gray; font-style: italic;")
-                        group_layout.addWidget(comment_lbl)
-                    elif linetype == 'blank':
-                        group_layout.addSpacing(8)
+                    else:
+                        # For comments and blanks, always use 2 columns for consistency
+                        if linetype == 'comment':
+                            comment_lbl = QLabel(data)
+                            comment_lbl.setStyleSheet("color: gray; font-style: italic;")
+                            row.addWidget(comment_lbl)
+                            row.addWidget(QLabel(""))
+                        elif linetype == 'blank':
+                            row.addWidget(QLabel(""))
+                            row.addWidget(QLabel(""))
+                    group_layout.addLayout(row)
                 group_layout.addStretch(1)
                 tab_layout.addWidget(group)
             tab_layout.addStretch(1)
@@ -357,6 +370,17 @@ class IniEditorDialog(QDialog):
             self.section_map[section].append(idx)
 
     def _make_widget(self, key, value):
+        # Special handling for Action fields
+        if 'action' in key.lower() and (
+            key.lower().startswith('buttonaction') or key.lower().startswith('buttonaction') or 'button' in key.lower() or 'action' in key.lower()):
+            cb = QComboBox()
+            options = ['None', 'click', 'doubleclick', 'longpress']
+            cb.addItems(options)
+            if value in options:
+                cb.setCurrentIndex(options.index(value))
+            else:
+                cb.setCurrentIndex(0)
+            return cb
         hints = FIELD_HINTS.get(key)
         # Handle fields that allow empty values
         if hints and hints.get('allow_empty'):
@@ -424,7 +448,11 @@ class IniEditorDialog(QDialog):
                 elif isinstance(widget, QSpinBox):
                     v = str(widget.value())
                 elif isinstance(widget, QComboBox):
-                    v = widget.currentText().split(' ')[0]
+                    # If this is an Action dropdown, blank for 'None'
+                    if widget.findText('None') != -1 and widget.currentText() == 'None':
+                        v = ''
+                    else:
+                        v = widget.currentText().split(' ')[0]
                 elif isinstance(widget, QLineEdit):
                     v = widget.text()
                 else:
