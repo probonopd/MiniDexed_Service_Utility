@@ -1,6 +1,6 @@
 import sys
 import requests
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QListWidget, QHBoxLayout, QComboBox, QPushButton, QLabel, QApplication, QListWidgetItem, QStatusBar, QMenuBar, QMenu
 from PyQt6.QtGui import QAction
 
@@ -61,6 +61,11 @@ class VoiceBrowser(QDialog):
         self.search_box.textChanged.connect(self.filter_voices)
         self.send_button.clicked.connect(self.send_voice)
         self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
+
+        self.search_box.setMinimumWidth(0)
+        self.list_widget.setMinimumWidth(0)
+        self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_widget.setWordWrap(True)
 
         self.load_voices()
 
@@ -124,25 +129,18 @@ class VoiceBrowser(QDialog):
         # Remove trailing F7 if present
         if syx_data and syx_data[-1] == 0xF7:
             syx_data = syx_data[:-1]
-        # Search for DX7 header 43 00 09 20 and use the next 155 bytes
-        header = [0x43, 0x00, 0x09, 0x20]
-        found = False
-        for i in range(len(syx_data) - 4 - 155 + 1):
-            if syx_data[i:i+4] == header:
-                syx_data = syx_data[i:i+4+155]
-                found = True
-                break
-        if not found:
-            print("DX7 header not found, using last 155 bytes as fallback.")
-            syx_data = header + syx_data[-155:]
-        if len(syx_data) != 159:
-            print(f"Warning: Expected 159 bytes (header+155), got {len(syx_data)} bytes.")
+        # Handle 161-byte files: skip header if present
+        if len(syx_data) == 161 and syx_data[:4] == [0x43, 0x00, 0x09, 0x20]:
+            syx_data = syx_data[6:161]
+        if len(syx_data) != 155:
+            print(f"Warning: Expected 155 bytes, got {len(syx_data)} bytes.")
         voice_sysex = [0xF0] + syx_data + [0xF7]
-        # MIDI channel rewrite for DX7: channel is in the 5th byte (index 4) and should be 0x20 | (channel-1)
+        # MIDI channel rewrite for DX7: the third byte (index 2 in voice_sysex) is the channel byte (0x00..0x0F)
         if channel_text != "Omni":
             try:
                 channel = int(channel_text)
-                voice_sysex[8] = 0x20 | ((channel - 1) & 0x0F)  # 5th byte after F0+header
+                if len(voice_sysex) > 3:
+                    voice_sysex[2] = (channel - 1) & 0x0F
             except Exception as e:
                 print(f"Channel rewrite error: {e}")
             send_sysex_list = [voice_sysex]
@@ -150,7 +148,8 @@ class VoiceBrowser(QDialog):
             send_sysex_list = []
             for ch in range(1, 17):
                 sysex = voice_sysex.copy()
-                sysex[8] = 0x20 | ((ch - 1) & 0x0F)
+                if len(sysex) > 3:
+                    sysex[2] = (ch - 1) & 0x0F
                 send_sysex_list.append(sysex)
         parent = self.parent() if self.parent() else self
         main_window = getattr(parent, 'main_window', parent)

@@ -33,6 +33,16 @@ def setup_menus(main_window):
     update_action.triggered.connect(main_window.show_updater_dialog)
     exit_action.triggered.connect(main_window.close)
 
+    # Repeat sending .mid file
+    repeat_mid_action = QAction("Repeat sending .mid file", main_window)
+    repeat_mid_action.setCheckable(True)
+    repeat_mid_action.setChecked(main_window.settings.value("repeat_mid_file", False, type=bool))
+    file_menu.addAction(repeat_mid_action)
+    def on_repeat_mid_toggled(checked):
+        main_window.settings.setValue("repeat_mid_file", checked)
+        main_window.midi_ops.repeat_mid_file = checked
+    repeat_mid_action.toggled.connect(on_repeat_mid_toggled)
+
     # Edit Menu
     edit_menu = menubar.addMenu("Edit")
     undo_action = QAction("Undo", main_window)
@@ -283,17 +293,29 @@ def setup_menus(main_window):
                 action.triggered.connect(lambda checked, c=item['cmd']: show_midi_command_dialog(c))
                 menu.addAction(action)
 
+    # Track the Voice Browser dialog instance
+    if not hasattr(main_window, 'voice_browser_dialog'):
+        main_window.voice_browser_dialog = None
+    def show_patch_browser():
+        if main_window.voice_browser_dialog is not None:
+            main_window.voice_browser_dialog.raise_()
+            main_window.voice_browser_dialog.activateWindow()
+            return
+        from voice_browser import VoiceBrowser
+        dlg = VoiceBrowser(main_window)
+        main_window.voice_browser_dialog = dlg
+        def on_close():
+            main_window.voice_browser_dialog = None
+        dlg.destroyed.connect(on_close)
+        dlg.show()
+
     def populate_midi_commands_menu():
         midi_commands_menu.clear()
         items = load_midi_commands_recursive(midi_commands_dir)
         add_midi_command_menu_items(midi_commands_menu, items)
         midi_commands_menu.addSeparator()
-        patch_browser_action = QAction("DX7 Voice Browser...", main_window)
+        patch_browser_action = QAction("DX7 Voices...", main_window)
         midi_commands_menu.addAction(patch_browser_action)
-        def show_patch_browser():
-            from voice_browser import VoiceBrowser
-            dlg = VoiceBrowser(main_window)
-            dlg.show()
         patch_browser_action.triggered.connect(show_patch_browser)
     midi_commands_menu.aboutToShow.connect(populate_midi_commands_menu)
 
@@ -302,3 +324,17 @@ def setup_menus(main_window):
     about_action = QAction("About", main_window)
     help_menu.addAction(about_action)
     about_action.triggered.connect(lambda: main_window.file_ops.menu_about())
+
+    # File Menu ordering and grouping
+    file_menu.clear()
+    file_menu.addAction(open_action)
+    file_menu.addSeparator()
+    file_menu.addAction(send_mid_action)
+    file_menu.addAction(repeat_mid_action)
+    file_menu.addSeparator()
+    file_menu.addAction(save_action)
+    file_menu.addAction(save_midi_in_action)
+    file_menu.addSeparator()
+    file_menu.addAction(update_action)
+    file_menu.addSeparator()
+    file_menu.addAction(exit_action)
