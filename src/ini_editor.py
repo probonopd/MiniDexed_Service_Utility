@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication, QPushButton, QTextEdit
 from PyQt6.QtCore import Qt
 from PyQt6 import QtGui, QtCore
 import ftplib
@@ -87,7 +87,7 @@ FIELD_HINTS = {
     'LongPressTimeout': {'type': 'int', 'min': 0, 'max': 5000},
     # MIDI Button Navigation
     'MIDIButtonCh': {'type': 'int', 'min': 0, 'max': 32},
-    'MIDIButtonNotes': {'type': 'int', 'min': 0, 'max': 127},
+    'MIDIButtonNotes': {'type': 'bool'},
     'MIDIButtonPrev': {'type': 'int', 'min': 0, 'max': 127},
     'MIDIButtonNext': {'type': 'int', 'min': 0, 'max': 127},
     'MIDIButtonBack': {'type': 'int', 'min': 0, 'max': 127},
@@ -119,7 +119,7 @@ FIELD_HINTS = {
     'NetworkSyslogEnabled': {'type': 'bool'},
     'NetworkSyslogServerIPAddress': {'type': 'str'},
     # Performance
-    'PerformanceSelectToLoad': {'type': 'bool'},
+    'PerformanceSelectToLoad': {'type': 'int', 'min': 0, 'max': 127},
     # Arturia
     'DAWControllerEnabled': {'type': 'bool'},
     # USB
@@ -251,6 +251,25 @@ FIELD_TOOLTIPS = {
     'DAWControllerEnabled': "1: Enable Arturia DAW controller mode.",
 }
 
+# Subsection descriptions for GUI display, derived from the MiniDexed wiki
+SUBSECTION_DESCRIPTIONS = {
+    'Sound device': "Configure the audio output hardware, including device type (PWM, HDMI, I2S), sample rate, and master volume. These settings determine how MiniDexed produces sound and which audio interface is used.",
+    'MIDI': "Set up MIDI communication parameters such as baud rate, MIDI Thru, and how MiniDexed responds to program changes and system exclusive messages. This section controls how the device interacts with other MIDI equipment.",
+    'HD44780 LCD': "Configure an HD44780-compatible character LCD, including GPIO pin assignments and I2C address. This section is for users with classic character LCD modules.",
+    'SSD1306 LCD': "Configure an SSD1306-based OLED display, including I2C address, width, height, and display orientation. Useful for compact graphical displays.",
+    'ST7789 LCD': "Set up SPI-connected ST7789 color displays, including pin assignments, resolution, and rotation. This section is for users with color TFT displays.",
+    'GPIO Button Navigation': "Assign GPIO pins to navigation buttons and define their actions (click, double-click, long-press). Unused pins should be set to 0 (disabled).",
+    'GPIO Program/Bank/TG Selection': "Assign GPIO pins to program, bank, and tone generator selection buttons. Unused pins should be set to 0 (disabled).",
+    'Timeouts': "Adjust timing for button double-click and long-press detection. These settings affect how quickly button presses are recognized as special actions.",
+    'MIDI Button Navigation': "Configure which MIDI messages control navigation buttons, allowing remote control of MiniDexed via MIDI.",
+    'KY-040 Rotary Encoder': "Enable and configure a KY-040 rotary encoder for menu navigation, including pin assignments and activation.",
+    'Debug': "Enable debug output to the display and periodic CPU usage reporting. Useful for troubleshooting and performance monitoring.",
+    'Network': "Configure network connectivity, including enabling/disabling networking, DHCP, hostname, and syslog server settings.",
+    'Performance': "Set up which performance (preset) to load at startup and related options for automatic configuration.",
+    'Arturia': "Enable or disable compatibility with Arturia DAW controller mode for integration with Arturia hardware/software.",
+    'USB Connectivity': "Configure USB gadget mode, allowing MiniDexed to act as a USB device. Warning: Do not use PWR when this is enabled!",
+}
+
 def categorize_section(section, section_keys=None):
     # If any key in the section contains 'Button', assign to Buttons
     if section_keys and any('button' in k.lower() for k in section_keys):
@@ -332,6 +351,20 @@ class IniEditorDialog(QDialog):
                     continue  # skip sections with only comments/blanks
                 group = QGroupBox(section)
                 group_layout = QVBoxLayout(group)
+                # Add subsection description inside the group/box
+                desc = SUBSECTION_DESCRIPTIONS.get(section)
+                if not desc:
+                    # Try case-insensitive and whitespace-insensitive match
+                    section_norm = section.strip().lower().replace(' ', '')
+                    for k, v in SUBSECTION_DESCRIPTIONS.items():
+                        if section_norm == k.strip().lower().replace(' ', ''):
+                            desc = v
+                            break
+                if desc:
+                    desc_lbl = QLabel(desc)
+                    desc_lbl.setWordWrap(True)
+                    desc_lbl.setStyleSheet("color: #555; font-style: italic; margin-bottom: 8px;")
+                    group_layout.addWidget(desc_lbl)
                 visible = False
                 for idx in self.section_map[section]:
                     linetype, data = self.lines[idx]
@@ -351,12 +384,12 @@ class IniEditorDialog(QDialog):
                             # Only show comment if it does not equal the group/section name (case-insensitive, strip # and whitespace)
                             comment_text = data.strip()
                             section_name = section.strip().lower()
-                            # Remove leading '#' and whitespace for comparison
+                            # Remove leading '#' and whitespace for comparison and display
                             if comment_text.startswith('#'):
-                                comment_text = comment_text[1:].strip()
+                                comment_text = comment_text[1:].lstrip()
                             if comment_text.lower() == section_name:
                                 continue  # skip this comment
-                            comment_lbl = QLabel(data)
+                            comment_lbl = QLabel(comment_text)
                             comment_lbl.setStyleSheet("color: gray; font-style: italic;")
                             row.addWidget(comment_lbl)
                             row.addWidget(QLabel(""))
@@ -378,13 +411,20 @@ class IniEditorDialog(QDialog):
             tab_content.setContentsMargins(0, 0, 0, 0)
             scroll.setWidget(tab_content)
             tabs.addTab(scroll, cat)
+        # Add .ini file tab (read-only)
+        ini_tab = QWidget()
+        ini_layout = QVBoxLayout(ini_tab)
+        ini_text = QTextEdit()
+        ini_text.setReadOnly(True)
+        ini_text.setPlainText(self.get_text())
+        ini_layout.addWidget(ini_text)
+        tabs.addTab(ini_tab, ".ini file")
         tabs.setContentsMargins(0, 0, 0, 0)
         tabs.setStyleSheet("QTabWidget::pane { border: 0px; }")
         layout.addWidget(tabs)
         # Add documentation link below the tabbed widget
         doc_link = QLabel('<a href="https://github.com/probonopd/MiniDexed/wiki/Files#minidexedini">minidexed.ini documentation</a>')
         doc_link.setOpenExternalLinks(True)
-
         layout.addWidget(doc_link)
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self.accept)
@@ -395,6 +435,7 @@ class IniEditorDialog(QDialog):
         section = "General"
         self.section_order = [section]
         self.section_map = {section: []}
+        prev_blank = True  # Track if previous line was blank
         for line in ini_text.splitlines():
             orig = line
             line = line.rstrip("\r\n")
@@ -402,10 +443,11 @@ class IniEditorDialog(QDialog):
                 idx = len(self.lines)
                 self.lines.append(('blank', ''))
                 self.section_map[section].append(idx)
+                prev_blank = True
                 continue
-            if line.strip().startswith('#'):
-                # Section header if line is like '# Section'
-                m = re.match(r'#\s*([A-Za-z0-9 /-]+)$', line.strip())
+            if prev_blank and line.strip().startswith('#'):
+                # Section header if line is like '# Section' and previous line was blank
+                m = re.match(r'#\s*([A-Za-z0-9 /\-]+)$', line.strip())
                 if m:
                     section = m.group(1).strip()
                     if section not in self.section_order:
@@ -414,6 +456,7 @@ class IniEditorDialog(QDialog):
                 idx = len(self.lines)
                 self.lines.append(('comment', line))
                 self.section_map[section].append(idx)
+                prev_blank = False
                 continue
             # Setting: key=value (may have inline comment)
             m = re.match(r'([^#=\s][^=]*)=([^#]*)(#.*)?$', line)
@@ -425,11 +468,13 @@ class IniEditorDialog(QDialog):
                 self.lines.append(('setting', (key, value, comment, orig)))
                 self.key_to_lineidx[key] = idx
                 self.section_map[section].append(idx)
+                prev_blank = False
                 continue
             # Fallback: treat as comment
             idx = len(self.lines)
             self.lines.append(('comment', line))
             self.section_map[section].append(idx)
+            prev_blank = False
 
     def _make_widget(self, key, value):
         # Special handling for Action fields
@@ -526,6 +571,21 @@ class IniEditorDialog(QDialog):
             else:
                 out.append(data)
         return '\n'.join(out)
+
+    def show_full_file_dialog(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle('Full minidexed.ini (read-only)')
+        dlg.setMinimumWidth(800)
+        dlg.setMinimumHeight(600)
+        vbox = QVBoxLayout(dlg)
+        text = QTextEdit()
+        text.setReadOnly(True)
+        text.setPlainText(self.get_text())
+        vbox.addWidget(text)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btns.rejected.connect(dlg.reject)
+        vbox.addWidget(btns)
+        dlg.exec()
 
 def download_ini_file(device_ip):
     ftp = ftplib.FTP()
