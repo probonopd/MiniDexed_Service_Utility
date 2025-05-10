@@ -249,7 +249,7 @@ def categorize_section(section, section_keys=None):
 CATEGORY_ORDER = ['Sound', 'MIDI', 'Display', 'Buttons', 'Network', 'Debug', 'Other']
 
 class IniEditorDialog(QDialog):
-    def __init__(self, parent, ini_text):
+    def __init__(self, parent, ini_text, syslog_ip=None):
         super().__init__(parent)
         self.setWindowTitle("Edit minidexed.ini")
         self.setMinimumWidth(700)
@@ -265,7 +265,17 @@ class IniEditorDialog(QDialog):
         self.key_to_lineidx = {}
         self.section_order = []
         self.section_map = {}
+        self.syslog_ip = syslog_ip
         self._parse_ini(ini_text)
+        # Pre-fill NetworkSyslogServerIPAddress if empty and syslog_ip is provided (before widget creation)
+        if self.syslog_ip:
+            idx = self.key_to_lineidx.get('NetworkSyslogServerIPAddress')
+            if idx is not None:
+                linetype, data = self.lines[idx]
+                key, value, comment, orig = data
+                if not value:
+                    self.lines[idx] = ('setting', (key, self.syslog_ip, comment, f'{key}={self.syslog_ip}{" " + comment if comment else ""}'))
+
         layout = QVBoxLayout(self)
         tabs = QTabWidget(self)
         # Group sections by improved category logic
@@ -343,6 +353,11 @@ class IniEditorDialog(QDialog):
         tabs.setContentsMargins(0, 0, 0, 0)
         tabs.setStyleSheet("QTabWidget::pane { border: 0px; }")
         layout.addWidget(tabs)
+        # Add documentation link below the tabbed widget
+        doc_link = QLabel('<a href="https://github.com/probonopd/MiniDexed/wiki/Files#minidexedini">minidexed.ini documentation</a>')
+        doc_link.setOpenExternalLinks(True)
+
+        layout.addWidget(doc_link)
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)

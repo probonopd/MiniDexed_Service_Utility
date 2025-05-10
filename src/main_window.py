@@ -283,7 +283,14 @@ class MainWindow(QMainWindow):
             from dialogs import Dialogs
             Dialogs.show_error(self, "FTP Error", f"Failed to download minidexed.ini: {e}")
             return
-        editor = IniEditorDialog(self, ini_text)
+        # Find syslog server IP if available
+        syslog_ip = None
+        if hasattr(self.ui, 'syslog_label'):
+            import re
+            m = re.search(r'Syslog \(([^:]+):', self.ui.syslog_label.text())
+            if m:
+                syslog_ip = m.group(1)
+        editor = IniEditorDialog(self, ini_text, syslog_ip=syslog_ip)
         if editor.exec():
             new_text = editor.get_text()
             if new_text != ini_text:
@@ -333,7 +340,7 @@ class MainWindow(QMainWindow):
                         from ini_editor import upload_ini_file
                         upload_ini_file(device_ip, new_text)
                         from dialogs import Dialogs
-                        Dialogs.show_message(self, "Success", "minidexed.ini uploaded successfully.")
+                        Dialogs.show_message(self, "Success", "minidexed.ini uploaded successfully.\nThe device will reboot.")
                     except Exception as e:
                         from dialogs import Dialogs
                         Dialogs.show_error(self, "FTP Error", f"Failed to upload minidexed.ini: {e}")
