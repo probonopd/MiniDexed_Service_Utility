@@ -1,6 +1,0 @@
-{
-  "name": "Tune Request",
-  "description": "Send Tune Request message (no parameters).",
-  "status_byte": 246,
-  "parameters": []
-}

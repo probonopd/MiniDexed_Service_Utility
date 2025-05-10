@@ -134,18 +134,21 @@ def setup_menus(main_window):
     midi_commands_menu = menubar.addMenu("MIDI Commands")
     midi_commands_dir = os.path.join(os.path.dirname(__file__), "midi_commands")
 
-    def load_midi_commands():
-        commands = []
-        if os.path.isdir(midi_commands_dir):
-            for fname in sorted(os.listdir(midi_commands_dir)):
-                if fname.endswith(".json"):
-                    with open(os.path.join(midi_commands_dir, fname), "r", encoding="utf-8") as f:
-                        try:
-                            cmd = json.load(f)
-                            commands.append(cmd)
-                        except Exception:
-                            pass
-        return commands
+    def show_patch_browser():
+        if hasattr(main_window, 'voice_browser_dialog') and main_window.voice_browser_dialog is not None:
+            if not main_window.voice_browser_dialog.isVisible():
+                main_window.voice_browser_dialog = None
+            else:
+                main_window.voice_browser_dialog.raise_()
+                main_window.voice_browser_dialog.activateWindow()
+                return
+        from voice_browser import VoiceBrowser
+        dlg = VoiceBrowser(main_window)
+        main_window.voice_browser_dialog = dlg
+        def on_close():
+            main_window.voice_browser_dialog = None
+        dlg.destroyed.connect(on_close)
+        dlg.show()
 
     def show_midi_command_dialog(cmd):
         # If there are no parameters or all parameters are fixed, skip dialog
@@ -266,64 +269,33 @@ def setup_menus(main_window):
             else:
                 main_window.midi_handler.send_custom_midi_command(cmd, values)
 
-    def load_midi_commands_recursive(base_dir):
-        items = []
-        for entry in sorted(os.listdir(base_dir)):
-            full_path = os.path.join(base_dir, entry)
-            if os.path.isdir(full_path):
-                # Subdirectory: submenu
-                items.append({
-                    'type': 'submenu',
-                    'name': entry,
-                    'children': load_midi_commands_recursive(full_path)
-                })
-            elif entry.endswith('.json'):
-                with open(full_path, 'r', encoding='utf-8') as f:
-                    try:
-                        cmd = json.load(f)
-                        items.append({'type': 'command', 'cmd': cmd})
-                    except Exception:
-                        pass
-        return items
+    def load_midi_commands_from_file(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
 
-    def add_midi_command_menu_items(menu, items):
-        for item in items:
-            if item['type'] == 'submenu':
-                submenu = menu.addMenu(item['name'])
-                add_midi_command_menu_items(submenu, item['children'])
-            elif item['type'] == 'command':
-                action = QAction(item['cmd'].get('name', 'Unnamed Command'), main_window)
-                action.triggered.connect(lambda checked, c=item['cmd']: show_midi_command_dialog(c))
-                menu.addAction(action)
-
-    # Track the Voice Browser dialog instance
-    if not hasattr(main_window, 'voice_browser_dialog'):
-        main_window.voice_browser_dialog = None
-    def show_patch_browser():
-        if main_window.voice_browser_dialog is not None:
-            # Check if the dialog was closed but not dereferenced
-            if not main_window.voice_browser_dialog.isVisible():
-                main_window.voice_browser_dialog = None
-            else:
-                main_window.voice_browser_dialog.raise_()
-                main_window.voice_browser_dialog.activateWindow()
-                return
-        from voice_browser import VoiceBrowser
-        dlg = VoiceBrowser(main_window)
-        main_window.voice_browser_dialog = dlg
-        def on_close():
-            main_window.voice_browser_dialog = None
-        dlg.destroyed.connect(on_close)
-        dlg.show()
+    def add_midi_command_menu_items(menu, commands):
+        for cmd in commands:
+            action = QAction(cmd.get("name", "Unnamed Command"), main_window)
+            action.triggered.connect(lambda checked, c=cmd: show_midi_command_dialog(c))
+            menu.addAction(action)
 
     def populate_midi_commands_menu():
         midi_commands_menu.clear()
-        items = load_midi_commands_recursive(midi_commands_dir)
-        add_midi_command_menu_items(midi_commands_menu, items)
+        # Each top-level .json file in midi_commands/ becomes a submenu
+        for entry in sorted(os.listdir(midi_commands_dir)):
+            if entry.lower().endswith('.json'):
+                file_path = os.path.join(midi_commands_dir, entry)
+                commands = load_midi_commands_from_file(file_path)
+                submenu = midi_commands_menu.addMenu(os.path.splitext(entry)[0])
+                add_midi_command_menu_items(submenu, commands)
         midi_commands_menu.addSeparator()
         patch_browser_action = QAction("DX7 Voices...", main_window)
         midi_commands_menu.addAction(patch_browser_action)
         patch_browser_action.triggered.connect(show_patch_browser)
+
     midi_commands_menu.aboutToShow.connect(populate_midi_commands_menu)
 
     # Help Menu (move to last)

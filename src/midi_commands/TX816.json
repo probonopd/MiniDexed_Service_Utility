@@ -1,0 +1,155 @@
+[
+  {
+    "name": "Source Select (MIDI Channel)",
+    "description": "Selects MIDI receive channel 1 to 16 (0 = ch 1, 15 = ch 16).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 01 {channel} F7"
+  },
+  {
+    "name": "Poly/Mono",
+    "description": "Set polyphonic (0) or monophonic (1) mode.",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Mode", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 02 {mode} F7"
+  },
+  {
+    "name": "Pitch Bend Range",
+    "description": "Set pitch bend range (0–12).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Range", "min": 0, "max": 12, "default": 2 }
+    ],
+    "template": "F0 43 1{device} 04 03 {range} F7"
+  },
+  {
+    "name": "Pitch Bend Step",
+    "description": "Set pitch bend step (0–12).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Step", "min": 0, "max": 12, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 04 {step} F7"
+  },
+  {
+    "name": "Portamento Time",
+    "description": "Set portamento time (0–99).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Time", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 05 {time} F7"
+  },
+  {
+    "name": "Portamento/Glissando",
+    "description": "Set portamento (0) or glissando (1) mode.",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Mode", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 06 {mode} F7"
+  },
+  {
+    "name": "Portamento Mode",
+    "description": "Sustain-key pitch: 0=retain, 1=follow.",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Mode", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 07 {mode} F7"
+  },
+  {
+    "name": "Modulation Wheel Sensitivity",
+    "description": "Set modulation wheel sensitivity (0–15).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Sensitivity", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 09 {sensitivity} F7"
+  },
+  {
+    "name": "Modulation Wheel Assign",
+    "description": "Bit 0: Pitch, bit 1: Amplitude, bit 2: EG bias (0–7).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Assign", "min": 0, "max": 7, "default": 1 }
+    ],
+    "template": "F0 43 1{device} 04 0A {assign} F7"
+  },
+  {
+    "name": "Foot Controller Sensitivity",
+    "description": "Set foot controller sensitivity (0–15).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Sensitivity", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 0B {sensitivity} F7"
+  },
+  {
+    "name": "Foot Controller Assign",
+    "description": "Bit 0: Pitch, bit 1: Amplitude, bit 2: EG bias (0–7).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Assign", "min": 0, "max": 7, "default": 2 }
+    ],
+    "template": "F0 43 1{device} 04 0C {assign} F7"
+  },
+  {
+    "name": "After Touch Sensitivity",
+    "description": "Set after touch sensitivity (0–15).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Sensitivity", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 0D {sensitivity} F7"
+  },
+  {
+    "name": "After Touch Assign",
+    "description": "Bit 0: Pitch, bit 1: Amplitude, bit 2: EG bias (0–7).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Assign", "min": 0, "max": 7, "default": 4 }
+    ],
+    "template": "F0 43 1{device} 04 0E {assign} F7"
+  },
+  {
+    "name": "Breath Controller Sensitivity",
+    "description": "Set breath controller sensitivity (0–15).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Sensitivity", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 1{device} 04 0F {sensitivity} F7"
+  },
+  {
+    "name": "Breath Controller Assign",
+    "description": "Bit 0: Pitch, bit 1: Amplitude, bit 2: EG bias (0–7).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Assign", "min": 0, "max": 7, "default": 4 }
+    ],
+    "template": "F0 43 1{device} 04 10 {assign} F7"
+  },
+  {
+    "name": "Audio Output Level Attenuator",
+    "description": "Set audio output level attenuator (0–7).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Attenuator", "min": 0, "max": 7, "default": 7 }
+    ],
+    "template": "F0 43 1{device} 04 1A {attenuator} F7"
+  },
+  {
+    "name": "Master Tuning",
+    "description": "Set master tuning (0–127, concert pitch at 64).",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Tuning", "min": 0, "max": 127, "default": 64 }
+    ],
+    "template": "F0 43 1{device} 04 40 {tuning} F7"
+  }
+]

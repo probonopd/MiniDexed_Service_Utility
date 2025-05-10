@@ -1,6 +1,0 @@
-{
-  "name": "Timing Clock",
-  "description": "Send Timing Clock real-time message (no parameters).",
-  "status_byte": 248,
-  "parameters": []
-}

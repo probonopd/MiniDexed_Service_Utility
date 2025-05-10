@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Bulk Dump Request (32 Voices)",
+    "description": "Request a bulk dump of 32 voices from the DX7.",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 2{device} 09 F7"
+  },
+  {
+    "name": "Bulk Dump Request (Single Voice)",
+    "description": "Request a bulk dump of a single voice from the DX7.",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 }
+    ],
+    "template": "F0 43 2{device} 00 F7"
+  },
+  {
+    "name": "Function Parameter Change",
+    "description": "Change a function parameter on the DX7.",
+    "parameters": [
+      { "name": "Device", "min": 0, "max": 15, "default": 0 },
+      { "name": "Function", "min": 0, "max": 31, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 43 2{device} 03 {function} {value} F7"
+  }
+]

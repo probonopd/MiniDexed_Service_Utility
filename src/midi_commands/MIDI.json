@@ -1,0 +1,211 @@
+[
+  {
+    "name": "Active Sensing",
+    "description": "MIDI Active Sensing message.",
+    "status_byte": 254,
+    "parameters": []
+  },
+  {
+    "name": "All Notes Off",
+    "description": "Turns off all notes that are currently on.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "data": [123, 0]
+  },
+  {
+    "name": "All Sound Off",
+    "description": "Silences all sound immediately.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "data": [120, 0]
+  },
+  {
+    "name": "Channel Aftertouch",
+    "description": "Channel pressure (aftertouch) message.",
+    "status_byte": 208,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Pressure", "min": 0, "max": 127, "default": 0 }
+    ]
+  },
+  {
+    "name": "Continue",
+    "description": "Continue song (MIDI Clock).",
+    "status_byte": 251,
+    "parameters": []
+  },
+  {
+    "name": "Control Change",
+    "description": "Change a controller value.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Controller", "min": 0, "max": 127, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ]
+  },
+  {
+    "name": "Local Control",
+    "description": "Enable or disable local control.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "OnOff", "min": 0, "max": 127, "default": 127 }
+    ],
+    "data": [122]
+  },
+  {
+    "name": "MIDI Time Code Quarter Frame",
+    "description": "MIDI Time Code Quarter Frame message.",
+    "status_byte": 241,
+    "parameters": [
+      { "name": "MessageType", "min": 0, "max": 7, "default": 0 },
+      { "name": "Values", "min": 0, "max": 15, "default": 0 }
+    ]
+  },
+  {
+    "name": "Mono Mode On",
+    "description": "Mono mode on (Poly Off).",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "NumberOfChannels", "min": 1, "max": 16, "default": 1 }
+    ],
+    "data": [126]
+  },
+  {
+    "name": "Note Off",
+    "description": "Note Off message.",
+    "status_byte": 128,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Note", "min": 0, "max": 127, "default": 60 },
+      { "name": "Velocity", "min": 0, "max": 127, "default": 64 }
+    ]
+  },
+  {
+    "name": "Note On",
+    "description": "Note On message.",
+    "status_byte": 144,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Note", "min": 0, "max": 127, "default": 60 },
+      { "name": "Velocity", "min": 0, "max": 127, "default": 100 }
+    ]
+  },
+  {
+    "name": "Omni Mode Off",
+    "description": "Omni mode off.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "data": [124, 0]
+  },
+  {
+    "name": "Omni Mode On",
+    "description": "Omni mode on.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "data": [125, 0]
+  },
+  {
+    "name": "Pitch Bend",
+    "description": "Pitch bend message.",
+    "status_byte": 224,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Value", "min": 0, "max": 16383, "default": 8192 }
+    ]
+  },
+  {
+    "name": "Poly Aftertouch",
+    "description": "Polyphonic key pressure (aftertouch) message.",
+    "status_byte": 160,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Note", "min": 0, "max": 127, "default": 60 },
+      { "name": "Pressure", "min": 0, "max": 127, "default": 0 }
+    ]
+  },
+  {
+    "name": "Poly Mode On",
+    "description": "Poly mode on (Mono Off).",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "data": [127, 0]
+  },
+  {
+    "name": "Program Change",
+    "description": "Change program (patch).",
+    "status_byte": 192,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 },
+      { "name": "Program", "min": 0, "max": 127, "default": 0 }
+    ]
+  },
+  {
+    "name": "Reset All Controllers",
+    "description": "Reset all controllers to their default values.",
+    "status_byte": 176,
+    "parameters": [
+      { "name": "Channel", "min": 0, "max": 15, "default": 0 }
+    ],
+    "data": [121, 0]
+  },
+  {
+    "name": "Song Position Pointer",
+    "description": "Send Song Position Pointer message.",
+    "status_byte": 242,
+    "parameters": [
+      {"name": "LSB", "min": 0, "max": 127, "default": 0},
+      {"name": "MSB", "min": 0, "max": 127, "default": 0}
+    ]
+  },
+  {
+    "name": "Song Select",
+    "description": "Song select message.",
+    "status_byte": 243,
+    "parameters": [
+      { "name": "Song", "min": 0, "max": 127, "default": 0 }
+    ]
+  },
+  {
+    "name": "Start",
+    "description": "Start song (MIDI Clock).",
+    "status_byte": 250,
+    "parameters": []
+  },
+  {
+    "name": "Stop",
+    "description": "Stop song (MIDI Clock).",
+    "status_byte": 252,
+    "parameters": []
+  },
+  {
+    "name": "System Reset",
+    "description": "System reset message.",
+    "status_byte": 255,
+    "parameters": []
+  },
+  {
+    "name": "Timing Clock",
+    "description": "Timing clock message.",
+    "status_byte": 248,
+    "parameters": []
+  },
+  {
+    "name": "Tune Request",
+    "description": "Tune request message.",
+    "status_byte": 246,
+    "parameters": []
+  }
+]

@@ -1,8 +1,0 @@
-{
-  "name": "System Exclusive (SysEx)",
-  "description": "Send a System Exclusive message. Enter data bytes (comma-separated, not including F0/F7).",
-  "status_byte": 240,
-  "parameters": [
-    {"name": "Data Bytes (comma-separated)", "min": 0, "max": 127, "default": 0}
-  ]
-}

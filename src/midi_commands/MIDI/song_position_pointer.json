@@ -1,9 +1,0 @@
-{
-  "name": "Song Position Pointer",
-  "description": "Send Song Position Pointer message.",
-  "status_byte": 242,
-  "parameters": [
-    {"name": "LSB", "min": 0, "max": 127, "default": 0},
-    {"name": "MSB", "min": 0, "max": 127, "default": 0}
-  ]
-}

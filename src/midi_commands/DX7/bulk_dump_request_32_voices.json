@@ -1,9 +1,0 @@
-{
-  "name": "DX7 Bulk Dump Request (32 Voices)",
-  "description": "Request a bulk dump of all 32 voices from a Yamaha DX7.",
-  "status_byte": 240,
-  "parameters": [
-    {"name": "Device Number", "min": 0, "max": 15, "default": 0}
-  ],
-  "template": "F0 43 2{device_number} 09 F7"
-}
