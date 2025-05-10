@@ -325,12 +325,12 @@ class DeviceDiscoveryWorker(QThread):
 
     def run(self):
         from zeroconf import Zeroconf, ServiceBrowser, ServiceListener
-        self.log.emit("[DNS-SD] Starting device discovery using mDNS/zeroconf...")
+        self.log.emit("Starting device discovery using mDNS/zeroconf...")
         self.zeroconf = Zeroconf()
         self_outer = self
         class MyListener(ServiceListener):
             def add_service(self, zc, type_, name):
-                self_outer.log.emit(f"[DNS-SD] Service found: {name}")
+                self_outer.log.emit(f"Service found: {name}")
                 info = zc.get_service_info(type_, name)
                 if info and info.addresses:
                     txt_records = info.properties
@@ -347,7 +347,7 @@ class DeviceDiscoveryWorker(QThread):
                         if ip not in self_outer.ip_list:
                             self_outer.ip_list.add(ip)
                             self_outer.name_list.add(name_str)
-                            self_outer.log.emit(f"[DNS-SD] Found MiniDexed device: {name_str} ({ip})")
+                            self_outer.log.emit(f"Found MiniDexed device: {name_str} ({ip})")
                             self_outer.device_found.emit(name_str, ip)
             def remove_service(self, zc, type_, name):
                 info = zc.get_service_info(type_, name)
@@ -357,14 +357,14 @@ class DeviceDiscoveryWorker(QThread):
                     if ip in self_outer.ip_list:
                         self_outer.ip_list.remove(ip)
                         self_outer.name_list.remove(name_str)
-                        self_outer.log.emit(f"[DNS-SD] Device removed: {name_str} ({ip})")
+                        self_outer.log.emit(f"Device removed: {name_str} ({ip})")
                         self_outer.device_removed.emit(name_str, ip)
             def update_service(self, zc, type_, name):
                 info = zc.get_service_info(type_, name)
                 if info and info.addresses:
                     ip = socket.inet_ntoa(info.addresses[0])
                     name_str = info.server.rstrip('.')
-                    self_outer.log.emit(f"[DNS-SD] Device updated: {name_str} ({ip})")
+                    self_outer.log.emit(f"Device updated: {name_str} ({ip})")
                     self_outer.device_updated.emit(name_str, ip)
         listener = MyListener()
         self.browser = ServiceBrowser(self.zeroconf, self.service, listener)
