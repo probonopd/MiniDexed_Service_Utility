@@ -16,7 +16,7 @@ from updater_worker import UpdaterWorker, DeviceDiscoveryWorker
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("MiniDexed Service Tool")
+        self.setWindowTitle("MiniDexed Service Utility")
         self.resize(800, 500)
         self.settings = QSettings("MIDISend", "MIDISendApp")
         self.midi_handler = MIDIHandler()
