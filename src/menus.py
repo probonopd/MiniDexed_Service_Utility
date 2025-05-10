@@ -319,6 +319,14 @@ def setup_menus(main_window):
     main_window.edit_ini_action = edit_ini_action
     edit_ini_action.setEnabled(bool(main_window.device_list))
     edit_ini_action.triggered.connect(main_window.show_ini_editor_dialog)
+    # Add Performance Editor menu entry
+    performance_editor_action = QAction("Performance Editor...", main_window)
+    file_menu.addAction(performance_editor_action)
+    def show_performance_editor():
+        from performance_editor import PerformanceEditor
+        dlg = PerformanceEditor(main_window)
+        dlg.exec()
+    performance_editor_action.triggered.connect(show_performance_editor)
     file_menu.addAction(update_action)
     file_menu.addSeparator()
     file_menu.addAction(exit_action)

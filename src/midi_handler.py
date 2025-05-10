@@ -24,6 +24,12 @@ class MIDIHandler:
 
     def send_sysex(self, data):
         if self.outport:
+            print(f"[MIDI LOG] Sending SysEx: {' '.join(f'{b:02X}' for b in data)}")
+            # Remove 0xF0 and 0xF7 if present
+            if data and data[0] == 0xF0:
+                data = data[1:]
+            if data and data[-1] == 0xF7:
+                data = data[:-1]
             msg = Message('sysex', data=data)
             self.outport.send(msg)
 
@@ -181,3 +187,10 @@ class MIDIHandler:
                 status = (status & 0xF0) | ((channel - 1) & 0x0F)
             data = [status] + params
             return ' '.join(f'{b:02X}' for b in data)
+
+    def send_cc(self, channel, control, value):
+        if self.outport:
+            print(f"[MIDI LOG] Sending CC: channel={channel+1} control={control} value={value}")
+            import mido
+            msg = mido.Message('control_change', channel=channel, control=control, value=value)
+            self.outport.send(msg)
