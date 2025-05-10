@@ -286,8 +286,15 @@ class IniEditorDialog(QDialog):
             tab_content = QWidget()
             tab_layout = QVBoxLayout(tab_content)
             for section in category_sections[cat]:
+                # Check if section has at least one setting (not just comments/blanks)
+                has_setting = any(
+                    self.lines[idx][0] == 'setting' for idx in self.section_map[section]
+                )
+                if not has_setting:
+                    continue  # skip sections with only comments/blanks
                 group = QGroupBox(section)
                 group_layout = QVBoxLayout(group)
+                visible = False
                 for idx in self.section_map[section]:
                     linetype, data = self.lines[idx]
                     row = QHBoxLayout()
@@ -299,19 +306,31 @@ class IniEditorDialog(QDialog):
                         self.widgets[key] = widget
                         row.addWidget(label)
                         row.addWidget(widget)
+                        group_layout.addLayout(row)
+                        visible = True
                     else:
-                        # For comments and blanks, always use 2 columns for consistency
                         if linetype == 'comment':
+                            # Only show comment if it does not equal the group/section name (case-insensitive, strip # and whitespace)
+                            comment_text = data.strip()
+                            section_name = section.strip().lower()
+                            # Remove leading '#' and whitespace for comparison
+                            if comment_text.startswith('#'):
+                                comment_text = comment_text[1:].strip()
+                            if comment_text.lower() == section_name:
+                                continue  # skip this comment
                             comment_lbl = QLabel(data)
                             comment_lbl.setStyleSheet("color: gray; font-style: italic;")
                             row.addWidget(comment_lbl)
                             row.addWidget(QLabel(""))
+                            group_layout.addLayout(row)
+                            visible = True
                         elif linetype == 'blank':
                             row.addWidget(QLabel(""))
                             row.addWidget(QLabel(""))
-                    group_layout.addLayout(row)
+                            group_layout.addLayout(row)
                 group_layout.addStretch(1)
-                tab_layout.addWidget(group)
+                if visible:
+                    tab_layout.addWidget(group)
             tab_layout.addStretch(1)
             # Make only the tab content scrollable (default appearance)
             scroll = QScrollArea(self)
