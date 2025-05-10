@@ -117,13 +117,13 @@ class MainWindow(QMainWindow):
         # Remove any existing device with this IP
         self.device_list = [(n, i) for n, i in self.device_list if i != ip]
         self.device_list.append((name, ip))
-        self.show_status(f"[DNS-SD] Device discovered: {name} ({ip})")
+        self.show_status(f"Device discovered: {name} ({ip})")
         self.update_device_actions()
         self.update_device_dialogs()
 
     def remove_discovered_device(self, name, ip):
         self.device_list = [(n, i) for n, i in self.device_list if i != ip]
-        self.show_status(f"[DNS-SD] Device removed: {name} ({ip})")
+        self.show_status(f"Device removed: {name} ({ip})")
         self.update_device_actions()
         self.update_device_dialogs()
 
@@ -140,7 +140,7 @@ class MainWindow(QMainWindow):
         if not updated:
             new_list.append((name, ip))
         self.device_list = new_list
-        self.show_status(f"[DNS-SD] Device updated: {name} ({ip})")
+        self.show_status(f"Device updated: {name} ({ip})")
         self.update_device_actions()
         self.update_device_dialogs()
 
