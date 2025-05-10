@@ -78,3 +78,24 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self.buttons)
     def get_github_token(self):
         return self.token_edit.text()
+
+class DeviceSelectDialog(QDialog):
+    def __init__(self, parent=None, device_list=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Device")
+        self.setMinimumWidth(400)
+        layout = QVBoxLayout(self)
+        label = QLabel("Select a device to edit minidexed.ini:")
+        layout.addWidget(label)
+        from PyQt6.QtWidgets import QComboBox
+        self.device_combo = QComboBox(self)
+        if device_list:
+            for name, ip in device_list:
+                self.device_combo.addItem(f"{name} ({ip})", ip)
+        layout.addWidget(self.device_combo)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+    def get_selected_ip(self):
+        return self.device_combo.currentData() or self.device_combo.currentText()

@@ -159,3 +159,57 @@ class MainWindow(QMainWindow):
             progress_dlg.cancel_btn.clicked.connect(cancel_update)
             worker.start()
             progress_dlg.exec()
+
+    def show_ini_editor_dialog(self):
+        from dialogs import DeviceSelectDialog
+        from ini_editor import IniEditorDialog
+        import difflib
+        from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
+        dlg = DeviceSelectDialog(self, device_list=self.device_list)
+        if dlg.exec():
+            device_ip = dlg.get_selected_ip()
+            try:
+                from ini_editor import download_ini_file
+                ini_text = download_ini_file(device_ip)
+            except Exception as e:
+                from dialogs import Dialogs
+                Dialogs.show_error(self, "FTP Error", f"Failed to download minidexed.ini: {e}")
+                return
+            editor = IniEditorDialog(self, ini_text)
+            if editor.exec():
+                new_text = editor.get_text()
+                if new_text != ini_text:
+                    # Show diff and ask for confirmation
+                    diff = list(difflib.unified_diff(
+                        ini_text.splitlines(),
+                        new_text.splitlines(),
+                        fromfile='minidexed.ini (old)',
+                        tofile='minidexed.ini (new)',
+                        lineterm=''
+                    ))
+                    diff_str = '\n'.join(diff)
+                    class DiffDialog(QDialog):
+                        def __init__(self, parent, diff_str):
+                            super().__init__(parent)
+                            self.setWindowTitle("Confirm Upload: minidexed.ini Diff")
+                            self.setMinimumWidth(800)
+                            layout = QVBoxLayout(self)
+                            layout.addWidget(QLabel("Review the changes below. Proceed with upload?"))
+                            text = QTextEdit()
+                            text.setReadOnly(True)
+                            text.setPlainText(diff_str)
+                            layout.addWidget(text)
+                            self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+                            self.buttons.accepted.connect(self.accept)
+                            self.buttons.rejected.connect(self.reject)
+                            layout.addWidget(self.buttons)
+                    diff_dlg = DiffDialog(self, diff_str)
+                    if diff_dlg.exec():
+                        try:
+                            from ini_editor import upload_ini_file
+                            upload_ini_file(device_ip, new_text)
+                            from dialogs import Dialogs
+                            Dialogs.show_message(self, "Success", "minidexed.ini uploaded successfully.")
+                        except Exception as e:
+                            from dialogs import Dialogs
+                            Dialogs.show_error(self, "FTP Error", f"Failed to upload minidexed.ini: {e}")
