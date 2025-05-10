@@ -291,8 +291,8 @@ def setup_menus(main_window):
         patch_browser_action = QAction("DX7 Voice Browser...", main_window)
         midi_commands_menu.addAction(patch_browser_action)
         def show_patch_browser():
-            from patch_browser import PatchBrowser
-            dlg = PatchBrowser(main_window)
+            from voice_browser import VoiceBrowser
+            dlg = VoiceBrowser(main_window)
             dlg.show()
         patch_browser_action.triggered.connect(show_patch_browser)
     midi_commands_menu.aboutToShow.connect(populate_midi_commands_menu)
