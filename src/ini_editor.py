@@ -115,127 +115,127 @@ FIELD_HINTS = {
 
 FIELD_TOOLTIPS = {
     # System Options
-    'ToneGenerators': "Number of Tone Generators. On a Raspberry Pi 4 or above, can be 8 or 16 (default 8). On Pi V1/Zero, fixed at 1. Pi V2, V3, Zero 2: fixed at 8.",
-    'Polyphony': "Polyphony per Tone Generator. Default and max depend on Pi version. Pi V1: default/max 8. Pi V2/V3/Zero 2: default/max 16. Pi V4: default 24, max 32. Pi V5: default/max 32. Higher values may cause glitches.",
+    'ToneGenerators': "Number of Tone Generators. On a Raspberry Pi 4 or above, can be 8 or 16 (default 8). On Pi V1/Zero, fixed at 1. Pi V2, V3, Zero 2: fixed at 8",
+    'Polyphony': "Polyphony per Tone Generator. Default and max depend on Pi version. Pi V1: default/max 8. Pi V2/V3/Zero 2: default/max 16. Pi V4: default 24, max 32. Pi V5: default/max 32. Higher values may cause glitches",
     # Sound device
-    'SoundDevice': "Sound device: pwm (headphone jack, default, worst quality), hdmi (HDMI output, better), i2s (i2s DAC, best). Choose to match your hardware.",
-    'SampleRate': "Sample rate for audio output. Best left at default.",
-    'ChunkSize': "Audio chunk size. Best left at default.",
-    'DACI2CAddress': "I2C address of your i2s DAC. 0 for autodetect. Can be decimal or hex (0x...).",
-    'ChannelsSwapped': "Set to 1 if left/right stereo channels are swapped due to hardware.",
-    'EngineType': "Synth engine: 1=Modern (24-bit, default), 2=Mark I (DX7), 3=OPL Series.",
-    'QuadDAC8Chan': "Advanced (Pi 5 only): Use four I2S DACs for 8 mono outputs (one per TG). No effects/pan. See documentation for details.",
-    'MasterVolume': "Overall synth volume (0=muted, 128=loudest, default 64).",
+    'SoundDevice': "Sound device: pwm (headphone jack, default, worst quality), hdmi (HDMI output, better), i2s (i2s DAC, best). Choose to match your hardware",
+    'SampleRate': "Sample rate for audio output. Best left at default",
+    'ChunkSize': "Audio chunk size. Best left at default",
+    'DACI2CAddress': "I2C address of your i2s DAC. 0 for autodetect. Can be decimal or hex (0x...)",
+    'ChannelsSwapped': "Swap left/right stereo channels (due to hardware)",
+    'EngineType': "Synth engine: 1=Modern (24-bit, default), 2=Mark I (DX7), 3=OPL Series",
+    'QuadDAC8Chan': "Advanced (Pi 5 only): Use four I2S DACs for 8 mono outputs (one per TG). No effects/pan. See documentation for details",
+    'MasterVolume': "Overall synth volume (0=muted, 128=loudest, default 64)",
     # MIDI
-    'MIDIBaudRate': "MIDI bus speed. Normally 31250.",
-    'MIDIThru': "Forward MIDI messages to another device. See documentation for details.",
-    'MIDIRXProgramChange': "1: Receive MIDI Program Change messages. 0: Ignore them.",
-    'IgnoreAllNotesOff': "1: Ignore All Notes Off messages. 0: Respond to them.",
-    'MIDIAutoVoiceDumpOnPC': "1: Send MIDI sysex dumps on program change (for Dexed etc). 0: Do not send.",
-    'HeaderlessSysExVoices': "1: Accept headerless SysEx voice bank files (4096 bytes). 0: Only accept headered (4104 bytes).",
-    'ExpandPCAcrossBanks': "1: Accept Program Change 0..127, map to 4 banks. 0: Only 0..31 (original DX7).",
-    'PerformanceSelectChannel': "0: PC/Bank select voices per TG. 1-16: PC/Bank on this channel select performances. >16: Any channel selects performances.",
-    'MIDISystemCCVol': "Enable separate MIDI CC control of TG volume. 0=not used. 1-7: see documentation for CC maps.",
-    'MIDISystemCCPan': "Enable separate MIDI CC control of TG pan. 0=not used. 1-7: see documentation for CC maps.",
-    'MIDISystemCCDetune': "Enable separate MIDI CC control of TG detune. 0=not used. 1-7: see documentation for CC maps.",
-    'MIDIGlobalExpression': "If nonzero, respond to MIDI CC 11 (Expression) on this channel as global. 0: per-channel only.",
-    'USBGadget': "1: Enable USB Gadget (device) mode. 0: USB Host mode. See documentation for power/compatibility notes.",
-    'USBGadgetPin': "When USBGadget=1, this pin LOW enables gadget mode, HIGH enables host mode.",
+    'MIDIBaudRate': "MIDI bus speed. Normally 31250",
+    'MIDIThru': "Forward MIDI messages to another device. See documentation for details",
+    'MIDIRXProgramChange': "Enable receiving MIDI Program Change messages",
+    'IgnoreAllNotesOff': "Ignore All Notes Off messages",
+    'MIDIAutoVoiceDumpOnPC': "Send MIDI sysex dumps on program change",
+    'HeaderlessSysExVoices': "Accept headerless SysEx voice bank files",
+    'ExpandPCAcrossBanks': "Map Program Change 0..127 to 4 banks",
+    'PerformanceSelectChannel': "0: PC/Bank select voices per TG. 1-16: PC/Bank on this channel select performances. >16: Any channel selects performances",
+    'MIDISystemCCVol': "Enable separate MIDI CC control of TG volume. 0=not used. 1-7: see documentation for CC maps",
+    'MIDISystemCCPan': "Enable separate MIDI CC control of TG pan. 0=not used. 1-7: see documentation for CC maps",
+    'MIDISystemCCDetune': "Enable separate MIDI CC control of TG detune. 0=not used. 1-7: see documentation for CC maps",
+    'MIDIGlobalExpression': "If nonzero, respond to MIDI CC 11 (Expression) on this channel as global. 0: per-channel only",
+    'USBGadget': "1: Enable USB Gadget (device) mode. See documentation!",
+    'USBGadgetPin': "When USBGadget=1, this pin LOW enables gadget mode, HIGH enables host mode",
     # LCD
-    'LCDEnabled': "1: Enable HD44780 or SSD1306 display. 0: No LCD attached.",
+    'LCDEnabled': "Enable HD44780 or SSD1306 display",
     # HD44780 LCD
-    'LCDPinEnable': "GPIO pin for HD44780 Enable.",
-    'LCDPinRegisterSelect': "GPIO pin for HD44780 Register Select.",
-    'LCDPinReadWrite': "GPIO pin for HD44780 Read/Write.",
-    'LCDPinData4': "GPIO pin for HD44780 Data4.",
-    'LCDPinData5': "GPIO pin for HD44780 Data5.",
-    'LCDPinData6': "GPIO pin for HD44780 Data6.",
-    'LCDPinData7': "GPIO pin for HD44780 Data7.",
-    'LCDI2CAddress': "I2C address for HD44780. 0x00 for direct GPIO, 0x27 for i2c backpack.",
+    'LCDPinEnable': "GPIO pin for HD44780 Enable",
+    'LCDPinRegisterSelect': "GPIO pin for HD44780 Register Select",
+    'LCDPinReadWrite': "GPIO pin for HD44780 Read/Write",
+    'LCDPinData4': "GPIO pin for HD44780 Data4",
+    'LCDPinData5': "GPIO pin for HD44780 Data5",
+    'LCDPinData6': "GPIO pin for HD44780 Data6",
+    'LCDPinData7': "GPIO pin for HD44780 Data7",
+    'LCDI2CAddress': "I2C address for HD44780. 0x00 for direct GPIO, 0x27 for i2c backpack",
     # SSD1306 OLED
-    'SSD1306LCDI2CAddress': "I2C address for SSD1306 OLED (usually 0x3c).",
-    'SSD1306LCDWidth': "Width of SSD1306 OLED (usually 128).",
-    'SSD1306LCDHeight': "Height of SSD1306 OLED (32 or 64).",
-    'SSD1306LCDRotate': "1: Rotate display 180°. 0: Normal.",
-    'SSD1306LCDMirror': "1: Mirror display. 0: Normal.",
-    'LCDColumns': "Number of columns for LCD (e.g. 16, 20).",
-    'LCDRows': "Number of rows for LCD (e.g. 2, 4).",
+    'SSD1306LCDI2CAddress': "I2C address for SSD1306 OLED (usually 0x3c)",
+    'SSD1306LCDWidth': "Width of SSD1306 OLED (usually 128)",
+    'SSD1306LCDHeight': "Height of SSD1306 OLED (32 or 64)",
+    'SSD1306LCDRotate': "Rotate SSD1306 display 180°",
+    'SSD1306LCDMirror': "Mirror SSD1306 display",
+    'LCDColumns': "Number of columns for LCD (e.g. 16, 20)",
+    'LCDRows': "Number of rows for LCD (e.g. 2, 4)",
     # ST7789 SPI
-    'SPIBus': "SPI bus number (0 for default). Leave blank if not used.",
-    'ST7789Enabled': "1: Enable ST7789 display. 0: Disable.",
-    'ST7789Data': "GPIO pin for ST7789 Data.",
-    'ST7789Select': "GPIO pin for ST7789 Select (CE0/CE1).",
-    'ST7789Reset': "GPIO pin for ST7789 Reset.",
-    'ST7789Backlight': "GPIO pin for ST7789 Backlight.",
-    'ST7789Width': "Width of ST7789 display (e.g. 240).",
-    'ST7789Height': "Height of ST7789 display (e.g. 240).",
-    'ST7789Rotation': "Display rotation: 0, 90, 180, 270.",
-    'ST7789SmallFont': "1: Use small font. 0: Normal font.",
+    'SPIBus': "SPI bus number (0 for default). Leave blank if not used",
+    'ST7789Enabled': "Enable ST7789 display",
+    'ST7789Data': "GPIO pin for ST7789 Data",
+    'ST7789Select': "GPIO pin for ST7789 Select (CE0/CE1)",
+    'ST7789Reset': "GPIO pin for ST7789 Reset",
+    'ST7789Backlight': "GPIO pin for ST7789 Backlight",
+    'ST7789Width': "Width of ST7789 display (e.g. 240)",
+    'ST7789Height': "Height of ST7789 display (e.g. 240)",
+    'ST7789Rotation': "Display rotation: 0, 90, 180, 270",
+    'ST7789SmallFont': "Use small font on ST7789 display",
     # Buttons
-    'ButtonPinPrev': "GPIO pin for Previous button (0 to disable).",
-    'ButtonActionPrev': "Action for Previous button (click, doubleclick, longpress).",
-    'ButtonPinNext': "GPIO pin for Next button (0 to disable).",
-    'ButtonActionNext': "Action for Next button.",
-    'ButtonPinBack': "GPIO pin for Back button.",
-    'ButtonActionBack': "Action for Back button.",
-    'ButtonPinSelect': "GPIO pin for Select button.",
-    'ButtonActionSelect': "Action for Select button.",
-    'ButtonPinHome': "GPIO pin for Home button.",
-    'ButtonActionHome': "Action for Home button.",
-    'ButtonPinShortcut': "GPIO pin for Shortcut button.",
+    'ButtonPinPrev': "GPIO pin for Previous button (0 to disable)",
+    'ButtonActionPrev': "Action for Previous button (click, doubleclick, longpress)",
+    'ButtonPinNext': "GPIO pin for Next button (0 to disable)",
+    'ButtonActionNext': "Action for Next button",
+    'ButtonPinBack': "GPIO pin for Back button",
+    'ButtonActionBack': "Action for Back button",
+    'ButtonPinSelect': "GPIO pin for Select button",
+    'ButtonActionSelect': "Action for Select button",
+    'ButtonPinHome': "GPIO pin for Home button",
+    'ButtonActionHome': "Action for Home button",
+    'ButtonPinShortcut': "GPIO pin for Shortcut button",
     # Program/Bank/TG selection
-    'ButtonPinPgmUp': "GPIO pin for Program Up button.",
-    'ButtonActionPgmUp': "Action for Program Up button.",
-    'ButtonPinPgmDown': "GPIO pin for Program Down button.",
-    'ButtonActionPgmDown': "Action for Program Down button.",
-    'ButtonPinBankUp': "GPIO pin for Bank Up button.",
-    'ButtonActionBankUp': "Action for Bank Up button.",
-    'ButtonPinBankDown': "GPIO pin for Bank Down button.",
-    'ButtonActionBankDown': "Action for Bank Down button.",
-    'ButtonPinTGUp': "GPIO pin for TG Up button.",
-    'ButtonActionTGUp': "Action for TG Up button.",
-    'ButtonPinTGDown': "GPIO pin for TG Down button.",
-    'ButtonActionTGDown': "Action for TG Down button.",
+    'ButtonPinPgmUp': "GPIO pin for Program Up button",
+    'ButtonActionPgmUp': "Action for Program Up button",
+    'ButtonPinPgmDown': "GPIO pin for Program Down button",
+    'ButtonActionPgmDown': "Action for Program Down button",
+    'ButtonPinBankUp': "GPIO pin for Bank Up button",
+    'ButtonActionBankUp': "Action for Bank Up button",
+    'ButtonPinBankDown': "GPIO pin for Bank Down button",
+    'ButtonActionBankDown': "Action for Bank Down button",
+    'ButtonPinTGUp': "GPIO pin for TG Up button",
+    'ButtonActionTGUp': "Action for TG Up button",
+    'ButtonPinTGDown': "GPIO pin for TG Down button",
+    'ButtonActionTGDown': "Action for TG Down button",
     # Timeouts
-    'DoubleClickTimeout': "Timeout for double click (ms).",
-    'LongPressTimeout': "Timeout for long press (ms). Must be >= DoubleClickTimeout.",
+    'DoubleClickTimeout': "Timeout for double click (ms)",
+    'LongPressTimeout': "Timeout for long press (ms). Must be >= DoubleClickTimeout",
     # MIDI Button Navigation
-    'MIDIButtonCh': "MIDI channel for button navigation. 0=OFF, 1-16=Ch, >16=Omni.",
-    'MIDIButtonNotes': "1: Use NoteOn/NoteOff as MIDI buttons. 0: Use CC.",
-    'MIDIButtonPrev': "MIDI CC/Note for Previous button.",
-    'MIDIButtonNext': "MIDI CC/Note for Next button.",
-    'MIDIButtonBack': "MIDI CC/Note for Back button.",
-    'MIDIButtonSelect': "MIDI CC/Note for Select button.",
-    'MIDIButtonHome': "MIDI CC/Note for Home button.",
-    'MIDIButtonPgmUp': "MIDI CC/Note for Program Up button.",
-    'MIDIButtonPgmDown': "MIDI CC/Note for Program Down button.",
-    'MIDIButtonBankUp': "MIDI CC/Note for Bank Up button.",
-    'MIDIButtonBankDown': "MIDI CC/Note for Bank Down button.",
-    'MIDIButtonTGUp': "MIDI CC/Note for TG Up button.",
-    'MIDIButtonTGDown': "MIDI CC/Note for TG Down button.",
+    'MIDIButtonCh': "MIDI channel for button navigation. 0=OFF, 1-16=Ch, >16=Omni",
+    'MIDIButtonNotes': "Use MIDI NoteOn/NoteOff as navigation buttons",
+    'MIDIButtonPrev': "MIDI CC/Note for Previous button",
+    'MIDIButtonNext': "MIDI CC/Note for Next button",
+    'MIDIButtonBack': "MIDI CC/Note for Back button",
+    'MIDIButtonSelect': "MIDI CC/Note for Select button",
+    'MIDIButtonHome': "MIDI CC/Note for Home button",
+    'MIDIButtonPgmUp': "MIDI CC/Note for Program Up button",
+    'MIDIButtonPgmDown': "MIDI CC/Note for Program Down button",
+    'MIDIButtonBankUp': "MIDI CC/Note for Bank Up button",
+    'MIDIButtonBankDown': "MIDI CC/Note for Bank Down button",
+    'MIDIButtonTGUp': "MIDI CC/Note for TG Up button",
+    'MIDIButtonTGDown': "MIDI CC/Note for TG Down button",
     # Rotary Encoder
-    'EncoderEnabled': "1: Enable rotary encoder. 0: Disable.",
-    'EncoderPinClock': "GPIO pin for rotary encoder clock.",
-    'EncoderPinData': "GPIO pin for rotary encoder data.",
+    'EncoderEnabled': "Enable rotary encoder",
+    'EncoderPinClock': "GPIO pin for rotary encoder clock",
+    'EncoderPinData': "GPIO pin for rotary encoder data",
     # Debug
-    'MIDIDumpEnabled': "1: Print incoming MIDI to HDMI display.",
-    'ProfileEnabled': "1: Print CPU usage to HDMI display.",
+    'MIDIDumpEnabled': "Show incoming MIDI on HDMI display",
+    'ProfileEnabled': "Show CPU usage on HDMI display",
     # Network
-    'NetworkEnabled': "1: Enable network. 0: Disable.",
-    'NetworkDHCP': "1: Use DHCP. 0: Static IP.",
-    'NetworkType': "wlan: WiFi, ethernet: Wired.",
-    'NetworkHostname': "Network hostname.",
-    'NetworkIPAddress': "Static IP address.",
-    'NetworkSubnetMask': "Static subnet mask.",
-    'NetworkDefaultGateway': "Static default gateway.",
-    'NetworkDNSServer': "Static DNS server.",
-    'NetworkFTPEnabled': "1: Enable FTP server. 0: Disable.",
-    'NetworkSyslogEnabled': "1: Enable syslog server. 0: Disable.",
-    'NetworkSyslogServerIPAddress': "Syslog server IP address.",
+    'NetworkEnabled': "Enable network connectivity",
+    'NetworkDHCP': "Use DHCP for network configuration",
+    'NetworkType': "wlan: WiFi, ethernet: Wired",
+    'NetworkHostname': "Network hostname",
+    'NetworkIPAddress': "Static IP address",
+    'NetworkSubnetMask': "Static subnet mask",
+    'NetworkDefaultGateway': "Static default gateway",
+    'NetworkDNSServer': "Static DNS server",
+    'NetworkFTPEnabled': "Enable FTP server",
+    'NetworkSyslogEnabled': "Enable syslog server",
+    'NetworkSyslogServerIPAddress': "Syslog server IP address",
     # Performance
-    'PerformanceSelectToLoad': "Performance to load at startup.",
+    'PerformanceSelectToLoad': "Performance to load at startup",
     # Arturia
-    'DAWControllerEnabled': "1: Enable Arturia DAW controller mode.",
+    'DAWControllerEnabled': "Enable Arturia DAW controller mode",
 }
 
 def categorize_section(section, section_keys=None):
@@ -326,24 +326,37 @@ class IniEditorDialog(QDialog):
                     row.setAlignment(Qt.AlignmentFlag.AlignTop)
                     if linetype == 'setting':
                         key, value, comment, orig = data
-                        label = QLabel(key)
+                        hints = FIELD_HINTS.get(key)
+                        is_checkbox = hints and hints.get('type') == 'bool'
                         desc = FIELD_TOOLTIPS.get(key, comment)
-                        desc_lbl = QLabel(desc)
-                        desc_lbl.setWordWrap(True)
-                        desc_lbl.setStyleSheet("color: #888; font-size: 8pt;")
-                        widget = self._make_widget(key, value)
-                        self.widgets[key] = widget
+                        label = QLabel(key)
                         label.setFixedWidth(180)
-                        widget.setFixedWidth(200)
-                        # Only two columns: label and widget (with description below widget)
-                        col_layout = QVBoxLayout()
-                        col_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-                        col_layout.addWidget(widget)
-                        col_layout.addWidget(desc_lbl)
-                        row.addWidget(label, alignment=Qt.AlignmentFlag.AlignTop)
-                        row.addLayout(col_layout)
-                        group_layout.addLayout(row)
-                        visible = True
+                        if is_checkbox:
+                            # Use description as checkbox text, styled as normal, but only prepend 'Enable' if not already a verb
+                            cb_text = desc.rstrip('.') if desc else 'Enable option'
+                            widget = self._make_widget(key, value)
+                            widget.setText(cb_text)
+                            self.widgets[key] = widget
+                            # Remove setFixedWidth for widget, let it expand
+                            row.addWidget(label, alignment=Qt.AlignmentFlag.AlignTop)
+                            row.addWidget(widget, alignment=Qt.AlignmentFlag.AlignTop)
+                            group_layout.addLayout(row)
+                            visible = True
+                        else:
+                            desc_lbl = QLabel(desc)
+                            desc_lbl.setWordWrap(True)
+                            desc_lbl.setStyleSheet("color: #888; font-size: 8pt;")
+                            widget = self._make_widget(key, value)
+                            self.widgets[key] = widget
+                            widget.setFixedWidth(200)
+                            col_layout = QVBoxLayout()
+                            col_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+                            col_layout.addWidget(widget)
+                            col_layout.addWidget(desc_lbl)
+                            row.addWidget(label, alignment=Qt.AlignmentFlag.AlignTop)
+                            row.addLayout(col_layout)
+                            group_layout.addLayout(row)
+                            visible = True
                     else:
                         if linetype == 'comment':
                             # Only show comment if it does not equal the group/section name (case-insensitive, strip # and whitespace)
