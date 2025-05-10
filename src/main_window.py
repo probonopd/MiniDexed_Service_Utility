@@ -23,16 +23,21 @@ class MainWindow(QMainWindow):
         self.ui = UiMainWindow(self)
         self.file_ops = FileOps(self)
         self.midi_ops = MidiOps(self)
+        self.device_list = []  # List of (name, ip) -- moved up before setup_menus
         setup_menus(self)
+        self.update_device_actions()  # Ensure menu items are enabled if devices already found
         self.init_workers()
         self.restore_last_ports()
         self.statusBar()  # Ensure status bar is created
-        self.device_list = []  # List of (name, ip)
         self.update_action = None  # Will be set in menus.py
+        self.edit_ini_action = None  # Will be set in menus.py
         self.device_discovery_worker = DeviceDiscoveryWorker()
         self.device_discovery_worker.device_found.connect(self.add_discovered_device)
-        self.device_discovery_worker.finished.connect(self.device_discovery_finished)
+        self.device_discovery_worker.device_removed.connect(self.remove_discovered_device)
+        self.device_discovery_worker.device_updated.connect(self.update_discovered_device)
+        self.device_discovery_worker.log.connect(self.show_status)
         self.device_discovery_worker.start()
+        self.device_dialogs = []  # Track open device selection dialogs
 
     def init_workers(self):
         self.receive_worker = None
@@ -109,17 +114,109 @@ class MainWindow(QMainWindow):
                     self.ui.update_syslog_label(ip, port)
 
     def add_discovered_device(self, name, ip):
+        # Remove any existing device with this IP
+        self.device_list = [(n, i) for n, i in self.device_list if i != ip]
         self.device_list.append((name, ip))
-        if self.update_action:
-            self.update_action.setEnabled(True)
+        self.show_status(f"[DNS-SD] Device discovered: {name} ({ip})")
+        self.update_device_actions()
+        self.update_device_dialogs()
 
-    def device_discovery_finished(self):
-        if not self.device_list and self.update_action:
-            self.update_action.setEnabled(False)
+    def remove_discovered_device(self, name, ip):
+        self.device_list = [(n, i) for n, i in self.device_list if i != ip]
+        self.show_status(f"[DNS-SD] Device removed: {name} ({ip})")
+        self.update_device_actions()
+        self.update_device_dialogs()
+
+    def update_discovered_device(self, name, ip):
+        # Just update the name for the IP if present
+        updated = False
+        new_list = []
+        for n, i in self.device_list:
+            if i == ip:
+                new_list.append((name, ip))
+                updated = True
+            else:
+                new_list.append((n, i))
+        if not updated:
+            new_list.append((name, ip))
+        self.device_list = new_list
+        self.show_status(f"[DNS-SD] Device updated: {name} ({ip})")
+        self.update_device_actions()
+        self.update_device_dialogs()
+
+    def update_device_actions(self):
+        # Enable/disable update and upload actions based on device_list
+        has_device = bool(self.device_list)
+        if self.update_action:
+            self.update_action.setEnabled(has_device)
+        if self.edit_ini_action:
+            self.edit_ini_action.setEnabled(has_device)
+
+    def update_device_dialogs(self):
+        # Update all open device selection dialogs with the latest device list
+        for dlg in self.device_dialogs:
+            if hasattr(dlg, 'device_combo'):
+                dlg.device_combo.clear()
+                for name, ip in self.device_list:
+                    dlg.device_combo.addItem(f"{name} ({ip})", ip)
 
     def show_updater_dialog(self):
+        # Skip dialog if only one device
+        if len(self.device_list) == 1:
+            device_ip = self.device_list[0][1]
+            dlg = UpdaterDialog(self, device_list=self.device_list)
+            dlg.device_combo.setCurrentIndex(0)
+            dlg.device_combo.setEnabled(False)
+            if dlg.exec():
+                update_performances = dlg.update_perf_checkbox.isChecked()
+                release_type = dlg.release_combo.currentIndex()
+                pr_number = dlg.pr_input.toPlainText().strip()
+                device_ip = dlg.device_combo.currentData() or dlg.device_combo.currentText()
+                src_path = None
+                if release_type == 2:  # Local build
+                    from PyQt6.QtWidgets import QFileDialog
+                    src_path = QFileDialog.getExistingDirectory(self, "Select your src/ folder")
+                    if not src_path:
+                        return  # User cancelled
+                if release_type == 3:  # PR build
+                    github_token = self.settings.value("github_token", "")
+                    if not github_token:
+                        Dialogs.show_error(self, "GitHub Token Required", "A GitHub Personal Access Token is required to download PR build artifacts. Please set it in Preferences.")
+                        return
+                github_token = self.settings.value("github_token", "")
+                progress_dlg = UpdaterProgressDialog(self)
+                worker = UpdaterWorker(release_type, pr_number, device_ip, update_performances, github_token=github_token, src_path=src_path)
+                worker.status.connect(progress_dlg.set_status)
+                worker.progress.connect(progress_dlg.set_progress)
+                def on_finished(success, msg):
+                    progress_dlg.set_status(msg)
+                    if success:
+                        progress_dlg.progress.setValue(100)
+                        progress_dlg.cancel_btn.setText("Close")
+                        progress_dlg.cancel_btn.clicked.disconnect()
+                        progress_dlg.cancel_btn.clicked.connect(progress_dlg.accept)
+                    else:
+                        progress_dlg.reject()
+                        Dialogs.show_error(self, "Update Error", msg)
+                worker.finished.connect(on_finished)
+                worker.finished.connect(worker.deleteLater)
+                def cancel_update():
+                    if worker.isRunning():
+                        worker.terminate()
+                    progress_dlg.reject()
+                progress_dlg.cancel_btn.clicked.connect(cancel_update)
+                worker.start()
+                progress_dlg.exec()
+            return
+
         dlg = UpdaterDialog(self, device_list=self.device_list)
-        if dlg.exec():
+        self.device_dialogs.append(dlg)
+        dlg.device_combo.clear()
+        for name, ip in self.device_list:
+            dlg.device_combo.addItem(f"{name} ({ip})", ip)
+        result = dlg.exec()
+        self.device_dialogs.remove(dlg)
+        if result:
             update_performances = dlg.update_perf_checkbox.isChecked()
             release_type = dlg.release_combo.currentIndex()
             pr_number = dlg.pr_input.toPlainText().strip()
@@ -165,51 +262,76 @@ class MainWindow(QMainWindow):
         from ini_editor import IniEditorDialog
         import difflib
         from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
-        dlg = DeviceSelectDialog(self, device_list=self.device_list)
-        if dlg.exec():
-            device_ip = dlg.get_selected_ip()
-            try:
-                from ini_editor import download_ini_file
-                ini_text = download_ini_file(device_ip)
-            except Exception as e:
-                from dialogs import Dialogs
-                Dialogs.show_error(self, "FTP Error", f"Failed to download minidexed.ini: {e}")
+        # Skip dialog if only one device
+        if len(self.device_list) == 1:
+            device_ip = self.device_list[0][1]
+        else:
+            dlg = DeviceSelectDialog(self, device_list=self.device_list)
+            self.device_dialogs.append(dlg)
+            dlg.device_combo.clear()
+            for name, ip in self.device_list:
+                dlg.device_combo.addItem(f"{name} ({ip})", ip)
+            if not dlg.exec():
+                self.device_dialogs.remove(dlg)
                 return
-            editor = IniEditorDialog(self, ini_text)
-            if editor.exec():
-                new_text = editor.get_text()
-                if new_text != ini_text:
-                    # Show diff and ask for confirmation
-                    diff = list(difflib.unified_diff(
-                        ini_text.splitlines(),
-                        new_text.splitlines(),
-                        fromfile='minidexed.ini (old)',
-                        tofile='minidexed.ini (new)',
-                        lineterm=''
-                    ))
-                    diff_str = '\n'.join(diff)
-                    class DiffDialog(QDialog):
-                        def __init__(self, parent, diff_str):
-                            super().__init__(parent)
-                            self.setWindowTitle("Confirm Upload: minidexed.ini Diff")
-                            self.setMinimumWidth(800)
-                            layout = QVBoxLayout(self)
-                            layout.addWidget(QLabel("Review the changes below. Proceed with upload?"))
-                            text = QTextEdit()
-                            text.setReadOnly(True)
-                            text.setPlainText(diff_str)
-                            layout.addWidget(text)
-                            self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-                            self.buttons.accepted.connect(self.accept)
-                            self.buttons.rejected.connect(self.reject)
-                            layout.addWidget(self.buttons)
-                    diff_dlg = DiffDialog(self, diff_str)
-                    if diff_dlg.exec():
-                        try:
-                            from ini_editor import upload_ini_file
-                            upload_ini_file(device_ip, new_text)
-                            from dialogs import Dialogs
-                            Dialogs.show_message(self, "Success", "minidexed.ini uploaded successfully.")
-                        except Exception as e:
-                            from dialogs import Dialogs
-                            Dialogs.show_error(self, "FTP Error", f"Failed to upload minidexed.ini: {e}")
+            device_ip = dlg.get_selected_ip()
+            self.device_dialogs.remove(dlg)
+        try:
+            from ini_editor import download_ini_file
+            ini_text = download_ini_file(device_ip)
+        except Exception as e:
+            from dialogs import Dialogs
+            Dialogs.show_error(self, "FTP Error", f"Failed to download minidexed.ini: {e}")
+            return
+        editor = IniEditorDialog(self, ini_text)
+        if editor.exec():
+            new_text = editor.get_text()
+            if new_text != ini_text:
+                # Show diff and ask for confirmation, with color
+                diff = list(difflib.unified_diff(
+                    ini_text.splitlines(),
+                    new_text.splitlines(),
+                    fromfile='minidexed.ini (old)',
+                    tofile='minidexed.ini (new)',
+                    lineterm=''
+                ))
+                def colorize_diff(diff_lines):
+                    html = []
+                    for line in diff_lines:
+                        if line.startswith('+') and not line.startswith('+++'):
+                            html.append('<span style="color: #228B22;">{}</span>'.format(line.replace('<','&lt;').replace('>','&gt;')))
+                        elif line.startswith('-') and not line.startswith('---'):
+                            html.append('<span style="color: #B22222;">{}</span>'.format(line.replace('<','&lt;').replace('>','&gt;')))
+                        elif line.startswith('@@'):
+                            html.append('<span style="color: #888888;">{}</span>'.format(line.replace('<','&lt;').replace('>','&gt;')))
+                        elif line.startswith('+++') or line.startswith('---'):
+                            html.append('<span style="color: #888888; font-weight: bold;">{}</span>'.format(line.replace('<','&lt;').replace('>','&gt;')))
+                        else:
+                            html.append('<span style="color: #888888;">{}</span>'.format(line.replace('<','&lt;').replace('>','&gt;')))
+                    return '<br>'.join(html)
+                diff_html = colorize_diff(diff)
+                class DiffDialog(QDialog):
+                    def __init__(self, parent, diff_html):
+                        super().__init__(parent)
+                        self.setWindowTitle("Confirm Upload: minidexed.ini Diff")
+                        self.setMinimumWidth(800)
+                        layout = QVBoxLayout(self)
+                        layout.addWidget(QLabel("Review the changes below. Proceed with upload?"))
+                        text = QTextEdit()
+                        text.setReadOnly(True)
+                        text.setHtml(diff_html)
+                        layout.addWidget(text)
+                        self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+                        self.buttons.accepted.connect(self.accept)
+                        self.buttons.rejected.connect(self.reject)
+                        layout.addWidget(self.buttons)
+                diff_dlg = DiffDialog(self, diff_html)
+                if diff_dlg.exec():
+                    try:
+                        from ini_editor import upload_ini_file
+                        upload_ini_file(device_ip, new_text)
+                        from dialogs import Dialogs
+                        Dialogs.show_message(self, "Success", "minidexed.ini uploaded successfully.")
+                    except Exception as e:
+                        from dialogs import Dialogs
+                        Dialogs.show_error(self, "FTP Error", f"Failed to upload minidexed.ini: {e}")

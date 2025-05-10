@@ -24,6 +24,8 @@ def setup_menus(main_window):
     file_menu.addSeparator()
     update_action = QAction("Update MiniDexed...", main_window)
     file_menu.addAction(update_action)
+    main_window.update_action = update_action
+    update_action.setEnabled(bool(main_window.device_list))
     exit_action = QAction("Exit", main_window)
     file_menu.addAction(exit_action)
     open_action.triggered.connect(main_window.file_ops.menu_open_syx)
@@ -341,7 +343,15 @@ def setup_menus(main_window):
     file_menu.addSeparator()
     edit_ini_action = QAction("Edit minidexed.ini...", main_window)
     file_menu.addAction(edit_ini_action)
+    main_window.edit_ini_action = edit_ini_action
+    edit_ini_action.setEnabled(bool(main_window.device_list))
     edit_ini_action.triggered.connect(main_window.show_ini_editor_dialog)
     file_menu.addAction(update_action)
     file_menu.addSeparator()
     file_menu.addAction(exit_action)
+
+    def update_file_menu_actions():
+        has_device = bool(main_window.device_list)
+        update_action.setEnabled(has_device)
+        edit_ini_action.setEnabled(has_device)
+    file_menu.aboutToShow.connect(update_file_menu_actions)
