@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication, QTextEdit
 from PyQt6.QtCore import Qt
 from PyQt6 import QtGui, QtCore
 import ftplib
@@ -376,6 +376,15 @@ class IniEditorDialog(QDialog):
             tab_content.setContentsMargins(0, 0, 0, 0)
             scroll.setWidget(tab_content)
             tabs.addTab(scroll, cat)
+        # Add .ini file tab (read-only)
+        ini_tab = QWidget()
+        ini_layout = QVBoxLayout(ini_tab)
+        ini_text = QTextEdit()
+        ini_text.setReadOnly(True)
+        ini_text.setPlainText(self.get_text())
+        ini_layout.addWidget(ini_text)
+        tabs.addTab(ini_tab, ".ini file")
+
         tabs.setContentsMargins(0, 0, 0, 0)
         tabs.setStyleSheet("QTabWidget::pane { border: 0px; }")
         layout.addWidget(tabs)
