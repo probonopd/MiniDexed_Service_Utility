@@ -5,6 +5,10 @@ import ftplib
 import io
 import re
 
+# Define global GPIO pin range for all *Pin fields
+pin_range_from = 0
+pin_range_to = 27
+
 # Field type and options hints derived from minidexed.ini documentation
 FIELD_HINTS = {
     # Sound device
@@ -25,13 +29,13 @@ FIELD_HINTS = {
     'PerformanceSelectChannel': {'type': 'int', 'min': 0, 'max': 32},
     # HD44780 LCD
     'LCDEnabled': {'type': 'bool'},
-    'LCDPinEnable': {'type': 'int', 'min': 0, 'max': 40},
-    'LCDPinRegisterSelect': {'type': 'int', 'min': 0, 'max': 40},
-    'LCDPinReadWrite': {'type': 'int', 'min': 0, 'max': 40},
-    'LCDPinData4': {'type': 'int', 'min': 0, 'max': 40},
-    'LCDPinData5': {'type': 'int', 'min': 0, 'max': 40},
-    'LCDPinData6': {'type': 'int', 'min': 0, 'max': 40},
-    'LCDPinData7': {'type': 'int', 'min': 0, 'max': 40},
+    'LCDPinEnable': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'LCDPinRegisterSelect': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'LCDPinReadWrite': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'LCDPinData4': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'LCDPinData5': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'LCDPinData6': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'LCDPinData7': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
     'LCDI2CAddress': {'type': 'hex'},
     # SSD1306 LCD
     'SSD1306LCDI2CAddress': {'type': 'hex'},
@@ -42,18 +46,42 @@ FIELD_HINTS = {
     # ST7789 LCD
     'SPIBus': {'type': 'int', 'min': 0, 'max': 1, 'allow_empty': True},
     'ST7789Enabled': {'type': 'bool'},
-    'ST7789Data': {'type': 'int', 'allow_empty': True},
-    'ST7789Select': {'type': 'int', 'allow_empty': True},
-    'ST7789Reset': {'type': 'int', 'allow_empty': True},
-    'ST7789Backlight': {'type': 'int', 'allow_empty': True},
+    'ST7789Data': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to, 'allow_empty': True},
+    'ST7789Select': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to, 'allow_empty': True},
+    'ST7789Reset': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to, 'allow_empty': True},
+    'ST7789Backlight': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to, 'allow_empty': True},
     'ST7789Width': {'type': 'int', 'min': 0, 'max': 480},
     'ST7789Height': {'type': 'int', 'min': 0, 'max': 480},
     'ST7789Rotation': {'type': 'enum', 'options': ['0', '90', '180', '270']},
     'ST7789SmallFont': {'type': 'bool'},
-    'LCDColumns': {'type': 'int', 'min': 1, 'max': 40},
+    'LCDColumns': {'type': 'int', 'min': 1, 'max': 28},
     'LCDRows': {'type': 'int', 'min': 1, 'max': 8},
     # GPIO Button Navigation
-    # ... (add more as needed, e.g. ButtonPin*, ButtonAction*) ...
+    # Button pin and action fields for GPIO navigation
+    'ButtonPinPrev': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinNext': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinBack': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinSelect': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinHome': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinShortcut': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinPgmUp': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinPgmDown': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinBankUp': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinBankDown': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinTGUp': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonPinTGDown': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'ButtonActionPrev': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionNext': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionBack': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionSelect': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionHome': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionShortcut': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionPgmUp': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionPgmDown': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionBankUp': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionBankDown': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionTGUp': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
+    'ButtonActionTGDown': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
     # Timeouts
     'DoubleClickTimeout': {'type': 'int', 'min': 0, 'max': 5000},
     'LongPressTimeout': {'type': 'int', 'min': 0, 'max': 5000},
@@ -73,8 +101,8 @@ FIELD_HINTS = {
     'MIDIButtonTGDown': {'type': 'int', 'min': 0, 'max': 127},
     # Rotary Encoder
     'EncoderEnabled': {'type': 'bool'},
-    'EncoderPinClock': {'type': 'int', 'min': 0, 'max': 40},
-    'EncoderPinData': {'type': 'int', 'min': 0, 'max': 40},
+    'EncoderPinClock': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
+    'EncoderPinData': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
     # Debug
     'MIDIDumpEnabled': {'type': 'bool'},
     'ProfileEnabled': {'type': 'bool'},
@@ -91,7 +119,7 @@ FIELD_HINTS = {
     'NetworkSyslogEnabled': {'type': 'bool'},
     'NetworkSyslogServerIPAddress': {'type': 'str'},
     # Performance
-    'PerformanceSelectToLoad': {'type': 'int', 'min': 0, 'max': 127},
+    'PerformanceSelectToLoad': {'type': 'bool'},
     # Arturia
     'DAWControllerEnabled': {'type': 'bool'},
     # USB
