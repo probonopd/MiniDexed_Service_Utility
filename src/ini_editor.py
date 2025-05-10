@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication, QPushButton, QTextEdit
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication
 from PyQt6.QtCore import Qt
 from PyQt6 import QtGui, QtCore
 import ftplib
@@ -57,7 +57,6 @@ FIELD_HINTS = {
     'LCDColumns': {'type': 'int', 'min': 1, 'max': 28},
     'LCDRows': {'type': 'int', 'min': 1, 'max': 8},
     # GPIO Button Navigation
-    # Button pin and action fields for GPIO navigation
     'ButtonPinPrev': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
     'ButtonPinNext': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
     'ButtonPinBack': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
@@ -70,18 +69,6 @@ FIELD_HINTS = {
     'ButtonPinBankDown': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
     'ButtonPinTGUp': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
     'ButtonPinTGDown': {'type': 'int', 'min': pin_range_from, 'max': pin_range_to},
-    'ButtonActionPrev': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionNext': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionBack': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionSelect': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionHome': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionShortcut': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionPgmUp': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionPgmDown': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionBankUp': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionBankDown': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionTGUp': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
-    'ButtonActionTGDown': {'type': 'enum', 'options': ['click', 'doubleclick', 'longpress']},
     # Timeouts
     'DoubleClickTimeout': {'type': 'int', 'min': 0, 'max': 5000},
     'LongPressTimeout': {'type': 'int', 'min': 0, 'max': 5000},
@@ -251,25 +238,6 @@ FIELD_TOOLTIPS = {
     'DAWControllerEnabled': "1: Enable Arturia DAW controller mode.",
 }
 
-# Subsection descriptions for GUI display, derived from the MiniDexed wiki
-SUBSECTION_DESCRIPTIONS = {
-    'Sound device': "Configure the audio output hardware, including device type (PWM, HDMI, I2S), sample rate, and master volume. These settings determine how MiniDexed produces sound and which audio interface is used.",
-    'MIDI': "Set up MIDI communication parameters such as baud rate, MIDI Thru, and how MiniDexed responds to program changes and system exclusive messages. This section controls how the device interacts with other MIDI equipment.",
-    'HD44780 LCD': "Configure an HD44780-compatible character LCD, including GPIO pin assignments and I2C address. This section is for users with classic character LCD modules.",
-    'SSD1306 LCD': "Configure an SSD1306-based OLED display, including I2C address, width, height, and display orientation. Useful for compact graphical displays.",
-    'ST7789 LCD': "Set up SPI-connected ST7789 color displays, including pin assignments, resolution, and rotation. This section is for users with color TFT displays.",
-    'GPIO Button Navigation': "Assign GPIO pins to navigation buttons and define their actions (click, double-click, long-press). Unused pins should be set to 0 (disabled).",
-    'GPIO Program/Bank/TG Selection': "Assign GPIO pins to program, bank, and tone generator selection buttons. Unused pins should be set to 0 (disabled).",
-    'Timeouts': "Adjust timing for button double-click and long-press detection. These settings affect how quickly button presses are recognized as special actions.",
-    'MIDI Button Navigation': "Configure which MIDI messages control navigation buttons, allowing remote control of MiniDexed via MIDI.",
-    'KY-040 Rotary Encoder': "Enable and configure a KY-040 rotary encoder for menu navigation, including pin assignments and activation.",
-    'Debug': "Enable debug output to the display and periodic CPU usage reporting. Useful for troubleshooting and performance monitoring.",
-    'Network': "Configure network connectivity, including enabling/disabling networking, DHCP, hostname, and syslog server settings.",
-    'Performance': "Set up which performance (preset) to load at startup and related options for automatic configuration.",
-    'Arturia': "Enable or disable compatibility with Arturia DAW controller mode for integration with Arturia hardware/software.",
-    'USB Connectivity': "Configure USB gadget mode, allowing MiniDexed to act as a USB device. Warning: Do not use PWR when this is enabled!",
-}
-
 def categorize_section(section, section_keys=None):
     # If any key in the section contains 'Button', assign to Buttons
     if section_keys and any('button' in k.lower() for k in section_keys):
@@ -351,32 +319,29 @@ class IniEditorDialog(QDialog):
                     continue  # skip sections with only comments/blanks
                 group = QGroupBox(section)
                 group_layout = QVBoxLayout(group)
-                # Add subsection description inside the group/box
-                desc = SUBSECTION_DESCRIPTIONS.get(section)
-                if not desc:
-                    # Try case-insensitive and whitespace-insensitive match
-                    section_norm = section.strip().lower().replace(' ', '')
-                    for k, v in SUBSECTION_DESCRIPTIONS.items():
-                        if section_norm == k.strip().lower().replace(' ', ''):
-                            desc = v
-                            break
-                if desc:
-                    desc_lbl = QLabel(desc)
-                    desc_lbl.setWordWrap(True)
-                    desc_lbl.setStyleSheet("color: #555; font-style: italic; margin-bottom: 8px;")
-                    group_layout.addWidget(desc_lbl)
                 visible = False
                 for idx in self.section_map[section]:
                     linetype, data = self.lines[idx]
                     row = QHBoxLayout()
+                    row.setAlignment(Qt.AlignmentFlag.AlignTop)
                     if linetype == 'setting':
                         key, value, comment, orig = data
                         label = QLabel(key)
-                        label.setToolTip(FIELD_TOOLTIPS.get(key, comment))
+                        desc = FIELD_TOOLTIPS.get(key, comment)
+                        desc_lbl = QLabel(desc)
+                        desc_lbl.setWordWrap(True)
+                        desc_lbl.setStyleSheet("color: #888; font-size: 8pt;")
                         widget = self._make_widget(key, value)
                         self.widgets[key] = widget
-                        row.addWidget(label)
-                        row.addWidget(widget)
+                        label.setFixedWidth(180)
+                        widget.setFixedWidth(200)
+                        # Only two columns: label and widget (with description below widget)
+                        col_layout = QVBoxLayout()
+                        col_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+                        col_layout.addWidget(widget)
+                        col_layout.addWidget(desc_lbl)
+                        row.addWidget(label, alignment=Qt.AlignmentFlag.AlignTop)
+                        row.addLayout(col_layout)
                         group_layout.addLayout(row)
                         visible = True
                     else:
@@ -411,20 +376,13 @@ class IniEditorDialog(QDialog):
             tab_content.setContentsMargins(0, 0, 0, 0)
             scroll.setWidget(tab_content)
             tabs.addTab(scroll, cat)
-        # Add .ini file tab (read-only)
-        ini_tab = QWidget()
-        ini_layout = QVBoxLayout(ini_tab)
-        ini_text = QTextEdit()
-        ini_text.setReadOnly(True)
-        ini_text.setPlainText(self.get_text())
-        ini_layout.addWidget(ini_text)
-        tabs.addTab(ini_tab, ".ini file")
         tabs.setContentsMargins(0, 0, 0, 0)
         tabs.setStyleSheet("QTabWidget::pane { border: 0px; }")
         layout.addWidget(tabs)
         # Add documentation link below the tabbed widget
         doc_link = QLabel('<a href="https://github.com/probonopd/MiniDexed/wiki/Files#minidexedini">minidexed.ini documentation</a>')
         doc_link.setOpenExternalLinks(True)
+
         layout.addWidget(doc_link)
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self.accept)
@@ -571,21 +529,6 @@ class IniEditorDialog(QDialog):
             else:
                 out.append(data)
         return '\n'.join(out)
-
-    def show_full_file_dialog(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle('Full minidexed.ini (read-only)')
-        dlg.setMinimumWidth(800)
-        dlg.setMinimumHeight(600)
-        vbox = QVBoxLayout(dlg)
-        text = QTextEdit()
-        text.setReadOnly(True)
-        text.setPlainText(self.get_text())
-        vbox.addWidget(text)
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        btns.rejected.connect(dlg.reject)
-        vbox.addWidget(btns)
-        dlg.exec()
 
 def download_ini_file(device_ip):
     ftp = ftplib.FTP()
