@@ -63,11 +63,11 @@ class PerformanceEditor(QDialog):
         row_height = 32
         header_height = 40
         total_height = header_height + row_height * len(PERFORMANCE_FIELDS)
-        self.setMinimumHeight(total_height)
-        self.resize(800, total_height)
+        self.setMinimumHeight(min(total_height, 600))
+        self.resize(800, min(total_height, 600))
         layout = QVBoxLayout(self)
         # Add red warning label above the table
-        warning = QLabel("<span style='color: red;'>Work in progress, not all fields can be read/written via SysEx yet</span>")
+        warning = QLabel("<span style='color: red;'>Work in progress, only works with firmware from  https://github.com/probonopd/MiniDexed/tree/md-perf</span>")
         layout.addWidget(warning)
         self.table = QTableWidget(len(PERFORMANCE_FIELDS), 8, self)
         self.table.setHorizontalHeaderLabels(TG_LABELS)
@@ -466,6 +466,7 @@ class PerformanceEditor(QDialog):
             (0x00, 0x19): "AftertouchTarget"
         }
         signed_fields = {"Detune", "NoteShift"}
+        # When programmatically setting values, block signals only for the change, not for the whole loop
         for tg in range(8):
             tg_data = self._sysex_data_buffer.get(tg)
             if tg_data and len(tg_data) > 4 and tg_data[1] == 0x21:
@@ -482,6 +483,7 @@ class PerformanceEditor(QDialog):
                         else:
                             val = (vv1 << 8) | vv2
                         widget = self.table.cellWidget(row, tg)
+                        # Only block signals for the duration of setValue/setChecked
                         if isinstance(widget, QSpinBox):
                             self._block_signal = True
                             try:
@@ -500,6 +502,8 @@ class PerformanceEditor(QDialog):
                             if item:
                                 item.setText(str(val))
                     i += 4
+        # After all programmatic changes, ensure _block_signal is False
+        self._block_signal = False
 
     @staticmethod
     def open_when_ready(main_window):
