@@ -89,9 +89,7 @@ class PerformanceEditor(QDialog):
                         from PyQt6.QtWidgets import QCheckBox
                         cb = QCheckBox()
                         cb.setChecked(str(value) == "1")
-                        # Use a lambda that captures row/col as default arguments to avoid late binding
                         cb.stateChanged.connect(lambda state, r=row, c=col: self.on_spin_changed(r, c, int(state == 2)))
-                        # Also connect toggled for immediate feedback
                         cb.toggled.connect(lambda checked, r=row, c=col: self.on_spin_changed(r, c, int(checked)))
                         self.table.setCellWidget(row, col, cb)
                     else:
@@ -100,7 +98,7 @@ class PerformanceEditor(QDialog):
                         spin.setMaximum(max_val)
                         if value != "":
                             spin.setValue(int(value))
-                        # Use a lambda that captures row/col as default arguments to avoid late binding
+                        # Fix late binding by using default arguments
                         spin.valueChanged.connect(lambda val, r=row, c=col: self.on_spin_changed(r, c, val))
                         self.table.setCellWidget(row, col, spin)
                 else:
@@ -147,6 +145,9 @@ class PerformanceEditor(QDialog):
                     pass
                 self.main_window.receive_worker.sysex_received.connect(self._on_performance_sysex)
         self._send_next_sysex_request()
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        self._debug = True
 
     def select_voice_dialog(self, row, col):
         from voice_browser import VoiceBrowser
@@ -174,26 +175,30 @@ class PerformanceEditor(QDialog):
             on_voice_selected()
 
     def on_spin_changed(self, row, col, value):
-        self._block_signal = True
+        import logging
+        if self._block_signal:
+            logging.debug(f"[on_spin_changed] Blocked: row={row}, col={col}, value={value}")
+            return
+        logging.debug(f"[on_spin_changed] row={row}, col={col}, value={value}, field={PERFORMANCE_FIELDS[row]}")
         # Update the QTableWidgetItem if present (for consistency)
         if self.table.item(row, col):
             self.table.item(row, col).setText(str(value))
-        self._block_signal = False
         field = PERFORMANCE_FIELDS[row]
         self.send_midi_for_field(field, col, value)
 
     def on_cell_changed(self, row, col):
+        import logging
         if self._block_signal:
+            logging.debug(f"[on_cell_changed] Blocked: row={row}, col={col}")
             return
         field = PERFORMANCE_FIELDS[row]
         value = self.table.item(row, col).text()
-        if field in PERFORMANCE_FIELD_RANGES:
-            # If a spinbox exists, ignore cell edit (spinbox handles it)
-            return
-        if self.main_window and hasattr(self.main_window, "midi_handler"):
-            self.send_midi_for_field(field, col, value)
+        logging.debug(f"[on_cell_changed] row={row}, col={col}, value={value}, field={field}")
+        self.send_midi_for_field(field, col, value)
 
     def send_midi_for_field(self, field, tg_index, value):
+        import logging
+        logging.debug(f"[send_midi_for_field] field={field}, tg_index={tg_index}, value={value}")
         try:
             # MiniDexed SysEx mapping for all fields in PERFORMANCE_FIELDS
             field_to_param = {
@@ -210,14 +215,46 @@ class PerformanceEditor(QDialog):
                 "MIDIChannel": (0x00, 0x02),
                 "Volume": (0x00, 0x03),
                 "Pan": (0x00, 0x04),
+                "Detune": (0x00, 0x05),
+                "Cutoff": (0x00, 0x06),
+                "Resonance": (0x00, 0x07),
+                "NoteLimitLow": (0x00, 0x08),
+                "NoteLimitHigh": (0x00, 0x09),
+                "NoteShift": (0x00, 0x0A),
+                "ReverbSend": (0x00, 0x0B),
+                "PitchBendRange": (0x00, 0x0C),
+                "PitchBendStep": (0x00, 0x0D),
+                "PortamentoMode": (0x00, 0x0E),
+                "PortamentoGlissando": (0x00, 0x0F),
+                "PortamentoTime": (0x00, 0x10),
+                "MonoMode": (0x00, 0x11),
+                "ModulationWheelRange": (0x00, 0x12),
+                "ModulationWheelTarget": (0x00, 0x13),
+                "FootControlRange": (0x00, 0x14),
+                "FootControlTarget": (0x00, 0x15),
+                "BreathControlRange": (0x00, 0x16),
+                "BreathControlTarget": (0x00, 0x17),
+                "AftertouchRange": (0x00, 0x18),
+                "AftertouchTarget": (0x00, 0x19),
             }
             if field in field_to_param:
                 pp1, pp2 = field_to_param[field]
                 min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (0, 127))
                 v = int(value)
                 v = max(min_val, min(max_val, v))
-                vv1 = (v >> 8) & 0x7F
-                vv2 = v & 0x7F
+                # For signed fields, use 2's complement split into two 7-bit bytes
+                if field in ["Detune", "NoteShift"]:
+                    v = int(value)
+                    # Clamp to allowed range
+                    min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (-99, 99) if field == "Detune" else (-24, 24))
+                    v = max(min_val, min(max_val, v))
+                    if v < 0:
+                        v = (1 << 14) + v  # 2's complement for 14 bits
+                    vv1 = (v >> 7) & 0x7F
+                    vv2 = v & 0x7F
+                else:
+                    vv1 = (v >> 8) & 0x7F
+                    vv2 = v & 0x7F
                 if field in ["CompressorEnable", "ReverbEnable", "ReverbSize", "ReverbHighDamp", "ReverbLowDamp", "ReverbLowPass", "ReverbDiffusion", "ReverbLevel"]:
                     # Global set
                     sysex = [0xF0, 0x7D, 0x20, pp1, pp2, vv1, vv2, 0xF7]
