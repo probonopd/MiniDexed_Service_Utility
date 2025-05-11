@@ -4,13 +4,14 @@ from PyQt6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 import sys
 
-PERFORMANCE_FIELDS = [
-    # TG-specific Parameters
-    "MIDIChannel", "BankNumber", "VoiceNumber", "Volume", "Pan", "Detune", "Cutoff", "Resonance", "NoteLimitLow", "NoteLimitHigh", "NoteShift", "ReverbSend", "PitchBendRange", "PitchBendStep", "PortamentoMode", "PortamentoGlissando", "PortamentoTime", "MonoMode", "ModulationWheelRange", "ModulationWheelTarget", "FootControlRange", "FootControlTarget", "BreathControlRange", "BreathControlTarget", "AftertouchRange", "AftertouchTarget",
-    # Global Parameters
+# Define global and TG-specific fields explicitly in the order they should appear
+TG_FIELDS = [
+    "MIDIChannel", "BankNumber", "VoiceNumber", "Volume", "Pan", "Detune", "Cutoff", "Resonance", "NoteLimitLow", "NoteLimitHigh", "NoteShift", "ReverbSend", "PitchBendRange", "PitchBendStep", "PortamentoMode", "PortamentoGlissando", "PortamentoTime", "MonoMode", "ModulationWheelRange", "ModulationWheelTarget", "FootControlRange", "FootControlTarget", "BreathControlRange", "BreathControlTarget", "AftertouchRange", "AftertouchTarget"
+]
+GLOBAL_FIELDS = [
     "CompressorEnable", "ReverbEnable", "ReverbSize", "ReverbHighDamp", "ReverbLowDamp", "ReverbLowPass", "ReverbDiffusion", "ReverbLevel"
 ]
-TG_LABELS = [f"TG{i+1}" for i in range(8)]
+PERFORMANCE_FIELDS = TG_FIELDS + GLOBAL_FIELDS
 
 # Hardcoded initial values as per user request
 PERFORMANCE_VALUES = [
@@ -54,6 +55,8 @@ PERFORMANCE_FIELD_RANGES = {
     "AftertouchTarget": (0, 127)
 }
 
+TG_LABELS = [f"TG{i+1}" for i in range(8)]
+
 class PerformanceEditor(QDialog):
     def __init__(self, main_window=None):
         super().__init__(main_window)
@@ -67,7 +70,7 @@ class PerformanceEditor(QDialog):
         self.resize(800, min(total_height, 600))
         layout = QVBoxLayout(self)
         # Add red warning label above the table
-        warning = QLabel("<span style='color: red;'>Work in progress, only works with firmware from  https://github.com/probonopd/MiniDexed/tree/md-perf</span>")
+        warning = QLabel("<span style='color: red;'>Work in progress, only works with firmware from  https://github.com/probonopd/MiniDexed/pull/915</span>")
         layout.addWidget(warning)
         self.table = QTableWidget(len(PERFORMANCE_FIELDS), 8, self)
         self.table.setHorizontalHeaderLabels(TG_LABELS)
@@ -77,34 +80,54 @@ class PerformanceEditor(QDialog):
         self._block_signal = False
         # Fill table with initial values
         for row, field in enumerate(PERFORMANCE_FIELDS):
-            for col in range(8):
-                value = PERFORMANCE_VALUES[row][col]
-                if field == "Voice":
-                    btn = QPushButton(str(value))
-                    btn.clicked.connect(lambda checked, r=row, c=col: self.select_voice_dialog(r, c))
-                    self.table.setCellWidget(row, col, btn)
-                elif field in PERFORMANCE_FIELD_RANGES:
-                    min_val, max_val = PERFORMANCE_FIELD_RANGES[field]
-                    if min_val == 0 and max_val == 1:
-                        from PyQt6.QtWidgets import QCheckBox
-                        cb = QCheckBox()
-                        cb.setChecked(str(value) == "1")
-                        cb.stateChanged.connect(lambda state, r=row, c=col: self.on_spin_changed(r, c, int(state == 2)))
-                        cb.toggled.connect(lambda checked, r=row, c=col: self.on_spin_changed(r, c, int(checked)))
-                        self.table.setCellWidget(row, col, cb)
-                    else:
-                        spin = QSpinBox()
-                        spin.setMinimum(min_val)
-                        spin.setMaximum(max_val)
-                        if value != "":
-                            spin.setValue(int(value))
-                        # Fix late binding by using default arguments
-                        spin.valueChanged.connect(lambda val, r=row, c=col: self.on_spin_changed(r, c, val))
-                        self.table.setCellWidget(row, col, spin)
+            if field in GLOBAL_FIELDS:
+                # Place controls for global fields in the last rows, spanning all columns
+                value = PERFORMANCE_VALUES[row][0]
+                min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (0, 127))
+                if min_val == 0 and max_val == 1:
+                    from PyQt6.QtWidgets import QCheckBox
+                    cb = QCheckBox()
+                    cb.setChecked(str(value) == "1")
+                    cb.stateChanged.connect(lambda state, r=row: self.on_spin_changed(r, 0, int(state == 2)))
+                    cb.toggled.connect(lambda checked, r=row: self.on_spin_changed(r, 0, int(checked)))
+                    self.table.setCellWidget(row, 0, cb)
                 else:
-                    item = QTableWidgetItem(str(value))
-                    item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsEditable)
-                    self.table.setItem(row, col, item)
+                    spin = QSpinBox()
+                    spin.setMinimum(min_val)
+                    spin.setMaximum(max_val)
+                    if value != "":
+                        spin.setValue(int(value))
+                    spin.valueChanged.connect(lambda val, r=row: self.on_spin_changed(r, 0, val))
+                    self.table.setCellWidget(row, 0, spin)
+                self.table.setSpan(row, 0, 1, 8)
+            else:
+                for col in range(8):
+                    value = PERFORMANCE_VALUES[row][col]
+                    if field == "Voice":
+                        btn = QPushButton(str(value))
+                        btn.clicked.connect(lambda checked, r=row, c=col: self.select_voice_dialog(r, c))
+                        self.table.setCellWidget(row, col, btn)
+                    elif field in PERFORMANCE_FIELD_RANGES:
+                        min_val, max_val = PERFORMANCE_FIELD_RANGES[field]
+                        if min_val == 0 and max_val == 1:
+                            from PyQt6.QtWidgets import QCheckBox
+                            cb = QCheckBox()
+                            cb.setChecked(str(value) == "1")
+                            cb.stateChanged.connect(lambda state, r=row, c=col: self.on_spin_changed(r, c, int(state == 2)))
+                            cb.toggled.connect(lambda checked, r=row, c=col: self.on_spin_changed(r, c, int(checked)))
+                            self.table.setCellWidget(row, col, cb)
+                        else:
+                            spin = QSpinBox()
+                            spin.setMinimum(min_val)
+                            spin.setMaximum(max_val)
+                            if value != "":
+                                spin.setValue(int(value))
+                            spin.valueChanged.connect(lambda val, r=row, c=col: self.on_spin_changed(r, c, val))
+                            self.table.setCellWidget(row, col, spin)
+                    else:
+                        item = QTableWidgetItem(str(value))
+                        item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsEditable)
+                        self.table.setItem(row, col, item)
         self.table.cellChanged.connect(self.on_cell_changed)
         layout.addWidget(self.table)
         # Make the spreadsheet scrollable and only show the table inside the scroll area
