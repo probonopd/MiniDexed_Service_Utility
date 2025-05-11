@@ -195,5 +195,378 @@
       { "name": "TG", "min": 0, "max": 7, "default": 0 }
     ],
     "template": "F0 7D 11 {tg} 00 04 F7"
+  },
+  {
+    "name": "Set Detune",
+    "description": "Set detune for TG (-99..99, 7-bit 2's complement).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value1", "min": 0, "max": 127, "default": 0 },
+      { "name": "Value2", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 05 {value1} {value2} F7"
+  },
+  {
+    "name": "Request Detune",
+    "description": "Request detune for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 05 F7"
+  },
+  {
+    "name": "Set Cutoff",
+    "description": "Set cutoff for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 06 {value} F7"
+  },
+  {
+    "name": "Request Cutoff",
+    "description": "Request cutoff for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 06 F7"
+  },
+  {
+    "name": "Set Resonance",
+    "description": "Set resonance for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 07 {value} F7"
+  },
+  {
+    "name": "Request Resonance",
+    "description": "Request resonance for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 07 F7"
+  },
+  {
+    "name": "Set NoteLimitLow",
+    "description": "Set note limit low for TG (0-127).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 08 {value} F7"
+  },
+  {
+    "name": "Request NoteLimitLow",
+    "description": "Request note limit low for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 08 F7"
+  },
+  {
+    "name": "Set NoteLimitHigh",
+    "description": "Set note limit high for TG (0-127).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 09 {value} F7"
+  },
+  {
+    "name": "Request NoteLimitHigh",
+    "description": "Request note limit high for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 09 F7"
+  },
+  {
+    "name": "Set NoteShift",
+    "description": "Set note shift for TG (-24..24, 7-bit 2's complement).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value1", "min": 0, "max": 127, "default": 0 },
+      { "name": "Value2", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 0A {value1} {value2} F7"
+  },
+  {
+    "name": "Request NoteShift",
+    "description": "Request note shift for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 0A F7"
+  },
+  {
+    "name": "Set ReverbSend",
+    "description": "Set reverb send for TG (0-127).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 0B {value} F7"
+  },
+  {
+    "name": "Request ReverbSend",
+    "description": "Request reverb send for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 0B F7"
+  },
+  {
+    "name": "Set PitchBendRange",
+    "description": "Set pitch bend range for TG (0-12).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 12, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 0C {value} F7"
+  },
+  {
+    "name": "Request PitchBendRange",
+    "description": "Request pitch bend range for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 0C F7"
+  },
+  {
+    "name": "Set PitchBendStep",
+    "description": "Set pitch bend step for TG (0-12).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 12, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 0D {value} F7"
+  },
+  {
+    "name": "Request PitchBendStep",
+    "description": "Request pitch bend step for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 0D F7"
+  },
+  {
+    "name": "Set PortamentoMode",
+    "description": "Set portamento mode for TG (0=off, 1=on).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 0E {value} F7"
+  },
+  {
+    "name": "Request PortamentoMode",
+    "description": "Request portamento mode for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 0E F7"
+  },
+  {
+    "name": "Set PortamentoGlissando",
+    "description": "Set portamento glissando for TG (0=off, 1=on).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 0F {value} F7"
+  },
+  {
+    "name": "Request PortamentoGlissando",
+    "description": "Request portamento glissando for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 0F F7"
+  },
+  {
+    "name": "Set PortamentoTime",
+    "description": "Set portamento time for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 10 {value} F7"
+  },
+  {
+    "name": "Request PortamentoTime",
+    "description": "Request portamento time for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 10 F7"
+  },
+  {
+    "name": "Set MonoMode",
+    "description": "Set mono mode for TG (0=off, 1=on).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 11 {value} F7"
+  },
+  {
+    "name": "Request MonoMode",
+    "description": "Request mono mode for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 11 F7"
+  },
+  {
+    "name": "Set ModWheelRange",
+    "description": "Set modulation wheel range for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 12 {value} F7"
+  },
+  {
+    "name": "Request ModWheelRange",
+    "description": "Request modulation wheel range for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 12 F7"
+  },
+  {
+    "name": "Set ModWheelTarget",
+    "description": "Set modulation wheel target for TG (0-7).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 13 {value} F7"
+  },
+  {
+    "name": "Request ModWheelTarget",
+    "description": "Request modulation wheel target for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 13 F7"
+  },
+  {
+    "name": "Set FootCtrlRange",
+    "description": "Set foot control range for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 14 {value} F7"
+  },
+  {
+    "name": "Request FootCtrlRange",
+    "description": "Request foot control range for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 14 F7"
+  },
+  {
+    "name": "Set FootCtrlTarget",
+    "description": "Set foot control target for TG (0-7).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 15 {value} F7"
+  },
+  {
+    "name": "Request FootCtrlTarget",
+    "description": "Request foot control target for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 15 F7"
+  },
+  {
+    "name": "Set BreathCtrlRange",
+    "description": "Set breath control range for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 16 {value} F7"
+  },
+  {
+    "name": "Request BreathCtrlRange",
+    "description": "Request breath control range for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 16 F7"
+  },
+  {
+    "name": "Set BreathCtrlTarget",
+    "description": "Set breath control target for TG (0-7).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 17 {value} F7"
+  },
+  {
+    "name": "Request BreathCtrlTarget",
+    "description": "Request breath control target for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 17 F7"
+  },
+  {
+    "name": "Set AftertouchRange",
+    "description": "Set aftertouch range for TG (0-99).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 18 {value} F7"
+  },
+  {
+    "name": "Request AftertouchRange",
+    "description": "Request aftertouch range for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 18 F7"
+  },
+  {
+    "name": "Set AftertouchTarget",
+    "description": "Set aftertouch target for TG (0-7).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 19 {value} F7"
+  },
+  {
+    "name": "Request AftertouchTarget",
+    "description": "Request aftertouch target for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 19 F7"
+  },
+  {
+    "name": "Request All Global Parameters",
+    "description": "Request all global parameters in sequence.",
+    "parameters": [],
+    "template": "F0 7D 10 F7"
+  },
+  {
+    "name": "Request All TG Parameters",
+    "description": "Request all TG parameters for a given TG (0-7) in sequence.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} F7"
   }
 ]
