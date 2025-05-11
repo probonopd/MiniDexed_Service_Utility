@@ -23,19 +23,15 @@ class VoiceDownloadWorker(QThread):
         self.voice_name = voice_name
     def run(self):
         try:
-            # Cache directory in AppData
             cache_dir = get_cache_dir()
             os.makedirs(cache_dir, exist_ok=True)
-            # Use hash of URL as filename
             url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
             cache_path = os.path.join(cache_dir, url_hash + '.syx')
             if os.path.exists(cache_path):
-                print(f"Opening cached file: {cache_path}")
                 with open(cache_path, 'rb') as f:
                     syx_data = list(f.read())
                 self.finished.emit(syx_data, self.voice_name, None)
                 return
-            print(f"Downloading file: {self.url}")
             import requests
             resp = requests.get(self.url)
             resp.raise_for_status()
@@ -73,8 +69,22 @@ class VoiceJsonDownloadWorker(QThread):
             self.finished.emit({}, self.voice_name, e)
 
 class VoiceBrowser(QDialog):
+    _instance = None
+
+    @classmethod
+    def get_instance(cls, parent=None):
+        # If the instance doesn't exist or is not visible, create a new one
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = VoiceBrowser(parent)
+            # When the dialog is closed, clear the instance
+            cls._instance.finished.connect(lambda: setattr(cls, "_instance", None))
+        return cls._instance
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        if hasattr(self, '_initialized') and self._initialized:
+            return
+        self._initialized = True
         self.setWindowTitle("DX7 Voice Browser")
         self.setModal(False)
         self.resize(200, 400)
@@ -111,6 +121,8 @@ class VoiceBrowser(QDialog):
         self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list_widget.setWordWrap(True)
         self.load_voices()
+        self.sending = False
+        self.send_queue = []
 
     def set_status(self, msg, error=False):
         if not error:
@@ -154,19 +166,39 @@ class VoiceBrowser(QDialog):
         for voice in self.filtered_voices:
             self.list_widget.addItem(QListWidgetItem(f"{voice['name']} - {voice.get('author', '')}"))
 
+    def download_voice(self, idx):
+        if self.sending:
+            # Queue the request if one is running
+            self.send_queue.append(idx)
+            return
+        self.sending = True
+        self.send_button.setEnabled(False)
+        voice = self.filtered_voices[idx]
+        channel_text = self.channel_combo.currentText()
+        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
+        self.set_status("Downloading voice...")
+        self.download_worker = VoiceDownloadWorker(url, voice["name"])
+        try:
+            self.download_worker.finished.disconnect()
+        except Exception:
+            pass
+        self.download_worker.finished.connect(lambda syx_data, voice_name, error: self._on_voice_downloaded_wrapper(syx_data, voice, channel_text, error))
+        self.download_worker.start()
+
+    def _on_voice_downloaded_wrapper(self, syx_data, voice, channel_text, error):
+        self.sending = False
+        self.on_voice_downloaded(syx_data, voice, channel_text, error)
+        # If there are queued requests, process the next one
+        if self.send_queue:
+            next_idx = self.send_queue.pop(0)
+            self.download_voice(next_idx)
+
     def send_voice(self):
         idx = self.list_widget.currentRow()
         if idx < 0 or idx >= len(self.filtered_voices):
             self.set_status("No voice selected.", error=True)
             return
-        voice = self.filtered_voices[idx]
-        channel_text = self.channel_combo.currentText()
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        self.set_status("Downloading voice...")
-        self.send_button.setEnabled(False)
-        self.download_worker = VoiceDownloadWorker(url, voice["name"])
-        self.download_worker.finished.connect(lambda syx_data, voice_name, error: self.on_voice_downloaded(syx_data, voice, channel_text, error))
-        self.download_worker.start()
+        self.download_voice(idx)
 
     def on_voice_downloaded(self, syx_data, voice, channel_text, error):
         self.send_button.setEnabled(True)
@@ -175,7 +207,8 @@ class VoiceBrowser(QDialog):
             Dialogs.show_error(self, "Voice Browser Error", f"Failed to download syx: {error}")
             self.set_status(f"Failed to download syx: {error}", error=True)
             return
-        print(f"Downloaded syx file length: {len(syx_data)} bytes")
+        # Only log once here:
+        self.set_status(f"Downloaded syx file length: {len(syx_data)} bytes")
         if syx_data and syx_data[0] == 0xF0:
             syx_data = syx_data[1:]
         if syx_data and syx_data[-1] == 0xF7:
@@ -183,7 +216,7 @@ class VoiceBrowser(QDialog):
         if len(syx_data) == 161 and syx_data[:4] == [0x43, 0x00, 0x09, 0x20]:
             syx_data = syx_data[6:161]
         if len(syx_data) != 155:
-            print(f"Warning: Expected 155 bytes, got {len(syx_data)} bytes.")
+            self.set_status(f"Warning: Expected 155 bytes, got {len(syx_data)} bytes.", error=True)
         voice_sysex = [0xF0] + syx_data + [0xF7]
         def rewrite_channel(sysex, ch):
             if len(sysex) > 3:
@@ -193,7 +226,7 @@ class VoiceBrowser(QDialog):
                 channel = int(channel_text)
                 rewrite_channel(voice_sysex, channel)
             except Exception as e:
-                print(f"Channel rewrite error: {e}")
+                self.set_status(f"Channel rewrite error: {e}", error=True)
             send_sysex_list = [voice_sysex]
         else:
             send_sysex_list = []

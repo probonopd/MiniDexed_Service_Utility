@@ -31,7 +31,8 @@ class MidiOps:
                     if data[0] == 0xF0:
                         msg = mido.Message('sysex', data=data[1:-1] if data[-1] == 0xF7 else data[1:])
                         self.main_window.midi_handler.outport.send(msg)
-                        self.main_window.show_status(f"Sent SysEx: {msg}")
+                        hex_str = ' '.join(f'{b:02X}' for b in data)
+                        self.main_window.show_status(f"Sent SysEx: sysex data={hex_str}")
                     else:
                         msg = mido.Message.from_bytes(data)
                         self.main_window.midi_handler.outport.send(msg)
