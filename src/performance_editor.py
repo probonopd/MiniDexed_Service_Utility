@@ -2,9 +2,13 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
+import sys
 
 PERFORMANCE_FIELDS = [
-    "MIDIChannel", "Voice", "Volume", "Pan", "Detune", "Cutoff", "Resonance", "NoteLimitLow", "NoteLimitHigh", "ReverbSend"
+    # Table 1: Global Parameters
+    "CompressorEnable", "ReverbEnable", "ReverbSize", "ReverbHighDamp", "ReverbLowDamp", "ReverbLowPass", "ReverbDiffusion", "ReverbLevel",
+    # Table 2: TG-specific Parameters (all from your table, in order)
+    "BankNumber", "VoiceNumber", "MIDIChannel", "Volume", "Pan", "Detune", "Cutoff", "Resonance", "NoteLimitLow", "NoteLimitHigh", "NoteShift", "ReverbSend", "PitchBendRange", "PitchBendStep", "PortamentoMode", "PortamentoGlissando", "PortamentoTime", "MonoMode", "ModulationWheelRange", "ModulationWheelTarget", "FootControlRange", "FootControlTarget", "BreathControlRange", "BreathControlTarget", "AftertouchRange", "AftertouchTarget"
 ]
 TG_LABELS = [f"TG{i+1}" for i in range(8)]
 
@@ -14,15 +18,40 @@ PERFORMANCE_VALUES = [
 ]
 
 PERFORMANCE_FIELD_RANGES = {
-    "MIDIChannel": (1, 16),
+    "CompressorEnable": (0, 1),
+    "ReverbEnable": (0, 1),
+    "ReverbSize": (0, 99),
+    "ReverbHighDamp": (0, 99),
+    "ReverbLowDamp": (0, 99),
+    "ReverbLowPass": (0, 99),
+    "ReverbDiffusion": (0, 99),
+    "ReverbLevel": (0, 99),
+    "BankNumber": (0, 127),
+    "VoiceNumber": (0, 31),
+    "MIDIChannel": (0, 17),
     "Volume": (0, 127),
     "Pan": (0, 127),
-    "Detune": (-64, 63),
+    "Detune": (-99, 99),
     "Cutoff": (0, 127),
     "Resonance": (0, 127),
     "NoteLimitLow": (0, 127),
     "NoteLimitHigh": (0, 127),
+    "NoteShift": (-24, 24),
     "ReverbSend": (0, 127),
+    "PitchBendRange": (0, 12),
+    "PitchBendStep": (0, 12),
+    "PortamentoMode": (0, 1),
+    "PortamentoGlissando": (0, 1),
+    "PortamentoTime": (0, 99),
+    "MonoMode": (0, 1),
+    "ModulationWheelRange": (0, 127),
+    "ModulationWheelTarget": (0, 127),
+    "FootControlRange": (0, 127),
+    "FootControlTarget": (0, 127),
+    "BreathControlRange": (0, 127),
+    "BreathControlTarget": (0, 127),
+    "AftertouchRange": (0, 127),
+    "AftertouchTarget": (0, 127)
 }
 
 class PerformanceEditor(QDialog):
@@ -50,30 +79,43 @@ class PerformanceEditor(QDialog):
         for row, field in enumerate(PERFORMANCE_FIELDS):
             for col in range(8):
                 value = PERFORMANCE_VALUES[row][col]
-                # Make all lines from Detune downwards read-only
-                if PERFORMANCE_FIELDS.index("Detune") <= row:
-                    item = QTableWidgetItem(str(value))
-                    item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-                    self.table.setItem(row, col, item)
-                elif field == "Voice":
+                if field == "Voice":
                     btn = QPushButton(str(value))
                     btn.clicked.connect(lambda checked, r=row, c=col: self.select_voice_dialog(r, c))
                     self.table.setCellWidget(row, col, btn)
                 elif field in PERFORMANCE_FIELD_RANGES:
                     min_val, max_val = PERFORMANCE_FIELD_RANGES[field]
-                    spin = QSpinBox()
-                    spin.setMinimum(min_val)
-                    spin.setMaximum(max_val)
-                    if value != "":
-                        spin.setValue(int(value))
-                    spin.valueChanged.connect(lambda val, r=row, c=col: self.on_spin_changed(r, c, val))
-                    self.table.setCellWidget(row, col, spin)
+                    if min_val == 0 and max_val == 1:
+                        from PyQt6.QtWidgets import QCheckBox
+                        cb = QCheckBox()
+                        cb.setChecked(str(value) == "1")
+                        # Use a lambda that captures row/col as default arguments to avoid late binding
+                        cb.stateChanged.connect(lambda state, r=row, c=col: self.on_spin_changed(r, c, int(state == 2)))
+                        # Also connect toggled for immediate feedback
+                        cb.toggled.connect(lambda checked, r=row, c=col: self.on_spin_changed(r, c, int(checked)))
+                        self.table.setCellWidget(row, col, cb)
+                    else:
+                        spin = QSpinBox()
+                        spin.setMinimum(min_val)
+                        spin.setMaximum(max_val)
+                        if value != "":
+                            spin.setValue(int(value))
+                        # Use a lambda that captures row/col as default arguments to avoid late binding
+                        spin.valueChanged.connect(lambda val, r=row, c=col: self.on_spin_changed(r, c, val))
+                        self.table.setCellWidget(row, col, spin)
                 else:
                     item = QTableWidgetItem(str(value))
                     item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsEditable)
                     self.table.setItem(row, col, item)
         self.table.cellChanged.connect(self.on_cell_changed)
         layout.addWidget(self.table)
+        # Make the spreadsheet scrollable and only show the table inside the scroll area
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.table)
+        layout.addWidget(scroll)
+        # Remove the direct layout.addWidget(self.table) above
         # Add buttons for quick MIDI channel assignment
         from PyQt6.QtWidgets import QHBoxLayout
         btn_layout = QHBoxLayout()
@@ -85,6 +127,26 @@ class PerformanceEditor(QDialog):
         btn_tg_to_ch.clicked.connect(self.set_tg_to_channels)
         btn_all_to_ch1.clicked.connect(self.set_all_tg_to_ch1)
         self.main_window = main_window
+        # Move initialization logic from showEvent here
+        from PyQt6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app:
+            app.setOverrideCursor(Qt.CursorShape.BusyCursor)
+        self.setEnabled(False)
+        self.hide()  # Hide until data is loaded
+        self._sysex_data_buffer = {}
+        self._expected_sysex_count = 9  # 1 global + 8 TGs
+        self._sysex_request_queue = [[0xF0, 0x7D, 0x10, 0xF7]] + [[0xF0, 0x7D, 0x11, tg, 0xF7] for tg in range(8)]
+        self._sysex_request_index = 0
+        # Only connect handler once
+        if self.main_window and hasattr(self.main_window, "midi_handler"):
+            if hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
+                try:
+                    self.main_window.receive_worker.sysex_received.disconnect(self._on_performance_sysex)
+                except Exception:
+                    pass
+                self.main_window.receive_worker.sysex_received.connect(self._on_performance_sysex)
+        self._send_next_sysex_request()
 
     def select_voice_dialog(self, row, col):
         from voice_browser import VoiceBrowser
@@ -133,32 +195,40 @@ class PerformanceEditor(QDialog):
 
     def send_midi_for_field(self, field, tg_index, value):
         try:
-            if field == "MIDIChannel":
-                # Clamp values to valid MIDI data byte range
-                device = max(0, min(7, tg_index))  # TG index 0-7
-                midi_ch = int(value)
-                midi_ch = max(1, min(16, midi_ch)) - 1  # Clamp to 0-15
-                sysex = [0xF0, 0x43, 0x10 + device, 0x04, 0x01, midi_ch, 0xF7]
-                # Ensure all data bytes except 0xF0 and 0xF7 are in 0..127
-                for b in sysex[1:-1]:
-                    if not (0 <= b <= 127):
-                        raise ValueError(f"SysEx data byte out of range: {b}")
+            # MiniDexed SysEx mapping for all fields in PERFORMANCE_FIELDS
+            field_to_param = {
+                "CompressorEnable": (0x00, 0x00),
+                "ReverbEnable": (0x00, 0x01),
+                "ReverbSize": (0x00, 0x02),
+                "ReverbHighDamp": (0x00, 0x03),
+                "ReverbLowDamp": (0x00, 0x04),
+                "ReverbLowPass": (0x00, 0x05),
+                "ReverbDiffusion": (0x00, 0x06),
+                "ReverbLevel": (0x00, 0x07),
+                "BankNumber": (0x00, 0x00),
+                "VoiceNumber": (0x00, 0x01),
+                "MIDIChannel": (0x00, 0x02),
+                "Volume": (0x00, 0x03),
+                "Pan": (0x00, 0x04),
+            }
+            if field in field_to_param:
+                pp1, pp2 = field_to_param[field]
+                min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (0, 127))
+                v = int(value)
+                v = max(min_val, min(max_val, v))
+                vv1 = (v >> 8) & 0x7F
+                vv2 = v & 0x7F
+                if field in ["CompressorEnable", "ReverbEnable", "ReverbSize", "ReverbHighDamp", "ReverbLowDamp", "ReverbLowPass", "ReverbDiffusion", "ReverbLevel"]:
+                    # Global set
+                    sysex = [0xF0, 0x7D, 0x20, pp1, pp2, vv1, vv2, 0xF7]
+                else:
+                    # TG set
+                    sysex = [0xF0, 0x7D, 0x21, tg_index, pp1, pp2, vv1, vv2, 0xF7]
                 if self.main_window and hasattr(self.main_window, "midi_handler"):
                     self.main_window.midi_handler.send_sysex(sysex)
                 return
-            # ...existing code for Volume, Pan, etc...
-            channel = tg_index  # 0-based MIDI channel
-            if field == "Volume":
-                cc = 7
-                val = int(value)
-                self.main_window.midi_handler.send_cc(channel, cc, val)
-            elif field == "Pan":
-                cc = 10
-                val = int(value)
-                self.main_window.midi_handler.send_cc(channel, cc, val)
-            # ...add more mappings as needed...
         except Exception as e:
-            print(f"Failed to send MIDI for {field} TG{tg_index+1}: {e}")
+            print(f"Failed to send MIDI for {field} TG{tg_index+1}: {e}", file=sys.stderr)
 
     def set_tg_to_channels(self):
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
@@ -180,98 +250,260 @@ class PerformanceEditor(QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
-        # Set TG1-8 to MIDI Channel 1-8
-        self.set_tg_to_channels()
-        # Request a voice dump for each TG (device 0-7)
-        if self.main_window and hasattr(self.main_window, "midi_handler"):
-            for tg in range(8):
-                sysex = [0xF0, 0x43, 0x20 + tg, 0x00, 0xF7]  # F0 43 2n 00 F7
-                self.main_window.midi_handler.send_sysex(sysex)
-        # Prepare to receive and parse voice dumps
-        if self.main_window and hasattr(self.main_window, "midi_handler"):
-            if hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
-                self.main_window.receive_worker.sysex_received.connect(self._on_voice_dump)
-        self._pending_voice_dumps = set(range(8))
-        self._voice_dump_data = {}
+
+    def _send_next_sysex_request(self):
+        if self._sysex_request_index < len(self._sysex_request_queue):
+            msg = self._sysex_request_queue[self._sysex_request_index]
+            self._sysex_request_index += 1
+            if self.main_window and hasattr(self.main_window, "midi_handler"):
+                self.main_window.midi_handler.send_sysex(msg)
+
+    def _on_performance_sysex(self, data):
+        try:
+            print(f"[PERF EDITOR DEBUG] Raw incoming SysEx: {' '.join(f'{b:02X}' for b in data)}")
+            if isinstance(data, bytes):
+                data = list(data)
+            print(f"[PERF EDITOR DEBUG] Parsed as list: {' '.join(f'{b:02X}' for b in data)}")
+            if data and data[0] == 0xF0:
+                data = data[1:]
+            if data and data[-1] == 0xF7:
+                data = data[:-1]
+            print(f"[PERF EDITOR DEBUG] Stripped F0/F7: {' '.join(f'{b:02X}' for b in data)}")
+            if not data or data[0] != 0x7D:
+                print(f"[PERF EDITOR DEBUG] Not a MiniDexed SysEx dump (missing 0x7D): {' '.join(f'{b:02X}' for b in data)}")
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data. Aborting Performance Editor.")
+                self._sysex_request_queue = []
+                self._sysex_request_index = 9999
+                self.reject()
+                return
+            # Global response: F0 7D 20 ... F7
+            if len(data) > 2 and data[1] == 0x20:
+                print(f"[PERF EDITOR DEBUG] Parsed as global response: {' '.join(f'{b:02X}' for b in data)}")
+                self._sysex_data_buffer['global'] = data.copy()
+            # TG response: F0 7D 21 nn ... F7 (device sends 7D 21 nn ...)
+            elif len(data) > 3 and data[1] == 0x21:
+                tg = data[2]
+                print(f"[PERF EDITOR DEBUG] Parsed as TG response for TG {tg}: {' '.join(f'{b:02X}' for b in data)}")
+                self._sysex_data_buffer[tg] = data.copy()
+            else:
+                print(f"[PERF EDITOR DEBUG] Unrecognized MiniDexed SysEx format: {' '.join(f'{b:02X}' for b in data)}")
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data. Aborting Performance Editor.")
+                self._sysex_request_queue = []
+                self._sysex_request_index = 9999
+                self.reject()
+                return
+            print(f"[PERF EDITOR DEBUG] Buffer state: {self._sysex_data_buffer}")
+            # When all expected responses are received, show window
+            if len(self._sysex_data_buffer) >= self._expected_sysex_count:
+                if self.main_window and hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
+                    try:
+                        self.main_window.receive_worker.sysex_received.disconnect(self._on_performance_sysex)
+                    except Exception:
+                        pass
+                print(f"[PERF EDITOR DEBUG] All expected responses received. Populating fields.")
+                self._populate_fields_from_sysex()
+                from PyQt6.QtWidgets import QApplication
+                app = QApplication.instance()
+                if app:
+                    app.restoreOverrideCursor()
+                self.setEnabled(True)
+                self.show()
+                QApplication.processEvents()
+            else:
+                self._send_next_sysex_request()
+        except Exception as e:
+            print(f"[PERF EDITOR] Exception in _on_performance_sysex: {e}", file=sys.stderr)
 
     def _on_voice_dump(self, data):
-        print(f"[PERF EDITOR] _on_voice_dump called with data: {data}")
-        print(f"[PERF EDITOR] Data length: {len(data) if data else 'None'}")
-        if not data or len(data) < 155:
-            print(f"[PERF EDITOR] Early return: data is None or too short")
-            return
-        print(f"[PERF EDITOR] Data[0]: {data[0]:02X}")
-        if data[0] != 0x43:
-            print(f"[PERF EDITOR] Early return: data[0] != 0x43")
-            return
-        tg = None
-        if 0x20 <= data[1] <= 0x27:
-            tg = data[1] - 0x20
-            print(f"[PERF EDITOR] TG index determined from data[1] (0x20..0x27): {tg}")
-        elif 0x00 <= data[1] <= 0x07:
-            tg = data[1]
-            print(f"[PERF EDITOR] TG index determined from data[1] (0x00..0x07): {tg}")
-        else:
-            print(f"[PERF EDITOR] Early return: data[1] not in 0x00..0x07 or 0x20..0x27, data[1]={data[1]:02X}")
-            return
-        decoder = SingleVoiceDumpDecoder(data)
-        if not decoder.is_valid():
-            print(f"[PERF EDITOR] Decoder did not validate the data.")
-            return
-        # Map fields to decoder param keys (VCED spec)
-        field_param_map = {
-            "Voice": "VNAM",
-            "Algorithm": "ALS",
-            "Feedback": "FBL",
-            "Transpose": "TRNP",
-            "Detune": None,
-            "Volume": None,
-            "Pan": None,
-            "Cutoff": None,
-            "Resonance": None,
-            "NoteLimitLow": None,
-            "NoteLimitHigh": None,
-            "ReverbSend": None,
-        }
-        for row, field in enumerate(PERFORMANCE_FIELDS):
-            if field == "MIDIChannel":
-                continue  # Do not overwrite MIDI Channel
-            param_key = field_param_map.get(field)
-            value = ""
-            if isinstance(param_key, str):
-                value = decoder.get_param(param_key)
-            elif isinstance(param_key, tuple) and param_key[0] == "operators":
-                # Show OPn's value in TGn (col==tg)
-                op_index = tg if tg < 6 else 0  # Only 6 ops, fallback to OP1
-                op_list = decoder.get_param("operators")
-                if op_list and 0 <= op_index < len(op_list):
-                    value = op_list[op_index].get(param_key[1], "")
-            # Set value in table
-            if field == "Voice":
-                btn = self.table.cellWidget(row, tg)
-                if isinstance(btn, QPushButton):
-                    btn.setText(str(value))
-            elif field in PERFORMANCE_FIELD_RANGES:
-                widget = self.table.cellWidget(row, tg)
-                if isinstance(widget, QSpinBox):
-                    if value != "" and value is not None:
-                        try:
-                            widget.setValue(int(value))
-                        except Exception:
-                            widget.setValue(widget.minimum())
+        try:
+            if isinstance(data, bytes):
+                data = list(data)
+            print(f"[PERF EDITOR] Raw SysEx data: {' '.join(f'{b:02X}' for b in data)}")
+            if data and data[0] == 0xF0:
+                data = data[1:]
+            if data and data[-1] == 0xF7:
+                data = data[:-1]
+            if not data or data[0] != 0x7D:
+                print("[PERF EDITOR] Not a MiniDexed SysEx dump (missing 0x7D)")
+                return
+
+            # Accept both 0x10 and 0x20 as the command byte for TG dumps
+            if len(data) > 2 and data[2] in (0x10, 0x20):
+                tg = data[1]
+                param_map = {
+                    (0x00, 0x00): "BankNumber",
+                    (0x00, 0x01): "VoiceNumber",
+                    (0x00, 0x02): "MIDIChannel",
+                    (0x00, 0x03): "Volume",
+                    (0x00, 0x04): "Pan",
+                    (0x00, 0x05): "Detune",
+                    (0x00, 0x06): "Cutoff",
+                    (0x00, 0x07): "Resonance",
+                    (0x00, 0x08): "NoteLimitLow",
+                    (0x00, 0x09): "NoteLimitHigh",
+                    (0x00, 0x0A): "NoteShift",
+                    (0x00, 0x0B): "ReverbSend",
+                    (0x00, 0x0C): "PitchBendRange",
+                    (0x00, 0x0D): "PitchBendStep",
+                    (0x00, 0x0E): "PortamentoMode",
+                    (0x00, 0x0F): "PortamentoGlissando",
+                    (0x00, 0x10): "PortamentoTime",
+                    (0x00, 0x11): "MonoMode",
+                    (0x00, 0x12): "ModulationWheelRange",
+                    (0x00, 0x13): "ModulationWheelTarget",
+                    (0x00, 0x14): "FootControlRange",
+                    (0x00, 0x15): "FootControlTarget",
+                    (0x00, 0x16): "BreathControlRange",
+                    (0x00, 0x17): "BreathControlTarget",
+                    (0x00, 0x18): "AftertouchRange",
+                    (0x00, 0x19): "AftertouchTarget"
+                }
+                signed_fields = {"Detune", "NoteShift"}
+                i = 3
+                while i + 3 < len(data):
+                    pp1, pp2, vv1, vv2 = data[i], data[i+1], data[i+2], data[i+3]
+                    field = param_map.get((pp1, pp2))
+                    if field and field in PERFORMANCE_FIELDS:
+                        row = PERFORMANCE_FIELDS.index(field)
+                        if field in signed_fields:
+                            val = (vv1 << 8) | vv2
+                            if val >= 0x8000:
+                                val -= 0x10000
+                        else:
+                            val = (vv1 << 8) | vv2
+                        widget = self.table.cellWidget(row, tg)
+                        if isinstance(widget, QSpinBox):
+                            self._block_signal = True
+                            try:
+                                widget.setValue(int(val))
+                            except Exception:
+                                widget.setValue(widget.minimum())
+                            self._block_signal = False
+                        elif hasattr(widget, 'setChecked'):
+                            self._block_signal = True
+                            widget.setChecked(val == 1)
+                            self._block_signal = False
+                        elif isinstance(widget, QPushButton):
+                            widget.setText(str(val))
+                        else:
+                            item = self.table.item(row, tg)
+                            if item:
+                                item.setText(str(val))
+                    i += 4
+                return
+
+            # ...existing code for global parameters if needed...
+
+        except Exception as e:
+            print(f"[PERF EDITOR] Exception in _on_voice_dump: {e}", file=sys.stderr)
+
+    def _populate_fields_from_sysex(self):
+        # Populate global parameters (first 8 fields, column 0)
+        global_data = self._sysex_data_buffer.get('global')
+        if global_data and len(global_data) > 3 and global_data[1] == 0x20:
+            i = 2  # skip 0x7D, 0x20
+            while i + 3 < len(global_data):
+                pp1, pp2, vv1, vv2 = global_data[i], global_data[i+1], global_data[i+2], global_data[i+3]
+                # Map param to field name
+                param_map = {
+                    (0x00, 0x00): "CompressorEnable",
+                    (0x00, 0x01): "ReverbEnable",
+                    (0x00, 0x02): "ReverbSize",
+                    (0x00, 0x03): "ReverbHighDamp",
+                    (0x00, 0x04): "ReverbLowDamp",
+                    (0x00, 0x05): "ReverbLowPass",
+                    (0x00, 0x06): "ReverbDiffusion",
+                    (0x00, 0x07): "ReverbLevel",
+                }
+                field = param_map.get((pp1, pp2))
+                if field and field in PERFORMANCE_FIELDS:
+                    row = PERFORMANCE_FIELDS.index(field)
+                    val = (vv1 << 8) | vv2
+                    widget = self.table.cellWidget(row, 0)
+                    if hasattr(widget, 'setChecked'):
+                        self._block_signal = True
+                        widget.setChecked(val == 1)
+                        self._block_signal = False
+                    elif isinstance(widget, QSpinBox):
+                        self._block_signal = True
+                        widget.setValue(val)
+                        self._block_signal = False
                     else:
-                        widget.clear()
-            else:
-                item = self.table.item(row, tg)
-                if item:
-                    item.setText(str(value))
-        self._pending_voice_dumps.discard(tg)
-        self._voice_dump_data[tg] = data
-        if not self._pending_voice_dumps:
-            print(f"[PERF EDITOR] All pending voice dumps received, disconnecting signal.")
-            if self.main_window and hasattr(self.main_window, "midi_handler"):
-                if hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
-                    try:
-                        self.main_window.receive_worker.sysex_received.disconnect(self._on_voice_dump)
-                    except Exception as e:
-                        print(f"[PERF EDITOR] Exception disconnecting signal: {e}")
+                        item = self.table.item(row, 0)
+                        if item:
+                            item.setText(str(val))
+                i += 4
+
+        # Populate TG parameters (fields 8+, columns 0-7)
+        tg_param_map = {
+            (0x00, 0x00): "BankNumber",
+            (0x00, 0x01): "VoiceNumber",
+            (0x00, 0x02): "MIDIChannel",
+            (0x00, 0x03): "Volume",
+            (0x00, 0x04): "Pan",
+            (0x00, 0x05): "Detune",
+            (0x00, 0x06): "Cutoff",
+            (0x00, 0x07): "Resonance",
+            (0x00, 0x08): "NoteLimitLow",
+            (0x00, 0x09): "NoteLimitHigh",
+            (0x00, 0x0A): "NoteShift",
+            (0x00, 0x0B): "ReverbSend",
+            (0x00, 0x0C): "PitchBendRange",
+            (0x00, 0x0D): "PitchBendStep",
+            (0x00, 0x0E): "PortamentoMode",
+            (0x00, 0x0F): "PortamentoGlissando",
+            (0x00, 0x10): "PortamentoTime",
+            (0x00, 0x11): "MonoMode",
+            (0x00, 0x12): "ModulationWheelRange",
+            (0x00, 0x13): "ModulationWheelTarget",
+            (0x00, 0x14): "FootControlRange",
+            (0x00, 0x15): "FootControlTarget",
+            (0x00, 0x16): "BreathControlRange",
+            (0x00, 0x17): "BreathControlTarget",
+            (0x00, 0x18): "AftertouchRange",
+            (0x00, 0x19): "AftertouchTarget"
+        }
+        signed_fields = {"Detune", "NoteShift"}
+        for tg in range(8):
+            tg_data = self._sysex_data_buffer.get(tg)
+            if tg_data and len(tg_data) > 4 and tg_data[1] == 0x21:
+                i = 3  # skip 0x7D, 0x21, tg
+                while i + 3 < len(tg_data):
+                    pp1, pp2, vv1, vv2 = tg_data[i], tg_data[i+1], tg_data[i+2], tg_data[i+3]
+                    field = tg_param_map.get((pp1, pp2))
+                    if field and field in PERFORMANCE_FIELDS:
+                        row = PERFORMANCE_FIELDS.index(field)
+                        if field in signed_fields:
+                            val = (vv1 << 8) | vv2
+                            if val >= 0x8000:
+                                val -= 0x10000
+                        else:
+                            val = (vv1 << 8) | vv2
+                        widget = self.table.cellWidget(row, tg)
+                        if isinstance(widget, QSpinBox):
+                            self._block_signal = True
+                            try:
+                                widget.setValue(int(val))
+                            except Exception:
+                                widget.setValue(widget.minimum())
+                            self._block_signal = False
+                        elif hasattr(widget, 'setChecked'):
+                            self._block_signal = True
+                            widget.setChecked(val == 1)
+                            self._block_signal = False
+                        elif isinstance(widget, QPushButton):
+                            widget.setText(str(val))
+                        else:
+                            item = self.table.item(row, tg)
+                            if item:
+                                item.setText(str(val))
+                    i += 4
+
+    @staticmethod
+    def open_when_ready(main_window):
+        dlg = PerformanceEditor(main_window)
+        # Do not show the dialog here!
+        # It will show itself after all SysEx responses are received and fields are populated.
+        return dlg

@@ -324,8 +324,8 @@ def setup_menus(main_window):
     file_menu.addAction(performance_editor_action)
     def show_performance_editor():
         from performance_editor import PerformanceEditor
-        dlg = PerformanceEditor(main_window)
-        dlg.exec()
+        PerformanceEditor.open_when_ready(main_window)
+        # Do not call .show() or .exec_(); dialog will show itself when ready
     performance_editor_action.triggered.connect(show_performance_editor)
     file_menu.addAction(update_action)
     file_menu.addSeparator()

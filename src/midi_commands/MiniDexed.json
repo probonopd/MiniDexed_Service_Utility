@@ -1,0 +1,199 @@
+[
+  {
+    "name": "Set CompressorEnable",
+    "description": "Set compressor enable (global parameter, 0=off, 1=on).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 00 {value} F7"
+  },
+  {
+    "name": "Request CompressorEnable",
+    "description": "Request compressor enable status (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 00 F7"
+  },
+  {
+    "name": "Set ReverbEnable",
+    "description": "Set reverb enable (global parameter, 0=off, 1=on).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 1, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 01 {value} F7"
+  },
+  {
+    "name": "Request ReverbEnable",
+    "description": "Request reverb enable status (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 01 F7"
+  },
+  {
+    "name": "Set ReverbSize",
+    "description": "Set reverb size (global parameter, 0-99).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 02 {value} F7"
+  },
+  {
+    "name": "Request ReverbSize",
+    "description": "Request reverb size (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 02 F7"
+  },
+  {
+    "name": "Set ReverbHighDamp",
+    "description": "Set reverb high damp (global parameter, 0-99).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 03 {value} F7"
+  },
+  {
+    "name": "Request ReverbHighDamp",
+    "description": "Request reverb high damp (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 03 F7"
+  },
+  {
+    "name": "Set ReverbLowDamp",
+    "description": "Set reverb low damp (global parameter, 0-99).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 04 {value} F7"
+  },
+  {
+    "name": "Request ReverbLowDamp",
+    "description": "Request reverb low damp (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 04 F7"
+  },
+  {
+    "name": "Set ReverbLowPass",
+    "description": "Set reverb low pass (global parameter, 0-99).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 05 {value} F7"
+  },
+  {
+    "name": "Request ReverbLowPass",
+    "description": "Request reverb low pass (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 05 F7"
+  },
+  {
+    "name": "Set ReverbDiffusion",
+    "description": "Set reverb diffusion (global parameter, 0-99).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 06 {value} F7"
+  },
+  {
+    "name": "Request ReverbDiffusion",
+    "description": "Request reverb diffusion (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 06 F7"
+  },
+  {
+    "name": "Set ReverbLevel",
+    "description": "Set reverb level (global parameter, 0-99).",
+    "parameters": [
+      { "name": "Value", "min": 0, "max": 99, "default": 0 }
+    ],
+    "template": "F0 7D 20 00 07 {value} F7"
+  },
+  {
+    "name": "Request ReverbLevel",
+    "description": "Request reverb level (global parameter).",
+    "parameters": [],
+    "template": "F0 7D 10 00 07 F7"
+  },
+  {
+    "name": "Set BankNumber",
+    "description": "Set bank number for TG (0-127).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 00 {value} F7"
+  },
+  {
+    "name": "Request BankNumber",
+    "description": "Request bank number for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 00 F7"
+  },
+  {
+    "name": "Set VoiceNumber",
+    "description": "Set voice number for TG (0-31).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 31, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 01 {value} F7"
+  },
+  {
+    "name": "Request VoiceNumber",
+    "description": "Request voice number for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 01 F7"
+  },
+  {
+    "name": "Set MIDIChannel",
+    "description": "Set MIDI channel for TG (0-15, 16=omni, 17=off).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 17, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 02 {value} F7"
+  },
+  {
+    "name": "Request MIDIChannel",
+    "description": "Request MIDI channel for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 02 F7"
+  },
+  {
+    "name": "Set Volume",
+    "description": "Set volume for TG (0-127).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 03 {value} F7"
+  },
+  {
+    "name": "Request Volume",
+    "description": "Request volume for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 03 F7"
+  },
+  {
+    "name": "Set Pan",
+    "description": "Set pan for TG (0-127).",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 },
+      { "name": "Value", "min": 0, "max": 127, "default": 0 }
+    ],
+    "template": "F0 7D 21 {tg} 00 04 {value} F7"
+  },
+  {
+    "name": "Request Pan",
+    "description": "Request pan for TG.",
+    "parameters": [
+      { "name": "TG", "min": 0, "max": 7, "default": 0 }
+    ],
+    "template": "F0 7D 11 {tg} 00 04 F7"
+  }
+]
