@@ -71,13 +71,7 @@ class PerformanceEditor(QDialog):
         self.setWindowTitle("Performance Editor")
         self.setModal(False)
         self.main_window = main_window
-        self.setMinimumWidth(800)
-        self.resize(800, self.sizeHint().height())
-        row_height = 32
-        header_height = 40
-        total_height = header_height + row_height * len(PERFORMANCE_FIELDS)
-        self.setMinimumHeight(min(total_height, 600))
-        self.resize(800, min(total_height, 600))
+        self.resize(800, 950)
         layout = QVBoxLayout(self)
         # Add red warning label above the table
         warning = QLabel("<span style='color: red;'>Work in progress, only works with firmware from  https://github.com/probonopd/MiniDexed/pull/915</span>")

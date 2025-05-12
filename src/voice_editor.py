@@ -9,7 +9,7 @@ class VoiceEditor(QDialog):
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("DX7 Voice Editor")
-        self.resize(900, 600)
+        self.resize(400, 950)
         self.midi_outport = midi_outport
         self.voice_bytes = voice_bytes or self.init_patch_bytes()
         self.decoder = SingleVoiceDumpDecoder(self.voice_bytes)
@@ -232,7 +232,8 @@ class VoiceEditor(QDialog):
 
     @classmethod
     def get_instance(cls, parent=None):
-        if cls._instance is None or not cls._instance.isVisible():
+        # If the instance is deleted or not visible, create a new one
+        if cls._instance is None or not hasattr(cls._instance, 'isVisible') or not cls._instance.isVisible():
             cls._instance = VoiceEditor(parent=parent)
             cls._instance.finished.connect(lambda: setattr(cls, "_instance", None))
         return cls._instance
