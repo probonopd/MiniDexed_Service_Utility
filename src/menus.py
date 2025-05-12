@@ -143,12 +143,7 @@ def setup_menus(main_window):
                 main_window.voice_browser_dialog.activateWindow()
                 return
         from voice_browser import VoiceBrowser
-        dlg = VoiceBrowser(main_window)
-        main_window.voice_browser_dialog = dlg
-        def on_close():
-            main_window.voice_browser_dialog = None
-        dlg.destroyed.connect(on_close)
-        dlg.show()
+        VoiceBrowser.show_singleton(main_window)
 
     def show_midi_command_dialog(cmd):
         # If there are no parameters or all parameters are fixed, skip dialog
@@ -324,8 +319,8 @@ def setup_menus(main_window):
     file_menu.addAction(performance_editor_action)
     def show_performance_editor():
         from performance_editor import PerformanceEditor
-        PerformanceEditor.open_when_ready(main_window)
-        # Do not call .show() or .exec_(); dialog will show itself when ready
+        dlg = PerformanceEditor(main_window)
+        dlg.show()
     performance_editor_action.triggered.connect(show_performance_editor)
     file_menu.addAction(update_action)
     file_menu.addSeparator()

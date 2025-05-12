@@ -23,6 +23,6 @@
       { "name": "Function", "min": 0, "max": 31, "default": 0 },
       { "name": "Value", "min": 0, "max": 127, "default": 0 }
     ],
-    "template": "F0 43 2{device} 03 {function} {value} F7"
+    "template": "F0 43 1{device} 03 {function} {value} F7"
   }
 ]

@@ -37,7 +37,13 @@ class MIDIHandler:
         if self.inport:
             for msg in self.inport.iter_pending():
                 if msg.type == 'sysex':
-                    callback(msg.data)
+                    # Ensure F0/F7 are present for incoming SysEx
+                    data = list(msg.data)
+                    if not (data and data[0] == 0xF0):
+                        data = [0xF0] + data
+                    if not (data and data[-1] == 0xF7):
+                        data = data + [0xF7]
+                    callback(data)
 
     def close(self):
         if self.inport:

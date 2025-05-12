@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLineEdit, QListWidget, QHBoxLayout, QComboBox, QPushButton, QLabel, QApplication, QListWidgetItem, QStatusBar, QMenuBar, QMenu
 )
 from PyQt6.QtGui import QAction
+from voice_editor import VoiceEditor
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"
 VOICE_LIST_CACHE_NAME = "patch_list.json"
@@ -80,11 +81,21 @@ class VoiceBrowser(QDialog):
             cls._instance.finished.connect(lambda: setattr(cls, "_instance", None))
         return cls._instance
 
+    @classmethod
+    def show_singleton(cls, parent=None):
+        dlg = cls.get_instance(parent)
+        dlg.setModal(False)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        return dlg
+
     def __init__(self, parent=None):
         super().__init__(parent)
         if hasattr(self, '_initialized') and self._initialized:
             return
         self._initialized = True
+        print("Initializing VoiceBrowser")
         self.setWindowTitle("DX7 Voice Browser")
         self.setModal(False)
         self.resize(200, 400)
@@ -132,7 +143,8 @@ class VoiceBrowser(QDialog):
         show_status = getattr(parent, 'show_status', None) or getattr(mw, 'show_status', None)
         if show_status:
             show_status(msg)
-        print(msg, file=sys.stderr if error else sys.stdout)
+        else:
+            print(msg, file=sys.stderr if error else sys.stdout)
 
     def load_voices(self):
         try:
@@ -213,10 +225,8 @@ class VoiceBrowser(QDialog):
             syx_data = syx_data[1:]
         if syx_data and syx_data[-1] == 0xF7:
             syx_data = syx_data[:-1]
-        if len(syx_data) == 161 and syx_data[:4] == [0x43, 0x00, 0x09, 0x20]:
-            syx_data = syx_data[6:161]
-        if len(syx_data) != 155:
-            self.set_status(f"Warning: Expected 155 bytes, got {len(syx_data)} bytes.", error=True)
+        if len(syx_data) != 155 and len(syx_data) != 161:
+            self.set_status(f"Warning: Expected 155 or 161 bytes, got {len(syx_data)} bytes.", error=True)
         voice_sysex = [0xF0] + syx_data + [0xF7]
         def rewrite_channel(sysex, ch):
             if len(sysex) > 3:
@@ -242,8 +252,8 @@ class VoiceBrowser(QDialog):
                     hex_str = ' '.join(f'{b:02X}' for b in sysex)
                     mw.ui.out_text.setPlainText(hex_str)
                     self.set_status(f"Sending '{voice['name']}'...")
-                    if hasattr(mw, 'show_status'):
-                        mw.show_status(f"Sending '{voice['name']}'...")
+#                    if hasattr(mw, 'show_status'):
+#                        mw.show_status(f"Sending '{voice['name']}'...")
                     if hasattr(mw.midi_ops, 'send_sysex'):
                         mw.midi_ops.send_sysex()
                 self.status_bar.clearMessage()
@@ -293,6 +303,23 @@ class VoiceBrowser(QDialog):
         if isinstance(bank, str):
             bank = bank.removesuffix('.syx').removesuffix('.SXY').removesuffix('.SYX').removesuffix('.sxy')
         self.bank_label.setText(f"Source: Bank {bank} by {author}")
+
+    def showEvent(self, event):
+        VoiceBrowser._instance = self
+        super().showEvent(event)
+        # Position the dialog to the right of the main window (if parent is a QDialog or QMainWindow)
+        parent = self.parentWidget()
+        if parent is not None:
+            parent_geom = parent.geometry()
+            x = parent_geom.x() + parent_geom.width() + 10  # 10px gap
+            y = parent_geom.y()
+            h = parent_geom.height()
+            self.move(x, y)
+            self.resize(self.width(), h)
+
+    def closeEvent(self, event):
+        VoiceBrowser._instance = None
+        super().closeEvent(event)
 
 # For standalone testing
 if __name__ == "__main__":

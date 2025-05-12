@@ -1,8 +1,10 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel, QCheckBox, QScrollArea, QHBoxLayout, QApplication
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 import sys
+import logging
+from voice_browser import VoiceBrowser
 
 # Define global and TG-specific fields explicitly in the order they should appear
 # Add a new Voice field at the top of TG_FIELDS
@@ -87,7 +89,6 @@ class PerformanceEditor(QDialog):
                 value = PERFORMANCE_VALUES[row][0]
                 min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (0, 127))
                 if min_val == 0 and max_val == 1:
-                    from PyQt6.QtWidgets import QCheckBox
                     cb = QCheckBox()
                     cb.setChecked(str(value) == "1")
                     cb.stateChanged.connect(lambda state, r=row: self.on_spin_changed(r, 0, int(state == 2)))
@@ -108,49 +109,10 @@ class PerformanceEditor(QDialog):
                     if field == "Voice":
                         btn = QPushButton(str(value))
                         btn.clicked.connect(lambda checked, r=row, c=col: self.select_voice_dialog(r, c))
-                        # Hide if MIDIChannel is Omni (on initial load)
-                        midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
-                        channel_widget = self.table.cellWidget(midi_channel_row, col)
-                        if channel_widget is not None and channel_widget.metaObject().className() == "QComboBox":
-                            if channel_widget.currentIndex() == 16:  # Omni
-                                btn.hide()
-                            else:
-                                btn.show()
                         self.table.setCellWidget(row, col, btn)
                     elif field in PERFORMANCE_FIELD_RANGES:
                         min_val, max_val = PERFORMANCE_FIELD_RANGES[field]
-                        if field == "MIDIChannel":
-                            from PyQt6.QtWidgets import QComboBox
-                            combo = QComboBox()
-                            for i in range(1, 17):
-                                combo.addItem(str(i))
-                            combo.addItem("Omni")
-                            # Set value
-                            if value != "":
-                                try:
-                                    v = int(value)
-                                    if v >= 16:
-                                        combo.setCurrentIndex(16)  # Omni
-                                    elif v > 0:
-                                        combo.setCurrentIndex(v - 1)
-                                    else:
-                                        combo.setCurrentIndex(0)
-                                except Exception:
-                                    combo.setCurrentIndex(0)
-                            def on_channel_changed(idx, r=row, c=col):
-                                self.on_spin_changed(r, c, idx)
-                                # Hide/show Voice button if present
-                                voice_row = PERFORMANCE_FIELDS.index("Voice")
-                                btn = self.table.cellWidget(voice_row, c)
-                                if isinstance(btn, QPushButton):
-                                    if idx == 16:
-                                        btn.hide()
-                                    else:
-                                        btn.show()
-                            combo.currentIndexChanged.connect(on_channel_changed)
-                            self.table.setCellWidget(row, col, combo)
-                        elif min_val == 0 and max_val == 1:
-                            from PyQt6.QtWidgets import QCheckBox
+                        if min_val == 0 and max_val == 1:
                             cb = QCheckBox()
                             cb.setChecked(str(value) == "1")
                             cb.stateChanged.connect(lambda state, r=row, c=col: self.on_spin_changed(r, c, int(state == 2)))
@@ -171,14 +133,12 @@ class PerformanceEditor(QDialog):
         self.table.cellChanged.connect(self.on_cell_changed)
         layout.addWidget(self.table)
         # Make the spreadsheet scrollable and only show the table inside the scroll area
-        from PyQt6.QtWidgets import QScrollArea
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.table)
         layout.addWidget(scroll)
         # Remove the direct layout.addWidget(self.table) above
         # Add buttons for quick MIDI channel assignment
-        from PyQt6.QtWidgets import QHBoxLayout
         btn_layout = QHBoxLayout()
         btn_tg_to_ch = QPushButton("Set TG1-8 to MIDI Channel 1-8")
         btn_all_to_ch1 = QPushButton("Set all TGs to MIDI Channel 1")
@@ -189,7 +149,6 @@ class PerformanceEditor(QDialog):
         btn_all_to_ch1.clicked.connect(self.set_all_tg_to_ch1)
         self.main_window = main_window
         # Move initialization logic from showEvent here
-        from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
             app.setOverrideCursor(Qt.CursorShape.BusyCursor)
@@ -208,70 +167,34 @@ class PerformanceEditor(QDialog):
                     pass
                 self.main_window.receive_worker.sysex_received.connect(self._on_performance_sysex)
         self._send_next_sysex_request()
-        import logging
         logging.basicConfig(level=logging.DEBUG)
         self._debug = True
 
     def select_voice_dialog(self, row, col):
-        from voice_browser import VoiceBrowser
-        # Use the singleton show method
-        dlg = VoiceBrowser.show_singleton(self)
+        dlg = VoiceBrowser(self)
         # Preselect channel in VoiceBrowser to match the MIDIChannel for this TG
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         channel_widget = self.table.cellWidget(midi_channel_row, col)
-        # Support both QSpinBox (legacy) and QComboBox (current)
-        channel_index = None
-        if channel_widget is not None:
-            if channel_widget.metaObject().className() == "QComboBox":
-                idx = channel_widget.currentIndex()
-                if idx < 16:
-                    channel_index = idx  # 0-15 for channels 1-16
-                else:
-                    channel_index = 16  # Omni
-            elif isinstance(channel_widget, QSpinBox):
-                channel_value = channel_widget.value()
-                if 1 <= channel_value <= 16:
-                    channel_index = channel_value - 1
-                else:
-                    channel_index = 16  # Omni
-        if channel_index is not None and hasattr(dlg, "channel_combo"):
-            dlg.channel_combo.setCurrentIndex(channel_index)
+        if isinstance(channel_widget, QSpinBox):
+            channel_value = channel_widget.value()
+            # VoiceBrowser channels are 1-based, combo index 0-15, last is 'Omni'
+            if 1 <= channel_value <= 16:
+                dlg.channel_combo.setCurrentIndex(channel_value - 1)
+        dlg.setModal(True)
         def on_voice_selected():
             idx = dlg.list_widget.currentRow()
             if idx >= 0 and idx < len(dlg.filtered_voices):
                 voice = dlg.filtered_voices[idx]
                 name = voice['name']
-                # Only update the button(s) for the selected channel
-                midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
-                for c in range(8):
-                    channel_widget = self.table.cellWidget(midi_channel_row, c)
-                    channel_index = None
-                    if channel_widget is not None:
-                        if channel_widget.metaObject().className() == "QComboBox":
-                            idx_ch = channel_widget.currentIndex()
-                            if idx_ch < 16:
-                                channel_index = idx_ch
-                            else:
-                                channel_index = 16
-                        elif isinstance(channel_widget, QSpinBox):
-                            channel_value = channel_widget.value()
-                            if 1 <= channel_value <= 16:
-                                channel_index = channel_value - 1
-                            else:
-                                channel_index = 16
-                    # Compare with the channel selected in the VoiceBrowser
-                    vb_channel_idx = dlg.channel_combo.currentIndex()
-                    if channel_index == vb_channel_idx:
-                        btn = self.table.cellWidget(PERFORMANCE_FIELDS.index("Voice"), c)
-                        if isinstance(btn, QPushButton):
-                            btn.setText(name)
-        dlg.list_widget.itemDoubleClicked.connect(lambda _: on_voice_selected())
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+                btn = self.table.cellWidget(row, col)
+                if isinstance(btn, QPushButton):
+                    btn.setText(name)
+                # Optionally: send MIDI for new voice selection here
+        dlg.list_widget.itemDoubleClicked.connect(lambda _: (on_voice_selected(), dlg.accept()))
+        if dlg.exec():
+            on_voice_selected()
 
     def on_spin_changed(self, row, col, value):
-        import logging
         if self._block_signal:
             logging.debug(f"[on_spin_changed] Blocked: row={row}, col={col}, value={value}")
             return
@@ -283,7 +206,6 @@ class PerformanceEditor(QDialog):
         self.send_midi_for_field(field, col, value)
 
     def on_cell_changed(self, row, col):
-        import logging
         if self._block_signal:
             logging.debug(f"[on_cell_changed] Blocked: row={row}, col={col}")
             return
@@ -293,7 +215,6 @@ class PerformanceEditor(QDialog):
         self.send_midi_for_field(field, col, value)
 
     def send_midi_for_field(self, field, tg_index, value):
-        import logging
         logging.debug(f"[send_midi_for_field] field={field}, tg_index={tg_index}, value={value}")
         try:
             # MiniDexed SysEx mapping for all fields in PERFORMANCE_FIELDS
@@ -337,9 +258,7 @@ class PerformanceEditor(QDialog):
                 pp1, pp2 = field_to_param[field]
                 min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (0, 127))
                 v = int(value)
-                # For MIDIChannel, use the value directly (0-15 for channels 1-16, 16 for Omni)
-                if field == "MIDIChannel":
-                    v = int(value)
+                v = max(min_val, min(max_val, v))
                 # For signed fields, use 2's complement split into two 7-bit bytes
                 if field in ["Detune", "NoteShift"]:
                     v = int(value)
@@ -369,25 +288,19 @@ class PerformanceEditor(QDialog):
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         for col in range(8):
             widget = self.table.cellWidget(midi_channel_row, col)
-            # Use 0-indexed for QComboBox (channel 1 = index 0, channel 2 = index 1, ...)
-            if widget is not None and widget.metaObject().className() == "QComboBox":
-                widget.setCurrentIndex(col)
-            elif isinstance(widget, QSpinBox):
+            if isinstance(widget, QSpinBox):
                 widget.setValue(col + 1)
-            # Send SysEx for each TG, value should be 0-indexed (0-15 for channels 1-16)
-            self.send_midi_for_field("MIDIChannel", col, col)
+            # Send SysEx for each TG
+            self.send_midi_for_field("MIDIChannel", col, col + 1)
 
     def set_all_tg_to_ch1(self):
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         for col in range(8):
             widget = self.table.cellWidget(midi_channel_row, col)
-            # Use 0-indexed for QComboBox (channel 1 = index 0)
-            if widget is not None and widget.metaObject().className() == "QComboBox":
-                widget.setCurrentIndex(0)
-            elif isinstance(widget, QSpinBox):
+            if isinstance(widget, QSpinBox):
                 widget.setValue(1)
-            # Send SysEx for each TG, value should be 0 (for channel 1)
-            self.send_midi_for_field("MIDIChannel", col, 0)
+            # Send SysEx for each TG
+            self.send_midi_for_field("MIDIChannel", col, 1)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -474,7 +387,6 @@ class PerformanceEditor(QDialog):
                 self._pending_voice_dumps = set(range(8))
                 self._voice_dump_data = {}
                 # --- END: Send voice dump requests for each TG and connect handler ---
-                from PyQt6.QtWidgets import QApplication
                 app = QApplication.instance()
                 if app:
                     app.restoreOverrideCursor()
@@ -487,12 +399,7 @@ class PerformanceEditor(QDialog):
             print(f"[PERF EDITOR] Exception in _on_performance_sysex: {e}", file=sys.stderr)
 
     def _on_voice_dump(self, data):
-        # Strip F0/F7 if present (SysEx start/end) before any logging or checks
-        if data and data[0] == 0xF0:
-            data = data[1:]
-        if data and data[-1] == 0xF7:
-            data = data[:-1]
-        print(f"[PERF EDITOR] _on_voice_dump called with data: {' '.join(f'{b:02X}' for b in data)}")
+        print(f"[PERF EDITOR] _on_voice_dump called with data: {data}")
         print(f"[PERF EDITOR] Data length: {len(data) if data else 'None'}")
         if not data or len(data) < 155:
             print(f"[PERF EDITOR] Early return: data is None or too short")
@@ -501,109 +408,123 @@ class PerformanceEditor(QDialog):
         if data[0] != 0x43:
             print(f"[PERF EDITOR] Early return: data[0] != 0x43")
             return
-        # Extract MIDI channel from the SysEx (second byte: 0x2n or 0x1n, n = channel)
-        midi_channel = data[1] & 0x0F  # 0-indexed
-        print(f"[PERF EDITOR] Voice dump MIDI channel: {midi_channel}")
+        tg = None
+        if 0x20 <= data[1] <= 0x27:
+            tg = data[1] - 0x20
+            print(f"[PERF EDITOR] TG index determined from data[1] (0x20..0x27): {tg}")
+        elif 0x00 <= data[1] <= 0x07:
+            tg = data[1]
+            print(f"[PERF EDITOR] TG index determined from data[1] (0x00..0x07): {tg}")
+        else:
+            print(f"[PERF EDITOR] Early return: data[1] not in 0x00..0x07 or 0x20..0x27, data[1]={data[1]:02X}")
+            return
         decoder = SingleVoiceDumpDecoder(data)
         if not decoder.is_valid():
             print(f"[PERF EDITOR] Decoder did not validate the data.")
             return
+        # Only update the Voice button text
         voice_row = PERFORMANCE_FIELDS.index("Voice")
-        midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         voice_name = decoder.get_param("VNAM")
-        # Update all TGs that listen on this MIDI channel
-        for tg in range(8):
-            channel_widget = self.table.cellWidget(midi_channel_row, tg)
-            tg_channel = None
-            if channel_widget is not None:
-                if channel_widget.metaObject().className() == "QComboBox":
-                    idx = channel_widget.currentIndex()
-                    if idx < 16:
-                        tg_channel = idx  # 0-15 for channels 1-16
-                    else:
-                        tg_channel = None  # Omni, skip for now
-                elif isinstance(channel_widget, QSpinBox):
-                    channel_value = channel_widget.value()
-                    if 1 <= channel_value <= 16:
-                        tg_channel = channel_value - 1
-                    else:
-                        tg_channel = None
-            if tg_channel is not None and tg_channel == midi_channel:
-                btn = self.table.cellWidget(voice_row, tg)
-                if isinstance(btn, QPushButton):
-                    btn.setText(str(voice_name))
-                self._voice_dump_data[tg] = data
-                self._pending_voice_dumps.discard(tg)
-        # If all TGs have received a voice dump, disconnect
+        btn = self.table.cellWidget(voice_row, tg)
+        if isinstance(btn, QPushButton):
+            btn.setText(str(voice_name))
+        self._pending_voice_dumps.discard(tg)
+        self._voice_dump_data[tg] = data
         if not self._pending_voice_dumps:
             print(f"[PERF EDITOR] All pending voice dumps received, disconnecting signal.")
             if self.main_window and hasattr(self.main_window, "midi_handler"):
                 if hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
                     try:
                         self.main_window.receive_worker.sysex_received.disconnect(self._on_voice_dump)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[PERF EDITOR] Exception disconnecting signal: {e}")
 
     def _populate_fields_from_sysex(self):
-        """
-        Populate the table fields from the data in self._sysex_data_buffer.
-        """
-        midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
+        # Populate global parameters (first 8 fields, column 0)
+        global_data = self._sysex_data_buffer.get('global')
+        if global_data and len(global_data) > 3 and global_data[1] == 0x20:
+            i = 2  # skip 0x7D, 0x20
+            while i + 3 < len(global_data):
+                pp1, pp2, vv1, vv2 = global_data[i], global_data[i+1], global_data[i+2], global_data[i+3]
+                # Map param to field name
+                param_map = {
+                    (0x00, 0x00): "CompressorEnable",
+                    (0x00, 0x01): "ReverbEnable",
+                    (0x00, 0x02): "ReverbSize",
+                    (0x00, 0x03): "ReverbHighDamp",
+                    (0x00, 0x04): "ReverbLowDamp",
+                    (0x00, 0x05): "ReverbLowPass",
+                    (0x00, 0x06): "ReverbDiffusion",
+                    (0x00, 0x07): "ReverbLevel",
+                }
+                field = param_map.get((pp1, pp2))
+                if field and field in PERFORMANCE_FIELDS:
+                    row = PERFORMANCE_FIELDS.index(field)
+                    val = (vv1 << 8) | vv2
+                    widget = self.table.cellWidget(row, 0)
+                    if hasattr(widget, 'setChecked'):
+                        self._block_signal = True
+                        widget.setChecked(val == 1)
+                        self._block_signal = False
+                    elif isinstance(widget, QSpinBox):
+                        self._block_signal = True
+                        widget.setValue(val)
+                        self._block_signal = False
+                    else:
+                        item = self.table.item(row, 0)
+                        if item:
+                            item.setText(str(val))
+                i += 4
+
+        # Populate TG parameters (fields 8+, columns 0-7)
+        tg_param_map = {
+            (0x00, 0x00): "BankNumber",
+            (0x00, 0x01): "VoiceNumber",
+            (0x00, 0x02): "MIDIChannel",
+            (0x00, 0x03): "Volume",
+            (0x00, 0x04): "Pan",
+            (0x00, 0x05): "Detune",
+            (0x00, 0x06): "Cutoff",
+            (0x00, 0x07): "Resonance",
+            (0x00, 0x08): "NoteLimitLow",
+            (0x00, 0x09): "NoteLimitHigh",
+            (0x00, 0x0A): "NoteShift",
+            (0x00, 0x0B): "ReverbSend",
+            (0x00, 0x0C): "PitchBendRange",
+            (0x00, 0x0D): "PitchBendStep",
+            (0x00, 0x0E): "PortamentoMode",
+            (0x00, 0x0F): "PortamentoGlissando",
+            (0x00, 0x10): "PortamentoTime",
+            (0x00, 0x11): "MonoMode",
+            (0x00, 0x12): "ModulationWheelRange",
+            (0x00, 0x13): "ModulationWheelTarget",
+            (0x00, 0x14): "FootControlRange",
+            (0x00, 0x15): "FootControlTarget",
+            (0x00, 0x16): "BreathControlRange",
+            (0x00, 0x17): "BreathControlTarget",
+            (0x00, 0x18): "AftertouchRange",
+            (0x00, 0x19): "AftertouchTarget"
+        }
+        signed_fields = {"Detune", "NoteShift"}
+        # When programmatically setting values, block signals only for the change, not for the whole loop
         for tg in range(8):
             tg_data = self._sysex_data_buffer.get(tg)
             if tg_data and len(tg_data) > 4 and tg_data[1] == 0x21:
                 i = 3  # skip 0x7D, 0x21, tg
                 while i + 3 < len(tg_data):
                     pp1, pp2, vv1, vv2 = tg_data[i], tg_data[i+1], tg_data[i+2], tg_data[i+3]
-                    # Map pp1, pp2 to field name
-                    field = None
-                    if pp1 == 0x00:
-                        tg_param_map = {
-                            0x00: "BankNumber",
-                            0x01: "VoiceNumber",
-                            0x02: "MIDIChannel",
-                            0x03: "Volume",
-                            0x04: "Pan",
-                            0x05: "Detune",
-                            0x06: "Cutoff",
-                            0x07: "Resonance",
-                            0x08: "NoteLimitLow",
-                            0x09: "NoteLimitHigh",
-                            0x0A: "NoteShift",
-                            0x0B: "ReverbSend",
-                            0x0C: "PitchBendRange",
-                            0x0D: "PitchBendStep",
-                            0x0E: "PortamentoMode",
-                            0x0F: "PortamentoGlissando",
-                            0x10: "PortamentoTime",
-                            0x11: "MonoMode",
-                            0x12: "ModulationWheelRange",
-                            0x13: "ModulationWheelTarget",
-                            0x14: "FootControlRange",
-                            0x15: "FootControlTarget",
-                            0x16: "BreathControlRange",
-                            0x17: "BreathControlTarget",
-                            0x18: "AftertouchRange",
-                            0x19: "AftertouchTarget"
-                        }
-                        field = tg_param_map.get(pp2)
+                    field = tg_param_map.get((pp1, pp2))
                     if field and field in PERFORMANCE_FIELDS:
                         row = PERFORMANCE_FIELDS.index(field)
-                        val = (vv1 << 8) | vv2
+                        if field in signed_fields:
+                            val = (vv1 << 8) | vv2
+                            if val >= 0x8000:
+                                val -= 0x10000
+                        else:
+                            val = (vv1 << 8) | vv2
                         widget = self.table.cellWidget(row, tg)
-                        if field == "MIDIChannel" and widget is not None and widget.metaObject().className() == "QComboBox":
-                            self._block_signal = True
-                            try:
-                                if int(val) >= 16:
-                                    widget.setCurrentIndex(16)  # Omni
-                                elif 0 <= int(val) <= 15:
-                                    widget.setCurrentIndex(int(val))  # 0-15 for channels 1-16
-                                else:
-                                    widget.setCurrentIndex(0)
-                            except Exception:
-                                widget.setCurrentIndex(0)
-                            self._block_signal = False
-                        elif isinstance(widget, QSpinBox):
+                        # Only block signals for the duration of setValue/setChecked
+                        if isinstance(widget, QSpinBox):
                             self._block_signal = True
                             try:
                                 widget.setValue(int(val))
@@ -623,3 +544,10 @@ class PerformanceEditor(QDialog):
                     i += 4
         # After all programmatic changes, ensure _block_signal is False
         self._block_signal = False
+
+    @staticmethod
+    def open_when_ready(main_window):
+        dlg = PerformanceEditor(main_window)
+        # Do not show the dialog here!
+        # It will show itself after all SysEx responses are received and fields are populated.
+        return dlg

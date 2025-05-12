@@ -76,7 +76,7 @@ class SingleVoiceDumpDecoder:
             self.params['VNAM'] = ''
         # Voice name chars (VNAM1..VNAM10)
         for i in range(10):
-            self.params[f'VNAM{i+1}'] = d[144+i]
+            self.params[f'VNAM{i+1}'] = d[145+i]
         # Operator enable and select (not always present in all dumps)
         self.params['OPE'] = d[155] if len(d) > 155 else None  # OPERATOR ENABLE
         self.params['OPSEL'] = d[156] if len(d) > 156 else None # OPERATOR SELECT
