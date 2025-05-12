@@ -82,73 +82,75 @@ class VoiceEditorPanel(QDialog):
         top_layout.addStretch()
         layout.addLayout(top_layout)
 
-        # Section headline row: only group headlines, not every label
-        headline_row = QHBoxLayout()
-        headline_row.setSpacing(10)
-        headline_row.addWidget(QLabel("Operator"))
-        headline_row.addSpacing(8)
-        headline_row.addWidget(QLabel("EG Rate"))
-        headline_row.addSpacing(40)
-        headline_row.addWidget(QLabel("EG Level"))
-        headline_row.addSpacing(40)
-        headline_row.addWidget(QLabel("Keyboard Scaling"))
-        headline_row.addSpacing(60)
-        headline_row.addWidget(QLabel("Operator"))
-        headline_row.addSpacing(30)
-        headline_row.addWidget(QLabel("Frequency"))
-        layout.addLayout(headline_row)
+        # Section headline row: use QGridLayout for precise alignment
+        headline_grid = QGridLayout()
+        col = 0
+        headline_grid.addWidget(QLabel("Operator"), 0, col)
+        col += 1
+        headline_grid.addWidget(QLabel("EG Rate"), 0, col, 1, 4)
+        col += 4
+        headline_grid.addWidget(QLabel("EG Level"), 0, col, 1, 4)
+        col += 4
+        headline_grid.addWidget(QLabel("Keyboard Scaling"), 0, col, 1, 6)
+        col += 6
+        headline_grid.addWidget(QLabel("Operator"), 0, col, 1, 3)
+        col += 3
+        headline_grid.addWidget(QLabel("Frequency"), 0, col, 1, 4)
+        layout.addLayout(headline_grid)
 
-        # TG rows: TG8 (top) to TG1 (bottom), all same color, one row per TG
-        tg_color = "#222c36"
-        label_color = "#e0e0e0"
-        self.tg_bg_widgets = []  # Store operator background widgets for color updates
+        # Operator rows: use QGridLayout for each row
+        self.tg_bg_widgets = []
         for tg in reversed(range(self.op_count)):
-            tg_row = QHBoxLayout()
+            tg_row_grid = QGridLayout()
             tg_bg = QWidget()
             is_carrier = tg in self.get_carrier_ops(self.get_param('ALS', 0))
-            op_bg_color = "#17677a" if is_carrier else "#222c36"  # dark turquoise for carrier, dark grey for modulator
+            op_bg_color = "#17677a" if is_carrier else "#222c36"
             tg_bg.setStyleSheet(f"background-color: {op_bg_color}; border-radius: 8px;")
-            self.tg_bg_widgets.insert(0, tg_bg)  # Insert at front so index matches operator number
-            tg_bg_layout = QHBoxLayout(tg_bg)
-            tg_bg_layout.setContentsMargins(8, 2, 8, 2)
-            tg_bg_layout.setSpacing(10)
+            self.tg_bg_widgets.insert(0, tg_bg)
+            tg_bg_layout = QGridLayout(tg_bg)
+            col = 0
             # Operator label
             tg_label = QLabel(f"TG{tg+1}")
-            tg_label.setStyleSheet(f"font-weight: bold; color: {label_color}; font-size: 16px;")
+            tg_label.setStyleSheet(f"font-weight: bold; color: #e0e0e0; font-size: 16px;")
             tg_label.setFixedWidth(48)
-            tg_bg_layout.addWidget(tg_label)
+            tg_bg_layout.addWidget(tg_label, 0, col)
+            col += 1
             # EG Rate (R1-R4)
             for i in range(4):
                 eg_col = QVBoxLayout()
-                eg_col.setSpacing(2)
                 eg_rate = QSlider(Qt.Orientation.Vertical)
                 eg_rate.setMinimum(0)
                 eg_rate.setMaximum(99)
                 eg_rate.setValue(self.get_op_param(tg, f'R{i+1}'))
-                eg_rate.setStyleSheet(f"QSlider::groove:vertical {{background: {tg_color}; border: 1px solid #444;}} QSlider::handle:vertical {{background: #8ecae6; border-radius: 6px;}}")
+                eg_rate.setStyleSheet(f"QSlider::groove:vertical {{background: #222c36; border: 1px solid #444;}} QSlider::handle:vertical {{background: #8ecae6; border-radius: 6px;}}")
                 eg_rate.setFixedHeight(30)
                 eg_rate.valueChanged.connect(lambda v, o=tg, idx=i: self.set_op_param(o, f'R{idx+1}', v))
                 eg_rate.setToolTip(f"EG Rate {i+1}: {eg_rate.value()}")
                 eg_rate.valueChanged.connect(lambda v, s=eg_rate, n=f'EG Rate {i+1}': s.setToolTip(f'{n}: {v}'))
                 eg_col.addWidget(eg_rate, alignment=Qt.AlignmentFlag.AlignHCenter)
                 eg_col.addWidget(QLabel(f"R{i+1}"), alignment=Qt.AlignmentFlag.AlignHCenter)
-                tg_bg_layout.addLayout(eg_col)
+                eg_widget = QWidget()
+                eg_widget.setLayout(eg_col)
+                tg_bg_layout.addWidget(eg_widget, 0, col)
+                col += 1
             # EG Level (L1-L4)
             for i in range(4):
                 eg_col = QVBoxLayout()
-                eg_col.setSpacing(2)
                 eg_level = QSlider(Qt.Orientation.Vertical)
                 eg_level.setMinimum(0)
                 eg_level.setMaximum(99)
                 eg_level.setValue(self.get_op_param(tg, f'L{i+1}'))
-                eg_level.setStyleSheet(f"QSlider::groove:vertical {{background: {tg_color}; border: 1px solid #444;}} QSlider::handle:vertical {{background: #ffb703; border-radius: 6px;}}")
+                eg_level.setStyleSheet(f"QSlider::groove:vertical {{background: #222c36; border: 1px solid #444;}} QSlider::handle:vertical {{background: #ffb703; border-radius: 6px;}}")
                 eg_level.setFixedHeight(30)
                 eg_level.valueChanged.connect(lambda v, o=tg, idx=i: self.set_op_param(o, f'L{idx+1}', v))
                 eg_level.setToolTip(f"EG Level {i+1}: {eg_level.value()}")
                 eg_level.valueChanged.connect(lambda v, s=eg_level, n=f'EG Level {i+1}': s.setToolTip(f'{n}: {v}'))
                 eg_col.addWidget(eg_level, alignment=Qt.AlignmentFlag.AlignHCenter)
                 eg_col.addWidget(QLabel(f"L{i+1}"), alignment=Qt.AlignmentFlag.AlignHCenter)
-                tg_bg_layout.addLayout(eg_col)
+                eg_widget = QWidget()
+                eg_widget.setLayout(eg_col)
+                tg_bg_layout.addWidget(eg_widget, 0, col)
+                col += 1
             # Keyboard Scaling (BP, LD, RD, LC, RC, RS)
             for key, full_name, short_lbl in zip([
                 "BP", "LD", "RD", "LC", "RC", "RS"
@@ -157,8 +159,7 @@ class VoiceEditorPanel(QDialog):
             ], [
                 "BP", "LD", "RD", "LC", "RC", "RS"
             ]):
-                col = QVBoxLayout()
-                col.setSpacing(2)
+                col_layout = QVBoxLayout()
                 dial = QDial()
                 dial.setMinimum(0)
                 dial.setMaximum(99 if key in ["BP", "LD", "RD"] else 3 if key in ["LC", "RC"] else 7)
@@ -169,9 +170,12 @@ class VoiceEditorPanel(QDialog):
                 dial.valueChanged.connect(lambda v, o=tg, k=key: self.set_op_param(o, k, v))
                 dial.setToolTip(f"{full_name}: {dial.value()}")
                 dial.valueChanged.connect(lambda v, s=dial, n=full_name: s.setToolTip(f'{n}: {v}'))
-                col.addWidget(dial, alignment=Qt.AlignmentFlag.AlignHCenter)
-                col.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
-                tg_bg_layout.addLayout(col)
+                col_layout.addWidget(dial, alignment=Qt.AlignmentFlag.AlignHCenter)
+                col_layout.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
+                col_widget = QWidget()
+                col_widget.setLayout(col_layout)
+                tg_bg_layout.addWidget(col_widget, 0, col)
+                col += 1
             # Operator (TL, AMS, TS)
             for key, full_name, short_lbl, max_val in zip([
                 "TL", "AMS", "TS"
@@ -180,8 +184,7 @@ class VoiceEditorPanel(QDialog):
             ], [
                 "TL", "AMS", "TS"
             ], [99, 3, 7]):
-                col = QVBoxLayout()
-                col.setSpacing(2)
+                col_layout = QVBoxLayout()
                 dial = QDial()
                 dial.setMinimum(0)
                 dial.setMaximum(max_val)
@@ -192,9 +195,12 @@ class VoiceEditorPanel(QDialog):
                 dial.valueChanged.connect(lambda v, o=tg, k=key: self.set_op_param(o, k, v))
                 dial.setToolTip(f"{full_name}: {dial.value()}")
                 dial.valueChanged.connect(lambda v, s=dial, n=full_name: s.setToolTip(f'{n}: {v}'))
-                col.addWidget(dial, alignment=Qt.AlignmentFlag.AlignHCenter)
-                col.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
-                tg_bg_layout.addLayout(col)
+                col_layout.addWidget(dial, alignment=Qt.AlignmentFlag.AlignHCenter)
+                col_layout.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
+                col_widget = QWidget()
+                col_widget.setLayout(col_layout)
+                tg_bg_layout.addWidget(col_widget, 0, col)
+                col += 1
             # Frequency (PM, PC, PF, PD)
             for key, full_name, short_lbl, max_val in zip([
                 "PM", "PC", "PF", "PD"
@@ -203,8 +209,7 @@ class VoiceEditorPanel(QDialog):
             ], [
                 "PM", "COARSE", "FINE", "DETUNE"
             ], [1, 31, 99, 14]):
-                col = QVBoxLayout()
-                col.setSpacing(2)
+                col_layout = QVBoxLayout()
                 dial = QDial()
                 dial.setMinimum(0)
                 dial.setMaximum(max_val)
@@ -215,14 +220,18 @@ class VoiceEditorPanel(QDialog):
                 dial.valueChanged.connect(lambda v, o=tg, k=key: self.set_op_param(o, k, v))
                 dial.setToolTip(f"{full_name}: {dial.value()}")
                 dial.valueChanged.connect(lambda v, s=dial, n=full_name: s.setToolTip(f'{n}: {v}'))
-                col.addWidget(dial, alignment=Qt.AlignmentFlag.AlignHCenter)
-                col.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
-                tg_bg_layout.addLayout(col)
-            tg_bg_layout.addStretch()
-            tg_row.addWidget(tg_bg)
-            layout.addLayout(tg_row)
+                col_layout.addWidget(dial, alignment=Qt.AlignmentFlag.AlignHCenter)
+                col_layout.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
+                col_widget = QWidget()
+                col_widget.setLayout(col_layout)
+                tg_bg_layout.addWidget(col_widget, 0, col)
+                col += 1
+            tg_bg.setLayout(tg_bg_layout)
+            tg_row_grid.addWidget(tg_bg, 0, 0)
+            layout.addLayout(tg_row_grid)
 
         # Global/voice section: PEG RATE/LEVEL as vertical sliders like R1-L4, rest as grey dials
+        tg_color = "#222c36"  # Ensure tg_color is defined for use below
         global_grid = QGridLayout()
         peg_labels = ["PEG RATE1", "PEG RATE2", "PEG RATE3", "PEG RATE4", "PEG LEVEL1", "PEG LEVEL2", "PEG LEVEL3", "PEG LEVEL4"]
         peg_keys = ["PR1", "PR2", "PR3", "PR4", "PL1", "PL2", "PL3", "PL4"]
