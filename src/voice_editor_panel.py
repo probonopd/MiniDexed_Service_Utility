@@ -61,6 +61,16 @@ class VoiceEditorPanel(QDialog):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
+        
+        channel_layout = QHBoxLayout()
+        channel_layout.addWidget(QLabel("MIDI Channel:"))
+        self.channel_combo = QComboBox()
+        for i in range(1, 17):
+            self.channel_combo.addItem(str(i))
+        channel_layout.addWidget(self.channel_combo)
+        channel_layout.addStretch()
+        layout.addLayout(channel_layout)
+
         # Top: Patch name and algorithm
         top_layout = QHBoxLayout()
         name_lbl = QLabel("Patch Name:")
@@ -321,9 +331,17 @@ class VoiceEditorPanel(QDialog):
             tg_bg.setStyleSheet(f"background-color: {op_bg_color}; border-radius: 8px;")
 
     def on_algorithm_changed(self, idx):
+        print(f"[DEBUG] on_algorithm_changed called with idx={idx}")
         self.set_param('ALS', idx)
         self.update_operator_bg_colors()
         self.update_svg_overlay()
+        # Also send SysEx for algorithm change
+        param_num = self._get_param_num('ALS')
+        print(f"[DEBUG] _get_param_num('ALS') returned {param_num}")
+        if param_num is not None:
+            self.send_sysex('ALS', idx, param_num)
+        else:
+            print("[DEBUG] No param_num for 'ALS', SysEx not sent.")
 
     def get_patch_name(self):
         name = ''
@@ -341,10 +359,10 @@ class VoiceEditorPanel(QDialog):
 
     def set_param(self, key, value):
         self.params[key] = value
-
-    def get_op_param(self, op, key):
-        ops = self.params.get('operators', [{}]*self.op_count)
-        return ops[op].get(key, 0)
+        # Find param_num for global params
+        param_num = self._get_param_num(key)
+        if param_num is not None:
+            self.send_sysex(key, value, param_num)
 
     def set_op_param(self, op, key, value):
         if 'operators' not in self.params or not isinstance(self.params['operators'], list):
@@ -352,10 +370,79 @@ class VoiceEditorPanel(QDialog):
         elif len(self.params['operators']) < self.op_count:
             self.params['operators'] += [{} for _ in range(self.op_count - len(self.params['operators']))]
         self.params['operators'][op][key] = value
+        # Calculate param_num for operator params
+        param_num = self._get_operator_param_num(op, key)
+        if param_num is not None:
+            self.send_sysex(key, value, param_num)
 
-    def init_patch_bytes(self):
-        data = [0xF0, 0x43, 0x00, 0x09, 0x20] + [0]*155 + [0xF7]
-        name = b'INIT PATCH'
-        for i, c in enumerate(name):
-            data[150 + i] = c
-        return bytes(data)
+    def get_op_param(self, op, key, default=0):
+        if 'operators' in self.params and isinstance(self.params['operators'], list):
+            if 0 <= op < len(self.params['operators']):
+                return self.params['operators'][op].get(key, default)
+        return default
+
+    def send_sysex(self, key, value, param_num):
+        print(f"[DEBUG] send_sysex called with key={key}, value={value}, param_num={param_num}")
+        # Build and send DX7 Parameter Change SysEx message
+        if param_num is not None and value is not None:
+            ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
+            print(f"[DEBUG] Using MIDI channel index {ch}")
+            # Voice parameter change (0-155)
+            if 0 <= param_num <= 155:
+                group = 0x00
+                if param_num <= 127:
+                    group_byte = group
+                    param_byte = param_num
+                else:
+                    group_byte = group | 0x01  # set pp bits for 128-155
+                    param_byte = param_num - 128
+            elif 64 <= param_num <= 77:
+                group = 0x20
+                group_byte = group
+                param_byte = param_num
+            else:
+                print(f"[VOICE EDITOR PANEL] Unsupported parameter number: {param_num}")
+                return
+            sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
+            print(f"[DEBUG] Constructed SysEx: {' '.join(f'{b:02X}' for b in sysex)}")
+            if self.midi_outport:
+                try:
+                    import mido
+                    msg = mido.Message('sysex', data=sysex[1:-1])
+                    print(f"[DEBUG] Sending SysEx via mido on channel {ch+1}")
+                    self.midi_outport.send(msg)
+                except Exception as e:
+                    print(f"[VOICE EDITOR PANEL] Failed to send SysEx: {e}")
+            else:
+                print("[DEBUG] midi_outport is not set, cannot send SysEx.")
+        else:
+            print("[VOICE EDITOR PANEL] No valid parameter or mapping for SysEx.")
+
+    def _get_param_num(self, key):
+        # Map global param key to DX7 parameter number
+        param_map = {
+            'PR1': 121, 'PR2': 122, 'PR3': 123, 'PR4': 124,
+            'PL1': 125, 'PL2': 126, 'PL3': 127, 'PL4': 128,
+            'FBL': 129, 'OPI': 130, 'ALS': 134, 'LFS': 137, 'LFD': 138, 'LPMD': 139, 'LAMD': 140,
+            'LFKS': 141, 'LFW': 142, 'LPMS': 143, 'TRNP': 144,
+        }
+        if key.startswith('VNAM'):
+            try:
+                idx = int(key[4:])
+                return 145 + idx - 1
+            except Exception:
+                return None
+        return param_map.get(key)
+
+    def _get_operator_param_num(self, op, key):
+        # Map operator param to DX7 parameter number (as in voice_editor.py)
+        op_param_order = [
+            'R1', 'R2', 'R3', 'R4', 'L1', 'L2', 'L3', 'L4',
+            'BP', 'LD', 'RD', 'LC', 'RC', 'RS', 'TL', 'AMS', 'TS', 'PM', 'PC', 'PF', 'PD'
+        ]
+        if key in op_param_order:
+            op_idx = int(op)
+            param_base = (5 - op_idx) * 21
+            param_offset = op_param_order.index(key)
+            return param_base + param_offset
+        return None
