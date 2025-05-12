@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction
 from voice_editor import VoiceEditor
+from main_window import MainWindow
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"
 VOICE_LIST_CACHE_NAME = "patch_list.json"
@@ -73,25 +74,33 @@ class VoiceBrowser(QDialog):
     _instance = None
 
     @classmethod
-    def get_instance(cls, parent=None):
+    def get_instance(cls, parent=None, main_window=None):
+        # If only one argument is passed and it's a MainWindow, treat it as main_window
+        if main_window is None and parent is not None and hasattr(parent, 'midi_handler'):
+            main_window = parent
+            parent = None
         # If the instance doesn't exist or is not visible, create a new one
         if cls._instance is None or not cls._instance.isVisible():
-            cls._instance = VoiceBrowser(parent)
-            # When the dialog is closed, clear the instance
+            cls._instance = VoiceBrowser(parent, main_window=main_window)
             cls._instance.finished.connect(lambda: setattr(cls, "_instance", None))
         return cls._instance
 
     @classmethod
-    def show_singleton(cls, parent=None):
-        dlg = cls.get_instance(parent)
+    def show_singleton(cls, parent=None, main_window=None):
+        dlg = cls.get_instance(parent, main_window)
         dlg.setModal(False)
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()
         return dlg
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, main_window=None):
+        # If only one argument is passed and it's a MainWindow, treat it as main_window
+        if main_window is None and parent is not None and hasattr(parent, 'midi_handler'):
+            main_window = parent
+            parent = None
         super().__init__(parent)
+        self.main_window = main_window
         if hasattr(self, '_initialized') and self._initialized:
             return
         self._initialized = True
@@ -175,8 +184,51 @@ class VoiceBrowser(QDialog):
         query = self.search_box.text().lower()
         self.list_widget.clear()
         self.filtered_voices = [v for v in self.voices if query in v["name"].lower() or query in v.get("author", "").lower()]
-        for voice in self.filtered_voices:
-            self.list_widget.addItem(QListWidgetItem(f"{voice['name']} - {voice.get('author', '')}"))
+        for idx, voice in enumerate(self.filtered_voices):
+            item = QListWidgetItem(f"{voice['name']} - {voice.get('author', '')}")
+            self.list_widget.addItem(item)
+        # Add edit buttons to each row
+        self.add_edit_buttons_to_list()
+
+    def add_edit_buttons_to_list(self):
+        # Add an 'e' button to each row in the QListWidget
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            widget = QWidget()
+            layout = QHBoxLayout(widget)
+            layout.setContentsMargins(0, 0, 0, 0)
+            label = QLabel(item.text())
+            edit_btn = QPushButton("e")
+            edit_btn.setFixedWidth(22)
+            edit_btn.setToolTip("Send and edit this voice")
+            edit_btn.clicked.connect(lambda checked, idx=i: self.edit_voice_from_list(idx))
+            layout.addWidget(label)
+            layout.addWidget(edit_btn)
+            layout.addStretch(1)
+            self.list_widget.setItemWidget(item, widget)
+
+    def edit_voice_from_list(self, idx):
+        # Send the voice via MIDI and open the Voice Editor for the selected channel
+        self.download_voice(idx)
+        # After sending, open the editor for the selected channel and voice
+        def after_download(syx_data, voice_name, error):
+            if error:
+                return
+            midi_outport = getattr(self.main_window, 'midi_handler', None)
+            if midi_outport and hasattr(midi_outport, 'outport'):
+                midi_outport = midi_outport.outport
+            VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=bytes(syx_data))
+            editor = VoiceEditor.get_instance()
+            if hasattr(editor, 'channel_combo'):
+                idx_ch = self.channel_combo.currentIndex()
+                editor.channel_combo.setCurrentIndex(idx_ch)
+        # Connect to the download worker's finished signal for this idx
+        if hasattr(self, 'download_worker'):
+            try:
+                self.download_worker.finished.disconnect()
+            except Exception:
+                pass
+            self.download_worker.finished.connect(after_download)
 
     def download_voice(self, idx):
         if self.sending:

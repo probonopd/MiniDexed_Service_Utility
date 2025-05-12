@@ -144,7 +144,7 @@ def setup_menus(main_window):
                 main_window.voice_browser_dialog.activateWindow()
                 return
         from voice_browser import VoiceBrowser
-        VoiceBrowser.show_singleton(main_window)
+        VoiceBrowser.show_singleton(main_window=main_window)
 
     def show_midi_command_dialog(cmd):
         # If there are no parameters or all parameters are fixed, skip dialog

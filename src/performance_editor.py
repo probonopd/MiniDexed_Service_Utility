@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
+from voice_editor import VoiceEditor
 import sys
 
 # Define global and TG-specific fields explicitly in the order they should appear
@@ -113,17 +114,32 @@ class PerformanceEditor(QDialog):
                 for col in range(8):
                     value = PERFORMANCE_VALUES[row][col]
                     if field == "Voice":
+                        from PyQt6.QtWidgets import QWidget, QHBoxLayout, QSizePolicy
+                        cell_widget = QWidget()
+                        h_layout = QHBoxLayout(cell_widget)
+                        h_layout.setContentsMargins(0, 0, 0, 0)
+                        h_layout.setSpacing(0)  # Remove spacing between widgets
                         btn = QPushButton(str(value))
+                        btn.setObjectName(f"voice_btn_{col}")
+                        btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
                         btn.clicked.connect(lambda checked, r=row, c=col: self.select_voice_dialog(r, c))
+                        edit_btn = QPushButton("e")
+                        edit_btn.setObjectName(f"edit_btn_{col}")
+                        edit_btn.setFixedWidth(22)
+                        edit_btn.setToolTip("Edit this voice")
+                        edit_btn.clicked.connect(lambda checked, r=row, c=col: self.open_voice_editor(r, c))
+                        h_layout.addWidget(btn)
+                        h_layout.addWidget(edit_btn)
+                        # No stretch, so buttons are flush
                         # Hide if MIDIChannel is Omni (on initial load)
                         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
                         channel_widget = self.table.cellWidget(midi_channel_row, col)
                         if channel_widget is not None and channel_widget.metaObject().className() == "QComboBox":
                             if channel_widget.currentIndex() == 16:  # Omni
-                                btn.hide()
+                                cell_widget.hide()
                             else:
-                                btn.show()
-                        self.table.setCellWidget(row, col, btn)
+                                cell_widget.show()
+                        self.table.setCellWidget(row, col, cell_widget)
                     elif field in PERFORMANCE_FIELD_RANGES:
                         min_val, max_val = PERFORMANCE_FIELD_RANGES[field]
                         if field == "MIDIChannel":
@@ -221,7 +237,7 @@ class PerformanceEditor(QDialog):
     def select_voice_dialog(self, row, col):
         from voice_browser import VoiceBrowser
         # Use the singleton show method
-        dlg = VoiceBrowser.show_singleton(self)
+        dlg = VoiceBrowser.show_singleton(main_window=self)
         # Preselect channel in VoiceBrowser to match the MIDIChannel for this TG
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         channel_widget = self.table.cellWidget(midi_channel_row, col)
@@ -535,8 +551,15 @@ class PerformanceEditor(QDialog):
                     else:
                         tg_channel = None
             if tg_channel is not None and tg_channel == midi_channel:
-                btn = self.table.cellWidget(voice_row, tg)
-                if isinstance(btn, QPushButton):
+                cell_widget = self.table.cellWidget(voice_row, tg)
+                # If cell_widget is a QWidget with a layout, get the first QPushButton
+                btn = None
+                if cell_widget is not None:
+                    for child in cell_widget.findChildren(QPushButton):
+                        # The first QPushButton is the voice name button
+                        btn = child
+                        break
+                if btn is not None:
                     btn.setText(str(voice_name))
                 self._voice_dump_data[tg] = data
                 self._pending_voice_dumps.discard(tg)
@@ -629,3 +652,28 @@ class PerformanceEditor(QDialog):
                     i += 4
         # After all programmatic changes, ensure _block_signal is False
         self._block_signal = False
+    def open_voice_editor(self, row, col):
+        # Get the voice name and MIDI channel for this TG
+        midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
+        channel_widget = self.table.cellWidget(midi_channel_row, col)
+        channel = 1
+        if channel_widget is not None:
+            if channel_widget.metaObject().className() == "QComboBox":
+                idx = channel_widget.currentIndex()
+                if idx < 16:
+                    channel = idx + 1
+            elif isinstance(channel_widget, QSpinBox):
+                channel = channel_widget.value()
+        # Try to get the voice bytes from the last voice dump if available
+        voice_bytes = None
+        if hasattr(self, '_voice_dump_data') and col in self._voice_dump_data:
+            voice_bytes = bytes(self._voice_dump_data[col])
+        # Open the Voice Editor
+        midi_outport = getattr(self.main_window, 'midi_handler', None)
+        if midi_outport and hasattr(midi_outport, 'outport'):
+            midi_outport = midi_outport.outport
+        VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=voice_bytes)
+        # Set the channel in the editor
+        editor = VoiceEditor.get_instance()
+        if hasattr(editor, 'channel_combo'):
+            editor.channel_combo.setCurrentIndex(channel - 1)
