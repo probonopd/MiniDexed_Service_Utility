@@ -1,42 +1,45 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QDial, QPushButton, QLineEdit, QSpinBox, QCheckBox, QWidget, QGridLayout
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QDial, QPushButton, QLineEdit, QSpinBox, QCheckBox, QWidget, QGridLayout, QStackedLayout
 from PyQt6.QtCore import Qt
+from PyQt6.QtSvgWidgets import QSvgWidget
+from PyQt6.QtGui import QResizeEvent
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
+import os
 
 class VoiceEditorPanel(QDialog):
-    # DX7 carrier operator mapping for algorithms 1-32 (1-based, OP1=0)
+    # DX7 carrier operators
     DX7_CARRIER_MAP = [
-        [5],            # 1: OP6
-        [4, 5],         # 2: OP5, OP6
-        [3, 5],         # 3: OP4, OP6
-        [2, 5],         # 4: OP3, OP6
-        [1, 5],         # 5: OP2, OP6
-        [0, 5],         # 6: OP1, OP6
-        [5],            # 7: OP6
-        [2, 5],         # 8: OP3, OP6
-        [0, 2, 5],      # 9: OP1, OP3, OP6
-        [0, 3, 5],      # 10: OP1, OP4, OP6
-        [0, 2, 4, 5],   # 11: OP1, OP3, OP5, OP6
-        [0, 1, 2, 3, 4, 5], # 12: all
-        [5],            # 13: OP6
-        [4, 5],         # 14: OP5, OP6
-        [3, 5],         # 15: OP4, OP6
-        [2, 5],         # 16: OP3, OP6
-        [1, 5],         # 17: OP2, OP6
-        [0, 5],         # 18: OP1, OP6
-        [5],            # 19: OP6
-        [2, 5],         # 20: OP3, OP6
-        [0, 2, 5],      # 21: OP1, OP3, OP6
-        [0, 3, 5],      # 22: OP1, OP4, OP6
-        [0, 2, 4, 5],   # 23: OP1, OP3, OP5, OP6
-        [0, 1, 2, 3, 4, 5], # 24: all
-        [5],            # 25: OP6
-        [4, 5],         # 26: OP5, OP6
-        [3, 5],         # 27: OP4, OP6
-        [2, 5],         # 28: OP3, OP6
-        [1, 5],         # 29: OP2, OP6
-        [0, 5],         # 30: OP1, OP6
-        [5],            # 31: OP6
-        [0, 1, 2, 3, 4, 5], # 32: all
+        [0, 2],           # 1
+        [0, 2],           # 2
+        [0, 3],           # 3
+        [0, 3],           # 4
+        [0, 2, 4],        # 5
+        [0, 2, 4],        # 6
+        [0, 2],           # 7
+        [0, 2],           # 8
+        [0, 2],           # 9
+        [0, 3],           # 10
+        [0, 3],           # 11
+        [0, 2],           # 12
+        [0, 2],           # 13
+        [0, 2],           # 14
+        [0, 2],           # 15
+        [0],              # 16
+        [0],              # 17
+        [0],              # 18
+        [0, 3, 4],        # 19
+        [0, 1, 3],        # 20
+        [0, 1, 3, 4],     # 21
+        [0, 2, 3, 4],     # 22
+        [0, 1, 3, 4],     # 23
+        [0, 1, 2, 3, 4],  # 24
+        [0, 1, 2, 3, 4],  # 25
+        [0, 1, 3],        # 26
+        [0, 1, 3],        # 27
+        [0, 2, 5],        # 28
+        [0, 1, 2, 4],     # 29
+        [0, 1, 2, 5],     # 30
+        [0, 1, 2, 3, 4],  # 31
+        [0, 1, 2, 3, 4, 5], # 32
     ]
 
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
@@ -82,39 +85,37 @@ class VoiceEditorPanel(QDialog):
         top_layout.addStretch()
         layout.addLayout(top_layout)
 
-        # Section headline row: use QGridLayout for precise alignment
-        headline_grid = QGridLayout()
+        # Section headline and operator rows: use a single QGridLayout for perfect alignment
+        op_grid = QGridLayout()
         col = 0
-        headline_grid.addWidget(QLabel("Operator"), 0, col)
+        op_grid.addWidget(QLabel("Operator"), 0, col)
         col += 1
-        headline_grid.addWidget(QLabel("EG Rate"), 0, col, 1, 4)
+        op_grid.addWidget(QLabel("EG Rate"), 0, col, 1, 4)
         col += 4
-        headline_grid.addWidget(QLabel("EG Level"), 0, col, 1, 4)
+        op_grid.addWidget(QLabel("EG Level"), 0, col, 1, 4)
         col += 4
-        headline_grid.addWidget(QLabel("Keyboard Scaling"), 0, col, 1, 6)
+        op_grid.addWidget(QLabel("Keyboard Scaling"), 0, col, 1, 6)
         col += 6
-        headline_grid.addWidget(QLabel("Operator"), 0, col, 1, 3)
+        op_grid.addWidget(QLabel("Operator"), 0, col, 1, 3)
         col += 3
-        headline_grid.addWidget(QLabel("Frequency"), 0, col, 1, 4)
-        layout.addLayout(headline_grid)
+        op_grid.addWidget(QLabel("Frequency"), 0, col, 1, 4)
 
-        # Operator rows: use QGridLayout for each row
         self.tg_bg_widgets = []
-        for tg in reversed(range(self.op_count)):
-            tg_row_grid = QGridLayout()
-            tg_bg = QWidget()
+        op_col_count = 1 + 4 + 4 + 6 + 3 + 4  # total columns in op_grid
+        for row, tg in enumerate(reversed(range(self.op_count)), start=1):
             is_carrier = tg in self.get_carrier_ops(self.get_param('ALS', 0))
             op_bg_color = "#17677a" if is_carrier else "#222c36"
+            tg_bg = QWidget()
             tg_bg.setStyleSheet(f"background-color: {op_bg_color}; border-radius: 8px;")
             self.tg_bg_widgets.insert(0, tg_bg)
-            tg_bg_layout = QGridLayout(tg_bg)
-            col = 0
+            tg_row_layout = QHBoxLayout(tg_bg)
+            tg_row_layout.setContentsMargins(2, 2, 2, 2)
+            tg_row_layout.setSpacing(2)
             # Operator label
             tg_label = QLabel(f"TG{tg+1}")
             tg_label.setStyleSheet(f"font-weight: bold; color: #e0e0e0; font-size: 16px;")
-            tg_label.setFixedWidth(48)
-            tg_bg_layout.addWidget(tg_label, 0, col)
-            col += 1
+            tg_label.setFixedWidth(60)
+            tg_row_layout.addWidget(tg_label)
             # EG Rate (R1-R4)
             for i in range(4):
                 eg_col = QVBoxLayout()
@@ -131,8 +132,7 @@ class VoiceEditorPanel(QDialog):
                 eg_col.addWidget(QLabel(f"R{i+1}"), alignment=Qt.AlignmentFlag.AlignHCenter)
                 eg_widget = QWidget()
                 eg_widget.setLayout(eg_col)
-                tg_bg_layout.addWidget(eg_widget, 0, col)
-                col += 1
+                tg_row_layout.addWidget(eg_widget)
             # EG Level (L1-L4)
             for i in range(4):
                 eg_col = QVBoxLayout()
@@ -149,8 +149,7 @@ class VoiceEditorPanel(QDialog):
                 eg_col.addWidget(QLabel(f"L{i+1}"), alignment=Qt.AlignmentFlag.AlignHCenter)
                 eg_widget = QWidget()
                 eg_widget.setLayout(eg_col)
-                tg_bg_layout.addWidget(eg_widget, 0, col)
-                col += 1
+                tg_row_layout.addWidget(eg_widget)
             # Keyboard Scaling (BP, LD, RD, LC, RC, RS)
             for key, full_name, short_lbl in zip([
                 "BP", "LD", "RD", "LC", "RC", "RS"
@@ -174,8 +173,7 @@ class VoiceEditorPanel(QDialog):
                 col_layout.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
                 col_widget = QWidget()
                 col_widget.setLayout(col_layout)
-                tg_bg_layout.addWidget(col_widget, 0, col)
-                col += 1
+                tg_row_layout.addWidget(col_widget)
             # Operator (TL, AMS, TS)
             for key, full_name, short_lbl, max_val in zip([
                 "TL", "AMS", "TS"
@@ -199,8 +197,7 @@ class VoiceEditorPanel(QDialog):
                 col_layout.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
                 col_widget = QWidget()
                 col_widget.setLayout(col_layout)
-                tg_bg_layout.addWidget(col_widget, 0, col)
-                col += 1
+                tg_row_layout.addWidget(col_widget)
             # Frequency (PM, PC, PF, PD)
             for key, full_name, short_lbl, max_val in zip([
                 "PM", "PC", "PF", "PD"
@@ -224,11 +221,31 @@ class VoiceEditorPanel(QDialog):
                 col_layout.addWidget(QLabel(short_lbl), alignment=Qt.AlignmentFlag.AlignHCenter)
                 col_widget = QWidget()
                 col_widget.setLayout(col_layout)
-                tg_bg_layout.addWidget(col_widget, 0, col)
-                col += 1
-            tg_bg.setLayout(tg_bg_layout)
-            tg_row_grid.addWidget(tg_bg, 0, 0)
-            layout.addLayout(tg_row_grid)
+                tg_row_layout.addWidget(col_widget)
+            # Add the row widget to the op_grid, spanning all columns
+            op_grid.addWidget(tg_bg, row, 0, 1, op_col_count)
+
+        # Create a container widget for the operator table and SVG overlay using absolute positioning
+        self.op_table_container = QWidget()
+        # Dynamically set minimum height based on operator rows (e.g. 60px per row + header)
+        row_height = 60
+        min_height = row_height * (self.op_count + 1)
+        self.op_table_container.setMinimumHeight(min_height)
+        self.op_table_container.setMaximumHeight(min_height)
+        # Operator table widget
+        op_table_widget = QWidget(self.op_table_container)
+        op_table_widget.setLayout(op_grid)
+        op_table_widget.setGeometry(0, 0, self.width(), min_height)
+        op_table_widget.lower()  # Ensure it's below the SVG overlay
+        # SVG overlay
+        self.svg_overlay = QSvgWidget(self.op_table_container)
+        self.svg_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.svg_overlay.setStyleSheet("background: transparent;")
+        self.svg_overlay.setGeometry(0, 0, self.width(), min_height)
+        self.svg_overlay.setVisible(True)
+        self.svg_overlay.raise_()  # Ensure overlay is above the table
+        self.update_svg_overlay()  # Initial SVG
+        layout.addWidget(self.op_table_container)
 
         # Global/voice section: PEG RATE/LEVEL as vertical sliders like R1-L4, rest as grey dials
         tg_color = "#222c36"  # Ensure tg_color is defined for use below
@@ -273,6 +290,29 @@ class VoiceEditorPanel(QDialog):
 
         self.setLayout(layout)
 
+    def resizeEvent(self, event: QResizeEvent):
+        super().resizeEvent(event)
+        # Resize SVG overlay and operator table to cover the operator table area
+        self.update_svg_overlay()
+
+    def update_svg_overlay(self):
+        alg_idx = self.alg_combo.currentIndex() + 1  # 1-based
+        svg_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "images", f"algorithm-{alg_idx:02d}.svg"))
+        self.svg_overlay.load(svg_path)
+        container_height = self.op_table_container.minimumHeight() + 18
+        # Get the SVG's intrinsic size
+        renderer = self.svg_overlay.renderer()
+        svg_size = renderer.defaultSize()
+        # Scale to fit height, keep aspect ratio
+        scale = container_height / svg_size.height()
+        new_height = int(svg_size.height() * scale)
+        new_width = int(svg_size.width() * scale)
+        x = 0
+        y = 35  # move down
+        self.svg_overlay.setGeometry(x, y, new_width, new_height)
+        self.svg_overlay.setVisible(True)
+        self.svg_overlay.raise_()  # Ensure overlay is above the table
+
     def update_operator_bg_colors(self):
         alg_idx = self.alg_combo.currentIndex()
         carrier_ops = self.get_carrier_ops(alg_idx)
@@ -283,6 +323,7 @@ class VoiceEditorPanel(QDialog):
     def on_algorithm_changed(self, idx):
         self.set_param('ALS', idx)
         self.update_operator_bg_colors()
+        self.update_svg_overlay()
 
     def get_patch_name(self):
         name = ''

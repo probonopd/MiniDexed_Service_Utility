@@ -10,7 +10,13 @@ class SingleVoiceDumpDecoder:
         self.decode()
 
     def decode(self):
-        if not self.data or len(self.data) != 161:
+        if not self.data:
+            print("[SVD DECODER] No data provided.")
+            return
+        if len(self.data) == 163:
+            # Striip first and last byte
+            self.data = self.data[1:-1]
+        if len(self.data) != 161:
             print(f"[SVD DECODER] Data must be exactly 161 bytes, got {len(self.data) if self.data else 'None'}.")
             return
         d = self.data[5:160]  # 155 bytes of VCED voice data
