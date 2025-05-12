@@ -97,7 +97,8 @@ class PerformanceEditor(QDialog):
                 if min_val == 0 and max_val == 1:
                     from PyQt6.QtWidgets import QCheckBox
                     cb = QCheckBox()
-                    cb.setChecked(str(value) == "1")
+                    # Set checked state based on value (treat '1', 1, True as checked)
+                    cb.setChecked(str(value) == "1" or value is True)
                     cb.stateChanged.connect(lambda state, r=row: self.on_spin_changed(r, 0, int(state == 2)))
                     cb.toggled.connect(lambda checked, r=row: self.on_spin_changed(r, 0, int(checked)))
                     self.table.setCellWidget(row, 0, cb)
@@ -105,8 +106,10 @@ class PerformanceEditor(QDialog):
                     spin = QSpinBox()
                     spin.setMinimum(min_val)
                     spin.setMaximum(max_val)
-                    if value != "":
+                    try:
                         spin.setValue(int(value))
+                    except Exception:
+                        spin.setValue(min_val)
                     spin.valueChanged.connect(lambda val, r=row: self.on_spin_changed(r, 0, val))
                     self.table.setCellWidget(row, 0, spin)
                 self.table.setSpan(row, 0, 1, 8)
@@ -237,7 +240,7 @@ class PerformanceEditor(QDialog):
     def select_voice_dialog(self, row, col):
         from voice_browser import VoiceBrowser
         # Use the singleton show method
-        dlg = VoiceBrowser.show_singleton(main_window=self)
+        dlg = VoiceBrowser.show_singleton(main_window=self.main_window)
         # Preselect channel in VoiceBrowser to match the MIDIChannel for this TG
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         channel_widget = self.table.cellWidget(midi_channel_row, col)
@@ -577,6 +580,42 @@ class PerformanceEditor(QDialog):
         """
         Populate the table fields from the data in self._sysex_data_buffer.
         """
+        # First, handle global fields
+        global_data = self._sysex_data_buffer.get('global')
+        if global_data and len(global_data) > 3 and global_data[1] == 0x20:
+            i = 2  # skip 0x7D, 0x20
+            while i + 3 < len(global_data):
+                pp1, pp2, vv1, vv2 = global_data[i], global_data[i+1], global_data[i+2], global_data[i+3]
+                # Map param to field name
+                param_map = {
+                    (0x00, 0x00): "CompressorEnable",
+                    (0x00, 0x01): "ReverbEnable",
+                    (0x00, 0x02): "ReverbSize",
+                    (0x00, 0x03): "ReverbHighDamp",
+                    (0x00, 0x04): "ReverbLowDamp",
+                    (0x00, 0x05): "ReverbLowPass",
+                    (0x00, 0x06): "ReverbDiffusion",
+                    (0x00, 0x07): "ReverbLevel",
+                }
+                field = param_map.get((pp1, pp2))
+                if field and field in PERFORMANCE_FIELDS:
+                    row = PERFORMANCE_FIELDS.index(field)
+                    val = (vv1 << 8) | vv2
+                    widget = self.table.cellWidget(row, 0)
+                    if hasattr(widget, 'setChecked'):
+                        self._block_signal = True
+                        widget.setChecked(val == 1)
+                        self._block_signal = False
+                    elif isinstance(widget, QSpinBox):
+                        self._block_signal = True
+                        widget.setValue(val)
+                        self._block_signal = False
+                    else:
+                        item = self.table.item(row, 0)
+                        if item:
+                            item.setText(str(val))
+                i += 4
+        # Then, handle TG-specific fields
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
         for tg in range(8):
             tg_data = self._sysex_data_buffer.get(tg)
