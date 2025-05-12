@@ -121,11 +121,10 @@ class VoiceEditorPanel(QDialog):
             tg_row_layout = QHBoxLayout(tg_bg)
             tg_row_layout.setContentsMargins(2, 2, 2, 2)
             tg_row_layout.setSpacing(2)
-            # Operator label
-            tg_label = QLabel(f"TG{tg+1}")
-            tg_label.setStyleSheet(f"font-weight: bold; color: #e0e0e0; font-size: 16px;")
-            tg_label.setFixedWidth(60)
-            tg_row_layout.addWidget(tg_label)
+            # Insert 50 pixels of space for the operator label
+            spacer_item = QWidget()
+            spacer_item.setFixedWidth(50)
+            tg_row_layout.addWidget(spacer_item)
             # EG Rate (R1-R4)
             for i in range(4):
                 eg_col = QVBoxLayout()
