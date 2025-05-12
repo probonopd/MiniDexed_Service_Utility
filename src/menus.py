@@ -6,6 +6,7 @@ import os
 import json
 import re
 from dialogs import PreferencesDialog
+from performance_editor import PerformanceEditor
 
 def setup_menus(main_window):
     menubar = main_window.menuBar()
@@ -318,8 +319,7 @@ def setup_menus(main_window):
     performance_editor_action = QAction("Performance Editor...", main_window)
     file_menu.addAction(performance_editor_action)
     def show_performance_editor():
-        from performance_editor import PerformanceEditor
-        dlg = PerformanceEditor(main_window)
+        dlg = PerformanceEditor(main_window=main_window)
         dlg.show()
     performance_editor_action.triggered.connect(show_performance_editor)
     file_menu.addAction(update_action)

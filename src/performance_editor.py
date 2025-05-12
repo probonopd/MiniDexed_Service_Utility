@@ -60,9 +60,16 @@ PERFORMANCE_FIELD_RANGES = {
 TG_LABELS = [f"TG{i+1}" for i in range(8)]
 
 class PerformanceEditor(QDialog):
-    def __init__(self, main_window=None):
-        super().__init__(main_window)
+    def __init__(self, parent=None, main_window=None):
+        # If only one argument is passed and it's a MainWindow, treat it as main_window
+        from main_window import MainWindow
+        if main_window is None and parent is not None and hasattr(parent, 'midi_handler'):
+            main_window = parent
+            parent = None
+        super().__init__(parent)
         self.setWindowTitle("Performance Editor")
+        self.setModal(False)
+        self.main_window = main_window
         self.setMinimumWidth(800)
         self.resize(800, self.sizeHint().height())
         row_height = 32
@@ -187,7 +194,6 @@ class PerformanceEditor(QDialog):
         layout.addLayout(btn_layout)
         btn_tg_to_ch.clicked.connect(self.set_tg_to_channels)
         btn_all_to_ch1.clicked.connect(self.set_all_tg_to_ch1)
-        self.main_window = main_window
         # Move initialization logic from showEvent here
         from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
