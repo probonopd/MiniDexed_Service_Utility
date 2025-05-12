@@ -54,32 +54,32 @@ class VoiceEditor(QDialog):
         param_info = []
         # Operator parameters (OP1..OP6, 21 params each)
         op_params = [
-            ("EG RATE1", "R1", 0, 99),
-            ("EG RATE2", "R2", 0, 99),
-            ("EG RATE3", "R3", 0, 99),
-            ("EG RATE4", "R4", 0, 99),
-            ("EG LEVEL1", "L1", 0, 99),
-            ("EG LEVEL2", "L2", 0, 99),
-            ("EG LEVEL3", "L3", 0, 99),
-            ("EG LEVEL4", "L4", 0, 99),
-            ("BREAK POINT", "BP", 0, 99),
-            ("LEFT DEPTH", "LD", 0, 99),
-            ("RIGHT DEPTH", "RD", 0, 99),
-            ("LEFT CURVE", "LC", 0, 3),
-            ("RIGHT CURVE", "RC", 0, 3),
-            ("RATE SCALING", "RS", 0, 7),
-            ("MODULATION SENSITIVITY", "AMS", 0, 3),
-            ("TOUCH SENSITIVITY", "TS", 0, 7),
-            ("TOTAL LEVEL", "TL", 0, 99),
-            ("FREQUENCY MODE", "PM", 0, 1),
-            ("FREQUENCY COARSE", "PC", 0, 31),
-            ("FREQUENCY FINE", "PF", 0, 99),
-            ("DETUNE", "PD", 0, 14),
+            ("EG RATE1", "R1", 0, 99),   # 0
+            ("EG RATE2", "R2", 0, 99),   # 1
+            ("EG RATE3", "R3", 0, 99),   # 2
+            ("EG RATE4", "R4", 0, 99),   # 3
+            ("EG LEVEL1", "L1", 0, 99),  # 4
+            ("EG LEVEL2", "L2", 0, 99),  # 5
+            ("EG LEVEL3", "L3", 0, 99),  # 6
+            ("EG LEVEL4", "L4", 0, 99),  # 7
+            ("BREAK POINT", "BP", 0, 99), # 8
+            ("LEFT DEPTH", "LD", 0, 99),  # 9
+            ("RIGHT DEPTH", "RD", 0, 99), # 10
+            ("LEFT CURVE", "LC", 0, 3),   # 11
+            ("RIGHT CURVE", "RC", 0, 3),  # 12
+            ("RATE SCALING", "RS", 0, 7), # 13
+            ("MODULATION SENSITIVITY", "AMS", 0, 3), # 14
+            ("TOUCH SENSITIVITY", "TS", 0, 7), # 15
+            ("TOTAL LEVEL", "TL", 0, 99), # 16
+            ("FREQUENCY MODE", "PM", 0, 1), # 17
+            ("FREQUENCY COARSE", "PC", 0, 31), # 18
+            ("FREQUENCY FINE", "PF", 0, 99), # 19
+            ("DETUNE", "PD", 0, 14), # 20
         ]
         for op in range(6):
             for i, (label, key, min_val, max_val) in enumerate(op_params):
                 param_num = op * 21 + i
-                param_info.append((f"OP{op+1} {label}", f"OP{op+1}_{key}", min_val, max_val, param_num))
+                param_info.append((f"OP{6-op} {label}", f"OP{6-op}_{key}", min_val, max_val, param_num))
         # Pitch EG (parameters 126-133)
         peg_params = [
             ("PEG RATE1", "PR1", 0, 99, 126),
@@ -93,30 +93,29 @@ class VoiceEditor(QDialog):
         ]
         param_info.extend(peg_params)
         # Global parameters (DX7 parameter change numbers, not VCED offsets)
-        # See Yamaha DX7 MIDI Data Format documentation
-        # https://github.com/jdkoftinoff/jdksysex/blob/master/doc/DX7_sysex_format.txt
         global_params = [
-            ("PITCH MOD SENSITIVITY", "LPMS", 0, 7, 0x00),
-            ("TRANSPOSE", "TRNP", 0, 48, 0x01),
-            ("VOICE NAME CHAR 1", "VNAM1", 32, 127, 0x02),
-            ("VOICE NAME CHAR 2", "VNAM2", 32, 127, 0x03),
-            ("VOICE NAME CHAR 3", "VNAM3", 32, 127, 0x04),
-            ("VOICE NAME CHAR 4", "VNAM4", 32, 127, 0x05),
-            ("VOICE NAME CHAR 5", "VNAM5", 32, 127, 0x06),
-            ("VOICE NAME CHAR 6", "VNAM6", 32, 127, 0x07),
-            ("VOICE NAME CHAR 7", "VNAM7", 32, 127, 0x08),
-            ("VOICE NAME CHAR 8", "VNAM8", 32, 127, 0x09),
-            ("VOICE NAME CHAR 9", "VNAM9", 32, 127, 0x0A),
-            ("VOICE NAME CHAR 10", "VNAM10", 32, 127, 0x0B),
-            ("ALGORITHM SELECTOR", "ALS", 0, 31, 0x1B),
-            ("FEEDBACK LEVEL", "FBL", 0, 7, 0x1C),
-            ("OSCILLATOR KEY SYNC", "OPI", 0, 1, 0x1D),
-            ("LFO SPEED", "LFS", 0, 99, 0x1E),
-            ("LFO DELAY TIME", "LFD", 0, 99, 0x1F),
-            ("LFO PITCH MOD DEPTH", "LPMD", 0, 99, 0x20),
-            ("LFO AMP MOD DEPTH", "LAMD", 0, 99, 0x21),
-            ("LFO KEY SYNC", "LFKS", 0, 1, 0x22),
-            ("LFO WAVE", "LFW", 0, 5, 0x23),
+            ("ALGORITHM SELECTOR", "ALS", 0, 31, 134),
+            ("FEEDBACK LEVEL", "FBL", 0, 7, 135),
+            ("OSCILLATOR KEY SYNC", "OPI", 0, 1, 136),
+            ("LFO SPEED", "LFS", 0, 99, 137),
+            ("LFO DELAY TIME", "LFD", 0, 99, 138),
+            ("LFO PITCH MOD DEPTH", "LPMD", 0, 99, 139),
+            ("LFO AMP MOD DEPTH", "LAMD", 0, 99, 140),
+            ("LFO KEY SYNC", "LFKS", 0, 1, 141),
+            ("LFO WAVE", "LFW", 0, 5, 142),
+            ("PITCH MOD SENSITIVITY", "LPMS", 0, 7, 143),
+            ("TRANSPOSE", "TRNP", 0, 48, 144),
+            ("VOICE NAME CHAR 1", "VNAM1", 32, 127, 145),
+            ("VOICE NAME CHAR 2", "VNAM2", 32, 127, 146),
+            ("VOICE NAME CHAR 3", "VNAM3", 32, 127, 147),
+            ("VOICE NAME CHAR 4", "VNAM4", 32, 127, 148),
+            ("VOICE NAME CHAR 5", "VNAM5", 32, 127, 149),
+            ("VOICE NAME CHAR 6", "VNAM6", 32, 127, 150),
+            ("VOICE NAME CHAR 7", "VNAM7", 32, 127, 151),
+            ("VOICE NAME CHAR 8", "VNAM8", 32, 127, 152),
+            ("VOICE NAME CHAR 9", "VNAM9", 32, 127, 153),
+            ("VOICE NAME CHAR 10", "VNAM10", 32, 127, 154),
+            ("OPERATOR ON/OFF", "OPON", 0, 63, 155),
         ]
         param_info.extend(global_params)
         self.table.setRowCount(len(param_info))
@@ -142,7 +141,8 @@ class VoiceEditor(QDialog):
                 spin.setValue(int(value) if value is not None else min_val)
                 spin.valueChanged.connect(lambda val, k=key, p=param_num, r=row: self.on_param_changed(k, val, r, p))
                 self.table.setCellWidget(row, 1, spin)
-
+        for row in range(self.table.rowCount()):
+            self.table.setRowHeight(row, 12)
     def _get_param_value(self, key):
         # Support both global and operator params
         if key.startswith("OP") and "_" in key:
@@ -156,18 +156,25 @@ class VoiceEditor(QDialog):
         # For operator params, send Operator Select first (0x15), then the param change
         if param_num is not None and value is not None:
             ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
-            # Check if this is an operator parameter
-            if key.startswith("OP") and "_" in key:
-                op_idx = int(key[2]) - 1  # 0-based operator index
-                # Send Operator Select: F0 43 1n 01 15 oo F7 (oo = 0 for OP1, ... 5 for OP6)
-                op_select_sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), 0x01, 0x15, op_idx, 0xF7]
-                if self.midi_outport:
-                    import mido
-                    msg = mido.Message('sysex', data=op_select_sysex[1:-1])
-                    print(f"Sending SysEx (Operator Select): {' '.join(f'{b:02X}' for b in op_select_sysex)} (MIDI channel {ch+1})")
-                    self.midi_outport.send(msg)
-            # Now send the actual parameter change
-            sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), 0x01, param_num, int(value), 0xF7]
+            # Determine parameter group and parameter number for correct mapping
+            if 0 <= param_num <= 155:
+                # Voice parameter change (g=0)
+                group = 0x00
+                if param_num <= 127:
+                    group_byte = group
+                    param_byte = param_num
+                else:
+                    group_byte = group | 0x01  # set pp bits for 128-155
+                    param_byte = param_num - 128
+            elif 64 <= param_num <= 77:
+                # Function parameter change (g=2)
+                group = 0x20
+                group_byte = group
+                param_byte = param_num
+            else:
+                print(f"[VOICE EDITOR] Unsupported parameter number: {param_num}")
+                return
+            sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
             if self.midi_outport:
                 import mido
                 msg = mido.Message('sysex', data=sysex[1:-1])
@@ -185,7 +192,17 @@ class VoiceEditor(QDialog):
             self.params["operators"][op_idx][op_key] = value
         else:
             self.params[key] = value
-        print(f"[VOICE EDITOR] Changed {key} to {value}")
+        print_str = f"[VOICE EDITOR] Changed {key} to {value}"
+        # Add parameter group and parameter number if param_num is provided
+        if param_num is not None:
+            if 0 <= param_num <= 155:
+                group = 0  # voice
+            elif 64 <= param_num <= 77:
+                group = 2  # function
+            else:
+                group = '?'
+            print_str += f" (group={group}, param={param_num})"
+        print(print_str)
         self.send_sysex(key, value, param_num)
 
     def update_voice(self, midi_outport=None, voice_bytes=None):
