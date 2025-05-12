@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction
 from voice_editor import VoiceEditor
+from voice_editor_panel import VoiceEditorPanel
 from main_window import MainWindow
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"
@@ -129,6 +130,11 @@ class VoiceBrowser(QDialog):
         self.edit_button.setToolTip("Send and edit this voice")
         self.edit_button.clicked.connect(self.edit_selected_voice)
         controls_layout.addWidget(self.edit_button)
+        self.edit_panel_button = QPushButton("Panel", self)
+        self.edit_panel_button.setFixedWidth(40)
+        self.edit_panel_button.setToolTip("Send and edit this voice (Panel UI)")
+        self.edit_panel_button.clicked.connect(self.edit_selected_voice_panel)
+        controls_layout.addWidget(self.edit_panel_button)
         self.send_button = QPushButton("Send", self)
         controls_layout.addWidget(self.send_button)
         layout.addLayout(controls_layout)
@@ -150,6 +156,7 @@ class VoiceBrowser(QDialog):
         self.sending = False
         self.send_queue = []
         self.edit_button.setEnabled(False)
+        self.edit_panel_button.setEnabled(False)
         self.send_button.setEnabled(False)
         self.list_widget.itemSelectionChanged.connect(self._update_action_buttons)
         self._active_workers = []  # Keep references to active workers
@@ -237,6 +244,42 @@ class VoiceBrowser(QDialog):
             VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
             editor = VoiceEditor.get_instance()
             if hasattr(editor, 'channel_combo'):
+                idx_ch = self.channel_combo.currentIndex()
+                editor.channel_combo.setCurrentIndex(idx_ch)
+        self.download_worker.finished.connect(after_download)
+        self.download_worker.start()
+
+    def edit_selected_voice_panel(self):
+        idx = self.list_widget.currentRow()
+        if idx < 0 or idx >= len(self.filtered_voices):
+            self.set_status("No voice selected.", error=True)
+            return
+        voice = self.filtered_voices[idx]
+        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
+        self.download_worker = VoiceDownloadWorker(url, voice["name"])
+        def after_download(syx_data, voice_name, error):
+            if error:
+                self.set_status(f"Failed to download voice: {error}", error=True)
+                return
+            midi_outport = getattr(self.main_window, 'midi_handler', None)
+            if midi_outport and hasattr(midi_outport, 'outport'):
+                midi_outport = midi_outport.outport
+            from voice_editor_panel import VoiceEditorPanel
+            # Ensure valid 161-byte SysEx for the editor
+            if isinstance(syx_data, list):
+                syx_data = bytes(syx_data)
+            if len(syx_data) == 159:
+                syx_data = b'\xF0' + syx_data + b'\xF7'
+            elif len(syx_data) == 161 and syx_data[0] != 0xF0:
+                syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
+            elif len(syx_data) == 155:
+                syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
+            editor = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
+            editor.setModal(False)
+            editor.show()
+            editor.raise_()
+            editor.activateWindow()
+            if hasattr(editor, 'channel_combo') and hasattr(self, 'channel_combo'):
                 idx_ch = self.channel_combo.currentIndex()
                 editor.channel_combo.setCurrentIndex(idx_ch)
         self.download_worker.finished.connect(after_download)
@@ -461,49 +504,5 @@ class VoiceBrowser(QDialog):
     def _update_action_buttons(self):
         has_selection = self.list_widget.currentRow() >= 0
         self.edit_button.setEnabled(has_selection)
+        self.edit_panel_button.setEnabled(has_selection)
         self.send_button.setEnabled(has_selection)
-
-# For standalone testing
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    dlg = VoiceBrowser()
-    # Add menubar if running standalone
-    menubar = QMenuBar(dlg)
-    dlg.layout().setMenuBar(menubar)
-    # File menu
-    file_menu = QMenu("File", menubar)
-    menubar.addMenu(file_menu)
-    exit_action = QAction("Exit", dlg)
-    exit_action.triggered.connect(dlg.close)
-    file_menu.addAction(exit_action)
-    # MIDI Out menu (wired up like in main app)
-    midi_out_menu = QMenu("MIDI Out", menubar)
-    menubar.addMenu(midi_out_menu)
-    def populate_out_menu():
-        midi_out_menu.clear()
-        import re
-        from midi_handler import MIDIHandler
-        handler = getattr(dlg, 'midi_handler', None)
-        if handler is None:
-            handler = MIDIHandler()
-            dlg.midi_handler = handler
-        # Remember last selected port using QSettings (like main app)
-        settings = QSettings("MIDISend", "MIDISendApp")
-        last_out = settings.value("last_out_port", "")
-        ports = sorted(handler.list_output_ports(), key=str.casefold)
-        current_out = getattr(handler, 'outport', None)
-        current_out_name = current_out.name if current_out else last_out
-        for port in ports:
-            display_port = re.sub(r'\s*\d+$', '', str(port))
-            action = QAction(display_port, dlg)
-            action.setCheckable(True)
-            if port == current_out_name:
-                action.setChecked(True)
-            def select_port(checked, p=port):
-                handler.open_output(p)
-                settings.setValue("last_out_port", p)
-            action.triggered.connect(select_port)
-            midi_out_menu.addAction(action)
-    midi_out_menu.aboutToShow.connect(populate_out_menu)
-    dlg.show()
-    sys.exit(app.exec())
