@@ -124,6 +124,11 @@ class VoiceBrowser(QDialog):
         self.channel_combo.addItems([str(i) for i in range(1, 17)] + ["Omni"])
         controls_layout.addWidget(QLabel("MIDI Channel:"))
         controls_layout.addWidget(self.channel_combo)
+        self.edit_button = QPushButton("e", self)
+        self.edit_button.setFixedWidth(22)
+        self.edit_button.setToolTip("Send and edit this voice")
+        self.edit_button.clicked.connect(self.edit_selected_voice)
+        controls_layout.addWidget(self.edit_button)
         self.send_button = QPushButton("Send", self)
         controls_layout.addWidget(self.send_button)
         layout.addLayout(controls_layout)
@@ -135,7 +140,8 @@ class VoiceBrowser(QDialog):
         self.search_box.textChanged.connect(self.filter_voices)
         self.send_button.clicked.connect(self.send_voice)
         self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
-        self.list_widget.itemClicked.connect(self.on_voice_clicked)
+        self.list_widget.itemClicked.connect(self.send_voice_on_click)
+        self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
         self.search_box.setMinimumWidth(0)
         self.list_widget.setMinimumWidth(0)
         self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -143,6 +149,10 @@ class VoiceBrowser(QDialog):
         self.load_voices()
         self.sending = False
         self.send_queue = []
+        self.edit_button.setEnabled(False)
+        self.send_button.setEnabled(False)
+        self.list_widget.itemSelectionChanged.connect(self._update_action_buttons)
+        self._active_workers = []  # Keep references to active workers
 
     def set_status(self, msg, error=False):
         if not error:
@@ -187,48 +197,116 @@ class VoiceBrowser(QDialog):
         for idx, voice in enumerate(self.filtered_voices):
             item = QListWidgetItem(f"{voice['name']} - {voice.get('author', '')}")
             self.list_widget.addItem(item)
-        # Add edit buttons to each row
-        self.add_edit_buttons_to_list()
+        self._update_action_buttons()
 
     def add_edit_buttons_to_list(self):
-        # Add an 'e' button to each row in the QListWidget
-        for i in range(self.list_widget.count()):
-            item = self.list_widget.item(i)
-            widget = QWidget()
-            layout = QHBoxLayout(widget)
-            layout.setContentsMargins(0, 0, 0, 0)
-            label = QLabel(item.text())
-            edit_btn = QPushButton("e")
-            edit_btn.setFixedWidth(22)
-            edit_btn.setToolTip("Send and edit this voice")
-            edit_btn.clicked.connect(lambda checked, idx=i: self.edit_voice_from_list(idx))
-            layout.addWidget(label)
-            layout.addWidget(edit_btn)
-            layout.addStretch(1)
-            self.list_widget.setItemWidget(item, widget)
+        pass  # No longer needed
 
-    def edit_voice_from_list(self, idx):
-        # Send the voice via MIDI and open the Voice Editor for the selected channel
-        self.download_voice(idx)
-        # After sending, open the editor for the selected channel and voice
+    def edit_selected_voice(self):
+        idx = self.list_widget.currentRow()
+        if idx < 0 or idx >= len(self.filtered_voices):
+            self.set_status("No voice selected.", error=True)
+            return
+        # Always create a new worker for each request
+        voice = self.filtered_voices[idx]
+        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
+        self.download_worker = VoiceDownloadWorker(url, voice["name"])
         def after_download(syx_data, voice_name, error):
             if error:
                 return
             midi_outport = getattr(self.main_window, 'midi_handler', None)
             if midi_outport and hasattr(midi_outport, 'outport'):
                 midi_outport = midi_outport.outport
-            VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=bytes(syx_data))
+            # Send the voice via MIDI before opening the editor
+            if midi_outport:
+                import mido
+                msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
+                midi_outport.send(msg)
+                self.set_status(f"Sent '{voice_name}' to MIDI Out.")
+            from voice_editor import VoiceEditor
+            # --- Ensure valid 161-byte SysEx for the editor ---
+            if isinstance(syx_data, list):
+                syx_data = bytes(syx_data)
+            if len(syx_data) == 159:
+                syx_data = b'\xF0' + syx_data + b'\xF7'
+            elif len(syx_data) == 161 and syx_data[0] != 0xF0:
+                syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
+            elif len(syx_data) == 155:
+                syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
+            # ---
+            VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
             editor = VoiceEditor.get_instance()
             if hasattr(editor, 'channel_combo'):
                 idx_ch = self.channel_combo.currentIndex()
                 editor.channel_combo.setCurrentIndex(idx_ch)
-        # Connect to the download worker's finished signal for this idx
-        if hasattr(self, 'download_worker'):
-            try:
-                self.download_worker.finished.disconnect()
-            except Exception:
-                pass
-            self.download_worker.finished.connect(after_download)
+        self.download_worker.finished.connect(after_download)
+        self.download_worker.start()
+
+    def send_voice_on_click(self, item):
+        idx = self.list_widget.currentRow()
+        if idx < 0 or idx >= len(self.filtered_voices):
+            self.set_status("No voice selected.", error=True)
+            return
+        self.download_and_send_voice(idx)
+
+    def open_voice_in_editor_on_double_click(self, item):
+        idx = self.list_widget.currentRow()
+        if idx < 0 or idx >= len(self.filtered_voices):
+            self.set_status("No voice selected.", error=True)
+            return
+        self.download_and_open_voice_in_editor(idx)
+
+    def download_and_send_voice(self, idx):
+        voice = self.filtered_voices[idx]
+        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
+        self.download_worker = VoiceDownloadWorker(url, voice["name"])
+        def after_download(syx_data, voice_name, error):
+            if error:
+                self.set_status(f"Failed to download voice: {error}", error=True)
+                return
+            midi_outport = getattr(self.main_window, 'midi_handler', None)
+            if midi_outport and hasattr(midi_outport, 'outport'):
+                midi_outport = midi_outport.outport
+            if midi_outport:
+                import mido
+                msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
+                midi_outport.send(msg)
+                self.set_status(f"Sent '{voice_name}' to MIDI Out.")
+        self.download_worker.finished.connect(after_download)
+        self.download_worker.start()
+
+    def download_and_open_voice_in_editor(self, idx):
+        voice = self.filtered_voices[idx]
+        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
+        worker = VoiceDownloadWorker(url, voice["name"])
+        self._active_workers.append(worker)  # Keep a reference
+        def after_download(syx_data, voice_name, error):
+            if error:
+                self.set_status(f"Failed to download voice: {error}", error=True)
+                self._active_workers.remove(worker)
+                return
+            midi_outport = getattr(self.main_window, 'midi_handler', None)
+            if midi_outport and hasattr(midi_outport, 'outport'):
+                midi_outport = midi_outport.outport
+            from voice_editor import VoiceEditor
+            # --- Ensure valid 161-byte SysEx for the editor ---
+            if isinstance(syx_data, list):
+                syx_data = bytes(syx_data)
+            # Add header/footer if needed
+            if len(syx_data) == 159:
+                syx_data = b'\xF0' + syx_data + b'\xF7'
+            elif len(syx_data) == 161 and syx_data[0] != 0xF0:
+                syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
+            elif len(syx_data) == 155:
+                syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
+            # ---
+            editor = VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
+            if hasattr(editor, 'channel_combo'):
+                idx_ch = self.channel_combo.currentIndex()
+                editor.channel_combo.setCurrentIndex(idx_ch)
+            self._active_workers.remove(worker)
+        worker.finished.connect(after_download)
+        worker.start()
 
     def download_voice(self, idx):
         if self.sending:
@@ -241,11 +319,8 @@ class VoiceBrowser(QDialog):
         channel_text = self.channel_combo.currentText()
         url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
         self.set_status("Downloading voice...")
+        # Always create a new worker for each request
         self.download_worker = VoiceDownloadWorker(url, voice["name"])
-        try:
-            self.download_worker.finished.disconnect()
-        except Exception:
-            pass
         self.download_worker.finished.connect(lambda syx_data, voice_name, error: self._on_voice_downloaded_wrapper(syx_data, voice, channel_text, error))
         self.download_worker.start()
 
@@ -370,8 +445,23 @@ class VoiceBrowser(QDialog):
             self.resize(self.width(), h)
 
     def closeEvent(self, event):
+        # Ensure any running worker threads are finished before closing
+        try:
+            if hasattr(self, 'download_worker') and self.download_worker is not None:
+                self.download_worker.quit()
+                self.download_worker.wait()
+            if hasattr(self, 'json_worker') and self.json_worker is not None:
+                self.json_worker.quit()
+                self.json_worker.wait()
+        except Exception:
+            pass
         VoiceBrowser._instance = None
         super().closeEvent(event)
+
+    def _update_action_buttons(self):
+        has_selection = self.list_widget.currentRow() >= 0
+        self.edit_button.setEnabled(has_selection)
+        self.send_button.setEnabled(has_selection)
 
 # For standalone testing
 if __name__ == "__main__":

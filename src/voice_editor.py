@@ -153,7 +153,10 @@ class VoiceEditor(QDialog):
         if key.startswith("OP") and "_" in key:
             op_idx = int(key[2]) - 1
             op_key = key.split("_", 1)[1]
-            return self.params["operators"][op_idx].get(op_key)
+            ops = self.params.get("operators")
+            if isinstance(ops, list) and 0 <= op_idx < len(ops):
+                return ops[op_idx].get(op_key)
+            return None
         return self.params.get(key)
 
     def send_sysex(self, key=None, value=None, param_num=None):
@@ -214,11 +217,22 @@ class VoiceEditor(QDialog):
         if midi_outport is not None:
             self.midi_outport = midi_outport
         if voice_bytes is not None:
-            self.voice_bytes = voice_bytes
+            # Ensure exactly 161 bytes, starting with 0xF0 and ending with 0xF7
+            b = bytes(voice_bytes)
+            if len(b) > 161:
+                start = b.find(0xF0)
+                end = b.rfind(0xF7)
+                if start != -1 and end != -1 and end > start:
+                    b = b[start:end+1]
+                if len(b) > 161:
+                    b = b[:161]
+            self.voice_bytes = b
+            print(f"[VOICE EDITOR DEBUG] voice_bytes: len={len(self.voice_bytes)}, head={[hex(x) for x in self.voice_bytes[:8]]}, tail={[hex(x) for x in self.voice_bytes[-8:]]}")
             self.decoder = SingleVoiceDumpDecoder(self.voice_bytes)
             self.decoder.decode()
             self.params = self.decoder.params
-            self.populate_table()
+        # Always repopulate the table to reflect the new voice
+        self.populate_table()
 
     @classmethod
     def show_singleton(cls, parent=None, midi_outport=None, voice_bytes=None):
