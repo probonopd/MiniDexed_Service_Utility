@@ -73,7 +73,8 @@ jobs:
             nuitka --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --enable-plugin=pyside6 --follow-imports src/main.py
           fi
       env:
-          PYTHONOPTIMIZE: 2        
+          PYTHONOPTIMIZE: 2
+      shell: bash   
 
     - name: Upload Nuitka Artifact
       uses: actions/upload-artifact@v4
