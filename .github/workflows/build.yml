@@ -60,6 +60,25 @@ jobs:
           dist/*
         retention-days: 1
 
+    - name: Install Nuitka
+      run: |
+        python -m pip install --upgrade pip
+        pip install nuitka
+
+    - name: Build Executable (Nuitka)
+      run: |
+        nuitka --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=pyqt6 --follow-imports src/main.py
+      env:
+        PYTHONOPTIMIZE: 2
+
+    - name: Upload Nuitka Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.os }}-nuitka-executable
+        path: |
+          dist_nuitka/*
+        retention-days: 1
+
   release:
     name: Create Release
     needs: build
