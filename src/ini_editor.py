@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication, QTextEdit
-from PyQt6.QtCore import Qt
-from PyQt6 import QtGui, QtCore
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QCheckBox, QComboBox, QGroupBox, QDialogButtonBox, QScrollArea, QWidget, QTabWidget, QApplication, QTextEdit
+from PySide6.QtCore import Qt
+from PySide6 import QtGui, QtCore
 import ftplib
 import io
 import re

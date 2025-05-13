@@ -1,6 +1,6 @@
 import os
-from PyQt6.QtWidgets import QMainWindow, QMessageBox, QFileDialog
-from PyQt6.QtGui import QAction
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QFileDialog
+from PySide6.QtGui import QAction
 from ui_main_window import UiMainWindow
 from menus import setup_menus
 from file_ops import FileOps
@@ -8,7 +8,7 @@ from midi_ops import MidiOps
 from midi_handler import MIDIHandler
 from workers import LogWorker, MIDIReceiveWorker, MidiSendWorker, SyslogWorker
 from dialogs import Dialogs
-from PyQt6.QtCore import QSettings
+from PySide6.QtCore import QSettings
 import re
 from updater_dialog import UpdaterDialog, UpdaterProgressDialog
 from updater_worker import UpdaterWorker, DeviceDiscoveryWorker
@@ -174,7 +174,7 @@ class MainWindow(QMainWindow):
                 device_ip = dlg.device_combo.currentData() or dlg.device_combo.currentText()
                 src_path = None
                 if release_type == 2:  # Local build
-                    from PyQt6.QtWidgets import QFileDialog
+                    from PySide6.QtWidgets import QFileDialog
                     src_path = QFileDialog.getExistingDirectory(self, "Select your src/ folder")
                     if not src_path:
                         return  # User cancelled
@@ -223,7 +223,7 @@ class MainWindow(QMainWindow):
             device_ip = dlg.device_combo.currentData() or dlg.device_combo.currentText()
             src_path = None
             if release_type == 2:  # Local build
-                from PyQt6.QtWidgets import QFileDialog
+                from PySide6.QtWidgets import QFileDialog
                 src_path = QFileDialog.getExistingDirectory(self, "Select your src/ folder")
                 if not src_path:
                     return  # User cancelled
@@ -261,7 +261,7 @@ class MainWindow(QMainWindow):
         from dialogs import DeviceSelectDialog
         from ini_editor import IniEditorDialog
         import difflib
-        from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
+        from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
         # Skip dialog if only one device
         if len(self.device_list) == 1:
             device_ip = self.device_list[0][1]

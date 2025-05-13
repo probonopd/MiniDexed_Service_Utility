@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
 import sys
@@ -89,7 +89,7 @@ class PerformanceEditor(QDialog):
                 value = PERFORMANCE_VALUES[row][0]
                 min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (0, 127))
                 if min_val == 0 and max_val == 1:
-                    from PyQt6.QtWidgets import QCheckBox
+                    from PySide6.QtWidgets import QCheckBox
                     cb = QCheckBox()
                     # Set checked state based on value (treat '1', 1, True as checked)
                     cb.setChecked(str(value) == "1" or value is True)
@@ -111,7 +111,7 @@ class PerformanceEditor(QDialog):
                 for col in range(8):
                     value = PERFORMANCE_VALUES[row][col]
                     if field == "Voice":
-                        from PyQt6.QtWidgets import QWidget, QHBoxLayout, QSizePolicy
+                        from PySide6.QtWidgets import QWidget, QHBoxLayout, QSizePolicy
                         cell_widget = QWidget()
                         h_layout = QHBoxLayout(cell_widget)
                         h_layout.setContentsMargins(0, 0, 0, 0)
@@ -140,7 +140,7 @@ class PerformanceEditor(QDialog):
                     elif field in PERFORMANCE_FIELD_RANGES:
                         min_val, max_val = PERFORMANCE_FIELD_RANGES[field]
                         if field == "MIDIChannel":
-                            from PyQt6.QtWidgets import QComboBox
+                            from PySide6.QtWidgets import QComboBox
                             combo = QComboBox()
                             for i in range(1, 17):
                                 combo.addItem(str(i))
@@ -170,7 +170,7 @@ class PerformanceEditor(QDialog):
                             combo.currentIndexChanged.connect(on_channel_changed)
                             self.table.setCellWidget(row, col, combo)
                         elif min_val == 0 and max_val == 1:
-                            from PyQt6.QtWidgets import QCheckBox
+                            from PySide6.QtWidgets import QCheckBox
                             cb = QCheckBox()
                             cb.setChecked(str(value) == "1")
                             cb.stateChanged.connect(lambda state, r=row, c=col: self.on_spin_changed(r, c, int(state == 2)))
@@ -191,14 +191,14 @@ class PerformanceEditor(QDialog):
         self.table.cellChanged.connect(self.on_cell_changed)
         layout.addWidget(self.table)
         # Make the spreadsheet scrollable and only show the table inside the scroll area
-        from PyQt6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QScrollArea
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.table)
         layout.addWidget(scroll)
         # Remove the direct layout.addWidget(self.table) above
         # Add buttons for quick MIDI channel assignment
-        from PyQt6.QtWidgets import QHBoxLayout
+        from PySide6.QtWidgets import QHBoxLayout
         btn_layout = QHBoxLayout()
         btn_tg_to_ch = QPushButton("Set TG1-8 to MIDI Channel 1-8")
         btn_all_to_ch1 = QPushButton("Set all TGs to MIDI Channel 1")
@@ -208,7 +208,7 @@ class PerformanceEditor(QDialog):
         btn_tg_to_ch.clicked.connect(self.set_tg_to_channels)
         btn_all_to_ch1.clicked.connect(self.set_all_tg_to_ch1)
         # Move initialization logic from showEvent here
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
             app.setOverrideCursor(Qt.CursorShape.BusyCursor)
@@ -449,7 +449,7 @@ class PerformanceEditor(QDialog):
             print(f"[PERF EDITOR DEBUG] Stripped F0/F7: {' '.join(f'{b:02X}' for b in data)}")
             if not data or data[0] != 0x7D:
                 print(f"[PERF EDITOR DEBUG] Not a MiniDexed SysEx dump (missing 0x7D): {' '.join(f'{b:02X}' for b in data)}")
-                from PyQt6.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data. Aborting Performance Editor.")
                 self._sysex_request_queue = []
                 self._sysex_request_index = 9999
@@ -466,7 +466,7 @@ class PerformanceEditor(QDialog):
                 self._sysex_data_buffer[tg] = data.copy()
             else:
                 print(f"[PERF EDITOR DEBUG] Unrecognized MiniDexed SysEx format: {' '.join(f'{b:02X}' for b in data)}")
-                from PyQt6.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data. Aborting Performance Editor.")
                 self._sysex_request_queue = []
                 self._sysex_request_index = 9999
@@ -493,7 +493,7 @@ class PerformanceEditor(QDialog):
                 self._pending_voice_dumps = set(range(8))
                 self._voice_dump_data = {}
                 # --- END: Send voice dump requests for each TG and connect handler ---
-                from PyQt6.QtWidgets import QApplication
+                from PySide6.QtWidgets import QApplication
                 app = QApplication.instance()
                 if app:
                     app.restoreOverrideCursor()

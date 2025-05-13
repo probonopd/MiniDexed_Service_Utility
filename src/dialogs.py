@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox, QTextEdit
-from PyQt6.QtWidgets import QPushButton, QHBoxLayout
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox, QTextEdit
+from PySide6.QtWidgets import QPushButton, QHBoxLayout
+from PySide6.QtCore import Qt
 import sys
 
 class Dialogs:
@@ -63,7 +63,7 @@ class PreferencesDialog(QDialog):
         def clear_app_data():
             import shutil
             import os
-            from PyQt6.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             cache_dir = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser('~/.local/share'), 'MiniDexed_Service_Utility')
             try:
                 if os.path.exists(cache_dir):
@@ -87,7 +87,7 @@ class DeviceSelectDialog(QDialog):
         layout = QVBoxLayout(self)
         label = QLabel("Select a device to edit minidexed.ini:")
         layout.addWidget(label)
-        from PyQt6.QtWidgets import QComboBox
+        from PySide6.QtWidgets import QComboBox
         self.device_combo = QComboBox(self)
         if device_list:
             for name, ip in device_list:

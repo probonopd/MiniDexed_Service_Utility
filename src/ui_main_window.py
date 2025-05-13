@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLabel, QSplitter, QTableView, QHeaderView
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QKeySequence
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QLabel, QSplitter, QTableView, QHeaderView
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QAction, QKeySequence
+from PySide6.QtCore import Qt
 import re
 from dialogs import Dialogs
 
@@ -77,7 +77,7 @@ class UiMainWindow:
                 row = index.row()
                 values = [self.syslog_model.item(row, col).text() for col in range(self.syslog_model.columnCount())]
                 lines.append('\t'.join(values))
-            from PyQt6.QtWidgets import QApplication
+            from PySide6.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText('\n'.join(lines))
         def select_all():

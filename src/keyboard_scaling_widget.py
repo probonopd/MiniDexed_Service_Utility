@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QPainterPath
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QPainterPath
+from PySide6.QtCore import Qt
 import sys
 
 class KeyboardScalingWidget(QWidget):
@@ -104,7 +104,7 @@ class KeyboardScalingWidget(QWidget):
         return int(center + y_off)
 
 if __name__ == "__main__":
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
     app = QApplication(sys.argv)
     w = KeyboardScalingWidget()
     # Symmetrical S-curve: break_point=50, max depth, left=+EXP, right=-EXP

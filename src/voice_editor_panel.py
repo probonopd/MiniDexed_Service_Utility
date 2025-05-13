@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber
-from PyQt6.QtCore import Qt
-from PyQt6.QtSvgWidgets import QSvgWidget
-from PyQt6.QtGui import QResizeEvent, QPalette, QColor
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber
+from PySide6.QtCore import Qt
+from PySide6.QtSvgWidgets import QSvgWidget
+from PySide6.QtGui import QResizeEvent, QPalette, QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from envelope_widget import EnvelopeWidget
 from keyboard_scaling_widget import KeyboardScalingWidget

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QComboBox, QTextEdit, QCheckBox
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QComboBox, QTextEdit, QCheckBox
+from PySide6.QtCore import Qt
 
 class UpdaterDialog(QDialog):
     def __init__(self, main_window, device_list=None):

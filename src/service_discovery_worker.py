@@ -1,12 +1,12 @@
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 import socket
 from zeroconf import Zeroconf, ServiceBrowser, ServiceListener
 
 class DeviceDiscoveryWorker(QThread):
-    device_found = pyqtSignal(str, str)  # name, ip
-    device_removed = pyqtSignal(str, str)  # name, ip
-    device_updated = pyqtSignal(str, str)  # name, ip
-    log = pyqtSignal(str)
+    device_found = Signal(str, str)  # name, ip
+    device_removed = Signal(str, str)  # name, ip
+    device_updated = Signal(str, str)  # name, ip
+    log = Signal(str)
 
     def __init__(self, service="_ftp._tcp.local."):
         super().__init__()

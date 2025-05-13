@@ -3,11 +3,11 @@ import requests
 import os
 import hashlib
 import json
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QSettings
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QThread, Signal, Qt, QSettings
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLineEdit, QListWidget, QHBoxLayout, QComboBox, QPushButton, QLabel, QApplication, QListWidgetItem, QStatusBar, QMenuBar, QMenu
 )
-from PyQt6.QtGui import QAction
+from PySide6.QtGui import QAction
 from voice_editor import VoiceEditor
 from voice_editor_panel import VoiceEditorPanel
 from main_window import MainWindow
@@ -19,7 +19,7 @@ def get_cache_dir():
     return os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser('~/.local/share'), 'MiniDexed_Service_Utility', 'patches_cache')
 
 class VoiceDownloadWorker(QThread):
-    finished = pyqtSignal(list, str, object)  # syx_data, voice_name, error (None if ok)
+    finished = Signal(list, str, object)  # syx_data, voice_name, error (None if ok)
     def __init__(self, url, voice_name):
         super().__init__()
         self.url = url
@@ -46,7 +46,7 @@ class VoiceDownloadWorker(QThread):
             self.finished.emit([], self.voice_name, e)
 
 class VoiceJsonDownloadWorker(QThread):
-    finished = pyqtSignal(dict, str, object)  # json_data, voice_name, error
+    finished = Signal(dict, str, object)  # json_data, voice_name, error
     def __init__(self, url, voice_name):
         super().__init__()
         self.url = url

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QLabel, QSpinBox, QComboBox, QLineEdit
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QLabel, QSpinBox, QComboBox, QLineEdit
+from PySide6.QtCore import Qt
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 import mido
 
@@ -17,7 +17,7 @@ class VoiceEditor(QDialog):
         self.params = self.decoder.params
         layout = QVBoxLayout(self)
         # Add channel selector
-        from PyQt6.QtWidgets import QHBoxLayout
+        from PySide6.QtWidgets import QHBoxLayout
         channel_layout = QHBoxLayout()
         channel_layout.addWidget(QLabel("MIDI Channel:"))
         self.channel_combo = QComboBox()

@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 import os
 import sys
 import tempfile
@@ -11,10 +11,10 @@ import re
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
 class UpdaterWorker(QThread):
-    status = pyqtSignal(str)
-    progress = pyqtSignal(int)
-    finished = pyqtSignal(bool, str)  # success, message
-    device_list = pyqtSignal(list)
+    status = Signal(str)
+    progress = Signal(int)
+    finished = Signal(bool, str)  # success, message
+    device_list = Signal(list)
 
     def __init__(self, release_type, pr_number, device_ip, update_performances, github_token=None, src_path=None):
         super().__init__()
@@ -309,10 +309,10 @@ class UpdaterWorker(QThread):
         return None
 
 class DeviceDiscoveryWorker(QThread):
-    device_found = pyqtSignal(str, str)  # name, ip
-    device_removed = pyqtSignal(str, str)  # name, ip
-    device_updated = pyqtSignal(str, str)  # name, ip
-    log = pyqtSignal(str)
+    device_found = Signal(str, str)  # name, ip
+    device_removed = Signal(str, str)  # name, ip
+    device_updated = Signal(str, str)  # name, ip
+    log = Signal(str)
 
     def __init__(self, service="_ftp._tcp.local."):
         super().__init__()

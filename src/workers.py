@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 import time
 import socket
 import sys
@@ -6,8 +6,8 @@ from dialogs import Dialogs
 from file_utils import FileUtils
 
 class MIDIReceiveWorker(QThread):
-    sysex_received = pyqtSignal(list)
-    log = pyqtSignal(str)
+    sysex_received = Signal(list)
+    log = Signal(str)
 
     def __init__(self, midi_handler):
         super().__init__()
@@ -28,7 +28,7 @@ class MIDIReceiveWorker(QThread):
         self.wait()
 
 class LogWorker(QThread):
-    log = pyqtSignal(str)
+    log = Signal(str)
     def __init__(self):
         super().__init__()
         self.messages = []
@@ -46,8 +46,8 @@ class LogWorker(QThread):
         self.wait()
 
 class MidiSendWorker(QThread):
-    log = pyqtSignal(str)
-    finished = pyqtSignal()
+    log = Signal(str)
+    finished = Signal()
     def __init__(self, midi_outport, midi_file):
         super().__init__()
         self.midi_outport = midi_outport
@@ -67,8 +67,8 @@ class MidiSendWorker(QThread):
         self._stop = True
 
 class SyslogWorker(QThread):
-    syslog_message = pyqtSignal(str)
-    log = pyqtSignal(str)
+    syslog_message = Signal(str)
+    log = Signal(str)
     def __init__(self, host='0.0.0.0', port=8514):
         super().__init__()
         self.host = host
@@ -117,8 +117,8 @@ class SyslogWorker(QThread):
         self.wait()
 
 class FileLoadWorker(QThread):
-    loaded = pyqtSignal(object, str)
-    error = pyqtSignal(str)
+    loaded = Signal(object, str)
+    error = Signal(str)
     def __init__(self, file_path, file_type):
         super().__init__()
         self.file_path = file_path
@@ -137,8 +137,8 @@ class FileLoadWorker(QThread):
             self.error.emit(str(e))
 
 class FileSaveWorker(QThread):
-    saved = pyqtSignal(str)
-    error = pyqtSignal(str)
+    saved = Signal(str)
+    error = Signal(str)
     def __init__(self, file_path, file_type, data):
         super().__init__()
         self.file_path = file_path

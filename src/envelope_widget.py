@@ -1,9 +1,9 @@
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QMouseEvent
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal
+from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QMouseEvent
+from PySide6.QtCore import Qt, QRectF, Signal
 
 class EnvelopeWidget(QWidget):
-    envelopeChanged = pyqtSignal(list, list)  # Emits (rates, levels) when changed by user
+    envelopeChanged = Signal(list, list)  # Emits (rates, levels) when changed by user
     def __init__(self, parent=None):
         super().__init__(parent)
         self.rates = [50, 50, 50, 50]
@@ -189,7 +189,7 @@ class EnvelopeWidget(QWidget):
         super().mouseReleaseEvent(event)
 
 if __name__ == "__main__":
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
     import sys
     def on_env_changed(rates, levels):
         print("Rates:", rates, "Levels:", levels)

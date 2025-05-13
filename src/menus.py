@@ -1,7 +1,7 @@
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QSlider, QDialogButtonBox, QHBoxLayout, QLineEdit, QTextEdit
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIntValidator
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QSlider, QDialogButtonBox, QHBoxLayout, QLineEdit, QTextEdit
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIntValidator
 import os
 import json
 import re
@@ -65,7 +65,7 @@ def setup_menus(main_window):
     edit_menu.addAction(select_all_action)
     def get_focused_textedit():
         widget = QApplication.focusWidget()
-        from PyQt6.QtWidgets import QTextEdit
+        from PySide6.QtWidgets import QTextEdit
         if isinstance(widget, QTextEdit):
             return widget
         return None
