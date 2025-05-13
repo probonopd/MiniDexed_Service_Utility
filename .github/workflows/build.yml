@@ -38,32 +38,33 @@ jobs:
       with:
         python-version: '3.x'
 
+#    - name: Install dependencies
+#      run: |
+#        python -m pip install --upgrade pip
+#        # pip install pyinstaller
+#        pip install -r src/requirements.txt
+
+#    - name: Build Executable
+#      run: |
+#        pyinstaller --onefile --name "MiniDexed Service Utility" --add-data "src/midi_commands:midi_commands" --add-data "src/images:images" --hidden-import mido.backends.rtmidi --hidden-import rtmidi src/main.py --noconsole
+#      env:
+#        PYINSTALLER_STRIP: 1
+#        PYINSTALLER_UPX: 1
+
+#    - name: Upload Artifact
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: ${{ runner.os }}-executable
+#        path: |
+#          dist/*.exe
+#          dist/*
+#        retention-days: 1
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install -r src/requirements.txt
-
-    - name: Build Executable
-      run: |
-        pyinstaller --onefile --name "MiniDexed Service Utility" --add-data "src/midi_commands:midi_commands" --add-data "src/images:images" --hidden-import mido.backends.rtmidi --hidden-import rtmidi src/main.py --noconsole
-      env:
-        PYINSTALLER_STRIP: 1
-        PYINSTALLER_UPX: 1
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.os }}-executable
-        path: |
-          dist/*.exe
-          dist/*
-        retention-days: 1
-
-    - name: Install Nuitka
-      run: |
-        python -m pip install --upgrade pip
         pip install nuitka
+        pip install -r src/requirements.txt
 
     - name: Build Executable (Nuitka)
       run: |
@@ -81,7 +82,7 @@ jobs:
     - name: Upload Nuitka Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.os }}-nuitka-executable
+        name: ${{ runner.os }}
         path: |
           dist_nuitka/main*
         retention-days: 1
@@ -99,7 +100,7 @@ jobs:
 
     - name: Zip Artifacts
       run: |
-        for d in ./executables/*-executable; do
+        for d in ./executables/*; do
           zip -r "$d.zip" "$d"
         done
         ls -lh ./executables/*.zip
