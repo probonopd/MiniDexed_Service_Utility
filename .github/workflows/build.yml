@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022] # macos-13, ubuntu-22.04-arm
+        os: [ubuntu-22.04, macos-13, windows-2022] # ubuntu-22.04-arm
 
     steps:
     - name: Checkout code
@@ -72,9 +72,9 @@ jobs:
             export CXX=clang++
             echo "CC is set to $CC"
             echo "CXX is set to $CXX"
-            python -m nuitka --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --macos-create-app-bundle --enable-plugin=pyside6 --follow-imports src/main.py
+            python -m nuitka --assume-yes-for-downloads --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --macos-create-app-bundle --enable-plugin=pyside6 --follow-imports src/main.py
           else
-            python -m nuitka --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --enable-plugin=pyside6 --follow-imports src/main.py
+            python -m nuitka --assume-yes-for-downloads --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --enable-plugin=pyside6 --follow-imports src/main.py
           fi
       env:
           PYTHONOPTIMIZE: 2
