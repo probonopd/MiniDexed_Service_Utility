@@ -68,10 +68,12 @@ jobs:
     - name: Build Executable (Nuitka)
       run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            python -m nuitka --windows-console-mode=hide --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --macos-create-app-bundle --enable-plugin=pyside6 --follow-imports src/main.py
+            python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --macos-create-app-bundle src/main.py
           else
-            python -m nuitka --windows-console-mode=hide --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --onefile --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=multiprocessing --enable-plugin=anti-bloat --enable-plugin=pyside6 --follow-imports src/main.py
+            python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --onefile src/main.py
           fi
+          rm -rf dist_nuitka/*.build
+          rm -rf dist_nuitka/*.dist
       env:
           PYTHONOPTIMIZE: 2
       shell: bash   
