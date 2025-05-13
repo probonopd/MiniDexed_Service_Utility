@@ -343,8 +343,13 @@ class VoiceBrowser(QDialog):
             elif len(syx_data) == 155:
                 syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
             # ---
-            editor = VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
-            if hasattr(editor, 'channel_combo'):
+            # editor = VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
+            editor = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
+            editor.setModal(False)
+            editor.show()
+            editor.raise_()
+            editor.activateWindow()
+            if hasattr(editor, 'channel_combo') and hasattr(self, 'channel_combo'):
                 idx_ch = self.channel_combo.currentIndex()
                 editor.channel_combo.setCurrentIndex(idx_ch)
             self._active_workers.remove(worker)

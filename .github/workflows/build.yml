@@ -46,7 +46,7 @@ jobs:
 
     - name: Build Executable
       run: |
-        pyinstaller --onefile --name "MiniDexed Service Utility" --add-data "src/midi_commands:midi_commands" --hidden-import mido.backends.rtmidi --hidden-import rtmidi src/main.py --noconsole
+        pyinstaller --onefile --name "MiniDexed Service Utility" --add-data "src/midi_commands:midi_commands" --add-data "src/images:images" --hidden-import mido.backends.rtmidi --hidden-import rtmidi src/main.py --noconsole
       env:
         PYINSTALLER_STRIP: 1
         PYINSTALLER_UPX: 1
