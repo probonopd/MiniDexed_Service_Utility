@@ -1,5 +1,4 @@
 import sys
-import threading
 import time
 import platform
 import importlib.metadata
@@ -12,8 +11,6 @@ try:
 except ImportError:
     import select
     import sys
-    import termios
-    import tty
     def key_pressed():
         dr, dw, de = select.select([sys.stdin], [], [], 0)
         return dr != []
@@ -26,7 +23,18 @@ def print_system_info():
         zeroconf_version = importlib.metadata.version('zeroconf')
     except Exception:
         zeroconf_version = 'unknown'
-    print(f"  Zeroconf version: {zeroconf_version}\n")
+    print(f"  Zeroconf version: {zeroconf_version}")
+    nuitka_version = None
+    if hasattr(sys, 'nuitka_compiled') and sys.nuitka_compiled:
+        try:
+            nuitka_version = importlib.metadata.version('nuitka')
+        except Exception:
+            nuitka_version = 'unknown'
+        print(f"  Nuitka compiled: Yes")
+        print(f"  Nuitka version: {nuitka_version}")
+    else:
+        print(f"  Nuitka compiled: No")
+    print()
 
 class ServiceTypeListener:
     def __init__(self, zeroconf):
