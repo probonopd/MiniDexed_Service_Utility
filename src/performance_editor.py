@@ -362,14 +362,14 @@ class PerformanceEditor(QDialog):
                 # For MIDIChannel, use the value directly (0-15 for channels 1-16, 16 for Omni)
                 if field == "MIDIChannel":
                     v = int(value)
-                # For signed fields, use 2's complement split into two 7-bit bytes
+                # For signed 14-bit fields, use standard MIDI mapping: value = signed + 8192 (center at 8192)
                 if field in ["Detune", "NoteShift"]:
                     v = int(value)
                     # Clamp to allowed range
                     min_val, max_val = PERFORMANCE_FIELD_RANGES.get(field, (-99, 99) if field == "Detune" else (-24, 24))
                     v = max(min_val, min(max_val, v))
-                    if v < 0:
-                        v = (1 << 14) + v  # 2's complement for 14 bits
+                    # MIDI standard: encode as unsigned with center at 8192
+                    v = v + 8192
                     vv1 = (v >> 7) & 0x7F
                     vv2 = v & 0x7F
                 else:
