@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-13, windows-2022] # ubuntu-22.04-arm
+        os: [ubuntu-22.04, macos-13, windows-2022, ubuntu-22.04-arm]
 
     steps:
     - name: Checkout code
@@ -82,9 +82,9 @@ jobs:
     - name: Upload Nuitka Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ runner.os }}
+        name: ${{ runner.os }}-${{ runner.arch }}
         path: |
-          dist_nuitka/main*
+          dist_nuitka/MiniDexed*
         retention-days: 1
 
   release:
