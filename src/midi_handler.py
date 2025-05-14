@@ -1,10 +1,12 @@
 import mido
 from mido import MidiFile, Message
+from workers import MidiMessageSendWorker
 
 class MIDIHandler:
     def __init__(self):
         self.inport = None
         self.outport = None
+        self.midi_send_worker = None
 
     def list_input_ports(self):
         return mido.get_input_names()
@@ -19,11 +21,26 @@ class MIDIHandler:
 
     def open_output(self, port_name):
         if self.outport:
+            self.close_output_worker()
             self.outport.close()
         self.outport = mido.open_output(port_name)
+        self.midi_send_worker = MidiMessageSendWorker(self.outport)
+        self.midi_send_worker.start()
+
+    def close_output_worker(self):
+        if self.midi_send_worker:
+            self.midi_send_worker.stop()
+            self.midi_send_worker = None
+
+    def close(self):
+        if self.inport:
+            self.inport.close()
+        if self.outport:
+            self.close_output_worker()
+            self.outport.close()
 
     def send_sysex(self, data):
-        if self.outport:
+        if self.outport and self.midi_send_worker:
             print(f"[MIDI LOG] Sending SysEx: {' '.join(f'{b:02X}' for b in data)}")
             # Remove 0xF0 and 0xF7 if present
             if data and data[0] == 0xF0:
@@ -31,7 +48,7 @@ class MIDIHandler:
             if data and data[-1] == 0xF7:
                 data = data[:-1]
             msg = Message('sysex', data=data)
-            self.outport.send(msg)
+            self.midi_send_worker.send(msg)
 
     def receive_sysex(self, callback):
         if self.inport:
@@ -44,12 +61,6 @@ class MIDIHandler:
                     if not (data and data[-1] == 0xF7):
                         data = data + [0xF7]
                     callback(data)
-
-    def close(self):
-        if self.inport:
-            self.inport.close()
-        if self.outport:
-            self.outport.close()
 
     def send_custom_midi_command(self, cmd, values):
         if not self.outport and not hasattr(self, 'main_window'):
@@ -92,6 +103,9 @@ class MIDIHandler:
                     voice_data = [int(x.strip()) for x in params[1].split(',') if x.strip()]
                 data += [0x10 | (device & 0x0F), 0x00, 0x09] + voice_data
             sysex_bytes = [0xF0] + data + [0xF7]
+            msg = Message('sysex', data=sysex_bytes[1:-1])
+            self.midi_send_worker.send(msg)
+            return
         elif status == 0xF0:
             data = [status] + params
             if data[0] == 0xF0:
@@ -99,18 +113,17 @@ class MIDIHandler:
             if data and data[-1] == 0xF7:
                 data = data[:-1]
             sysex_bytes = [0xF0] + data + [0xF7]
+            msg = Message('sysex', data=sysex_bytes[1:-1])
+            self.midi_send_worker.send(msg)
+            return
         else:
             if cmd["parameters"] and cmd["parameters"][0]["name"].lower() == "channel":
                 channel = params.pop(0)
                 status = (status & 0xF0) | ((channel - 1) & 0x0F)
             data = [status] + params
             msg = Message.from_bytes(data)
-            self.outport.send(msg)
+            self.midi_send_worker.send(msg)
             return
-        # Instead of sending, put the SysEx hex string in the MIDI Out text field
-        hex_str = ' '.join(f'{b:02X}' for b in sysex_bytes)
-        if hasattr(self, 'main_window') and hasattr(self.main_window, 'ui'):
-            self.main_window.ui.out_text.setPlainText(hex_str)
 
     def get_command_hex(self, cmd, values):
         # If a template is present, use it for SysEx construction
@@ -195,8 +208,8 @@ class MIDIHandler:
             return ' '.join(f'{b:02X}' for b in data)
 
     def send_cc(self, channel, control, value):
-        if self.outport:
+        if self.outport and self.midi_send_worker:
             print(f"[MIDI LOG] Sending CC: channel={channel+1} control={control} value={value}")
             import mido
             msg = mido.Message('control_change', channel=channel, control=control, value=value)
-            self.outport.send(msg)
+            self.midi_send_worker.send(msg)

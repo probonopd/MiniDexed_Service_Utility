@@ -12,15 +12,17 @@ class EnvelopeWidget(QWidget):
         self.setMinimumWidth(180)
         self.setMaximumHeight(120)
         self.setMaximumWidth(400)
-        self.bg_color = QColor('#23272e')
+        self.bg_color = QColor('#332b28')
         self.fg_color = QColor('#ffb703')
-        self.line_color = QColor('#777777')
+        self.line_color = QColor('#aaaaaa')
         self.text_color = QColor('#e0e0e0')
+        self.highlight_color = QColor('#ffffff')
         self._drag_idx = None  # Which point is being dragged
         self._drag_offset = (0, 0)
         self._last_mouse_pos = None
         self.highlight_type = None  # 'rate' or 'level'
         self.highlight_index = None
+        self.setMouseTracking(True)  # Enable mouse tracking for hover labels
 
     def set_envelope(self, rates, levels):
         if len(rates) == 4 and len(levels) == 4:
@@ -102,25 +104,42 @@ class EnvelopeWidget(QWidget):
             else:
                 painter.setPen(QPen(QColor('#777777'), 2))
                 painter.setBrush(QColor('#777777'))
-            #painter.drawEllipse(int(x)-4, int(y_)-4, 8, 8)
-        # Draw labels
+            # painter.drawEllipse(int(x)-4, int(y_)-4, 8, 8)
+        # Draw labels only if highlighted
         painter.setPen(QPen(self.text_color))
         font = QFont()
-        font.setPointSize(7)
+        font.setPointSize(9)
         painter.setFont(font)
-        # painter.drawText(QRectF(points[1][0]-10, points[1][1]-18, 20, 16), Qt.AlignmentFlag.AlignCenter, "L1")
-        # painter.drawText(QRectF(points[2][0]-10, points[2][1]-18, 20, 16), Qt.AlignmentFlag.AlignCenter, "L2")
-        # painter.drawText(QRectF(points[3][0]-10, points[3][1]-18, 20, 16), Qt.AlignmentFlag.AlignCenter, "L3")
-        # painter.drawText(QRectF(points[5][0]-10, points[5][1]-18, 20, 16), Qt.AlignmentFlag.AlignCenter, "L4")
-        # painter.drawText(QRectF(points[0][0]-18, points[0][1]+8, 36, 16), Qt.AlignmentFlag.AlignCenter, "KEY ON")
-        # painter.drawText(QRectF(points[4][0]-18, points[4][1]+8, 36, 16), Qt.AlignmentFlag.AlignCenter, "KEY OFF")
-        for i in range(3):
-            mid_x = (points[i][0] + points[i+1][0]) / 2
-            mid_y = (points[i][1] + points[i+1][1]) / 2
-            # painter.drawText(QRectF(mid_x-10, mid_y+2, 20, 16), Qt.AlignmentFlag.AlignCenter, f"R{i+1}")
-        mid_x = (points[4][0] + points[5][0]) / 2
-        mid_y = (points[4][1] + points[5][1]) / 2
-        # painter.drawText(QRectF(mid_x-10, mid_y+2, 20, 16), Qt.AlignmentFlag.AlignCenter, "R4")
+        # Show L1/L2/L3/L4 or R1/R2/R3/R4 labels depending on highlight type
+        label_offset = 20  # Space between point/line and label
+        if self.highlight_type == 'level':
+            if self.highlight_index == 0:
+                painter.drawText(QRectF(points[1][0]-10, points[1][1]-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "L1")
+            if self.highlight_index == 1:
+                painter.drawText(QRectF(points[2][0]-10, points[2][1]-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "L2")
+            if self.highlight_index == 2:
+                painter.drawText(QRectF(points[3][0]-10, points[3][1]-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "L3")
+            if self.highlight_index == 3:
+                painter.drawText(QRectF(points[5][0]-10, points[5][1]-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "L4")
+        elif self.highlight_type == 'rate':
+            # Draw R1-R4 in the middle of the corresponding line segments
+            if self.highlight_index == 0:
+                mx = (points[0][0] + points[1][0]) / 2
+                my = (points[0][1] + points[1][1]) / 2
+                painter.drawText(QRectF(mx-10, my-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "R1")
+            if self.highlight_index == 1:
+                mx = (points[1][0] + points[2][0]) / 2
+                my = (points[1][1] + points[2][1]) / 2
+                painter.drawText(QRectF(mx-10, my-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "R2")
+            if self.highlight_index == 2:
+                mx = (points[2][0] + points[3][0]) / 2
+                my = (points[2][1] + points[3][1]) / 2
+                painter.drawText(QRectF(mx-10, my-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "R3")
+            if self.highlight_index == 3:
+                mx = (points[4][0] + points[5][0]) / 2
+                my = (points[4][1] + points[5][1]) / 2
+                painter.drawText(QRectF(mx-10, my-label_offset, 20, 16), Qt.AlignmentFlag.AlignCenter, "R4")
+
         painter.setPen(QPen(self.text_color, 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(margin, margin, w, h)

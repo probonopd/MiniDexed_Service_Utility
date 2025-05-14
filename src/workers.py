@@ -2,6 +2,7 @@ from PySide6.QtCore import QThread, Signal
 import time
 import socket
 import sys
+import queue
 from dialogs import Dialogs
 from file_utils import FileUtils
 
@@ -59,7 +60,11 @@ class MidiSendWorker(QThread):
             if self._stop:
                 self.log.emit("MIDI sending stopped by user.")
                 break
-            self.midi_outport.send(msg)
+            # Use the global midi_send_worker if available
+            if hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
+                self.midi_outport.midi_send_worker.send(msg)
+            else:
+                self.midi_outport.send(msg)
         elapsed = time.time() - start_time
         self.log.emit(f"MIDI file sent in {elapsed:.2f} seconds.")
         self.finished.emit()
@@ -156,3 +161,30 @@ class FileSaveWorker(QThread):
                 self.error.emit(f"Unknown file type: {self.file_type}")
         except Exception as e:
             self.error.emit(str(e))
+
+class MidiMessageSendWorker(QThread):
+    log = Signal(str)
+    def __init__(self, midi_outport):
+        super().__init__()
+        self.midi_outport = midi_outport
+        self.msg_queue = queue.Queue()
+        self.running = True
+    def run(self):
+        while self.running:
+            try:
+                msg = self.msg_queue.get(timeout=0.1)
+                if msg is None:
+                    break
+                # Use the global midi_send_worker if available
+                if hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
+                    self.midi_outport.midi_send_worker.send(msg)
+                else:
+                    self.midi_outport.send(msg)
+            except queue.Empty:
+                continue
+    def send(self, msg):
+        self.msg_queue.put(msg)
+    def stop(self):
+        self.running = False
+        self.msg_queue.put(None)
+        self.wait()

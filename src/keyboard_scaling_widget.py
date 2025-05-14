@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QPainter, QPen, QColor, QFont, QPainterPath
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRectF
 import sys
 
 class KeyboardScalingWidget(QWidget):
@@ -12,7 +12,7 @@ class KeyboardScalingWidget(QWidget):
         self.right_depth = 50  # 0-99
         self.left_curve = 1    # 0=LIN, 1=-EXP, 2=+EXP, 3=-LIN
         self.right_curve = 2   # 0=LIN, 1=-EXP, 2=+EXP, 3=-LIN
-        self.bg_color = QColor('#23272e')
+        self.bg_color = QColor('#332b28')
         self.line_color = QColor('#aaaaaa')
         self.curve_color = QColor('#aaaaaa')
         self.text_color = QColor('#e0e0e0')
@@ -82,6 +82,44 @@ class KeyboardScalingWidget(QWidget):
             pen = QPen(self.highlight_color, 3)
         painter.setPen(pen)
         painter.drawLine(int(bp_x), margin, int(bp_x), h-margin)
+
+        # Draw hover labels for highlighted part
+        painter.setPen(QPen(self.text_color))
+        font = QFont()
+        font.setPointSize(9)
+        painter.setFont(font)
+        label_offset = 28
+        
+        curve_labels = {0: '+LIN', 1: '-EXP', 2: '+EXP', 3: '-LIN'}
+        if self.highlight == 'left_curve':
+            label = curve_labels.get(self.left_curve, '')
+            x = margin + (bp_x - margin) * 0.25
+            y = 5
+            painter.drawText(QRectF(x-20, y, 40, 18), Qt.AlignmentFlag.AlignCenter, label)
+        elif self.highlight == 'right_curve':
+            label = curve_labels.get(self.right_curve, '')
+            x = bp_x + (w - margin - bp_x) * 0.25
+            y = 5
+            painter.drawText(QRectF(x-20, y, 40, 18), Qt.AlignmentFlag.AlignCenter, label)
+        elif self.highlight == 'break':
+            label = "BREAK"
+            painter.drawText(QRectF(bp_x-20, 5, 40, 18), Qt.AlignmentFlag.AlignCenter, label)
+        elif self.highlight == 'left_depth':
+            # Horizontally center the label over the widget, accounting for text width
+            label = 'L DEPTH'
+            metrics = painter.fontMetrics()
+            text_width = metrics.horizontalAdvance(label)
+            x = (w / 2) - (text_width / 2)
+            y = 5
+            painter.drawText(QRectF(x, y, text_width, 18), Qt.AlignmentFlag.AlignCenter, label)
+        elif self.highlight == 'right_depth':
+            # Horizontally center the label over the widget, accounting for text width
+            label = 'R DEPTH'
+            metrics = painter.fontMetrics()
+            text_width = metrics.horizontalAdvance(label)
+            x = (w / 2) - (text_width / 2)
+            y = 5
+            painter.drawText(QRectF(x, y, text_width, 18), Qt.AlignmentFlag.AlignCenter, label)
 
     def _dx7_curve(self, rel, depth, curve, h, margin, left=True):
         # rel: 0..1, depth: 0..99, curve: 0=+LIN, 1=-EXP, 2=+EXP, 3=-LIN

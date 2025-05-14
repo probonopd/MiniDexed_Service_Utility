@@ -4,6 +4,7 @@ from PySide6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
 import sys
+import warnings
 
 # Define global and TG-specific fields explicitly in the order they should appear
 # Add a new Voice field at the top of TG_FIELDS
@@ -222,7 +223,9 @@ class PerformanceEditor(QDialog):
         if self.main_window and hasattr(self.main_window, "midi_handler"):
             if hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
                 try:
-                    self.main_window.receive_worker.sysex_received.disconnect(self._on_performance_sysex)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", category=RuntimeWarning)
+                        self.main_window.receive_worker.sysex_received.disconnect(self._on_performance_sysex)
                 except Exception:
                     pass
                 self.main_window.receive_worker.sysex_received.connect(self._on_performance_sysex)
@@ -373,13 +376,17 @@ class PerformanceEditor(QDialog):
                     vv1 = (v >> 8) & 0x7F
                     vv2 = v & 0x7F
                 if field in ["CompressorEnable", "ReverbEnable", "ReverbSize", "ReverbHighDamp", "ReverbLowDamp", "ReverbLowPass", "ReverbDiffusion", "ReverbLevel"]:
-                    # Global set
                     sysex = [0xF0, 0x7D, 0x20, pp1, pp2, vv1, vv2, 0xF7]
                 else:
-                    # TG set
                     sysex = [0xF0, 0x7D, 0x21, tg_index, pp1, pp2, vv1, vv2, 0xF7]
                 if self.main_window and hasattr(self.main_window, "midi_handler"):
-                    self.main_window.midi_handler.send_sysex(sysex)
+                    midi_handler = self.main_window.midi_handler
+                    if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
+                        import mido
+                        msg = mido.Message('sysex', data=sysex[1:-1])
+                        midi_handler.midi_send_worker.send(msg)
+                    else:
+                        midi_handler.send_sysex(sysex)
                 return
         except Exception as e:
             print(f"Failed to send MIDI for {field} TG{tg_index+1}: {e}", file=sys.stderr)
@@ -477,7 +484,9 @@ class PerformanceEditor(QDialog):
             if len(self._sysex_data_buffer) >= self._expected_sysex_count:
                 if self.main_window and hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
                     try:
-                        self.main_window.receive_worker.sysex_received.disconnect(self._on_performance_sysex)
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore", category=RuntimeWarning)
+                            self.main_window.receive_worker.sysex_received.disconnect(self._on_performance_sysex)
                     except Exception:
                         pass
                 print(f"[PERF EDITOR DEBUG] All expected responses received. Populating fields.")

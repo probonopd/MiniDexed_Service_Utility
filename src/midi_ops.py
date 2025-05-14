@@ -21,7 +21,10 @@ class MidiOps:
             for line in lines:
                 try:
                     msg = mido.Message.from_str(line)
-                    self.main_window.midi_handler.outport.send(msg)
+                    if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
+                        self.main_window.midi_handler.midi_send_worker.send(msg)
+                    else:
+                        self.main_window.midi_handler.outport.send(msg)
                     self.main_window.show_status(f"Sent MIDI: {msg}")
                     continue
                 except Exception:
@@ -30,12 +33,18 @@ class MidiOps:
                 if data:
                     if data[0] == 0xF0:
                         msg = mido.Message('sysex', data=data[1:-1] if data[-1] == 0xF7 else data[1:])
-                        self.main_window.midi_handler.outport.send(msg)
+                        if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
+                            self.main_window.midi_handler.midi_send_worker.send(msg)
+                        else:
+                            self.main_window.midi_handler.outport.send(msg)
                         hex_str = ' '.join(f'{b:02X}' for b in data)
                         self.main_window.show_status(f"Sent SysEx: sysex data={hex_str}")
                     else:
                         msg = mido.Message.from_bytes(data)
-                        self.main_window.midi_handler.outport.send(msg)
+                        if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
+                            self.main_window.midi_handler.midi_send_worker.send(msg)
+                        else:
+                            self.main_window.midi_handler.outport.send(msg)
                         self.main_window.show_status(f"Sent MIDI bytes: {msg}")
                 else:
                     Dialogs.show_error(self.main_window, "Error", f"Invalid MIDI/SysEx data: {line}")
@@ -46,7 +55,7 @@ class MidiOps:
         if self.midi_send_worker and self.midi_send_worker.isRunning():
             self.midi_send_worker.stop()
             self.main_window.show_status("Stop requested.")
-            self.send_all_notes_off()
+            # Do not send all notes off here; wait until finished
         else:
             self.main_window.show_status("No MIDI file is currently being sent.")
 
@@ -55,7 +64,10 @@ class MidiOps:
             # Send All Notes Off for all 16 channels
             for ch in range(16):
                 msg = mido.Message('control_change', channel=ch, control=123, value=0)
-                self.main_window.midi_handler.outport.send(msg)
+                if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
+                    self.main_window.midi_handler.midi_send_worker.send(msg)
+                else:
+                    self.main_window.midi_handler.outport.send(msg)
             self.main_window.show_status("Sent All Notes Off (CC123) to all channels.")
         except Exception as e:
             Dialogs.show_error(self.main_window, "Error", f"Failed to send All Notes Off: {e}")
@@ -63,6 +75,7 @@ class MidiOps:
     def on_midi_send_finished(self):
         self.main_window.show_status("Finished sending MIDI file.")
         self.midi_send_worker = None
+        self.send_all_notes_off()  # Now send All Notes Off after the file is done
         # Repeat logic: check if the Repeat menu entry is checked
         repeat_action = getattr(self.main_window, 'repeat_action', None)
         repeat_enabled = repeat_action.isChecked() if repeat_action else False

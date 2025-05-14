@@ -85,12 +85,37 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.midi_ops.stop_sending()
+        # Stop and wait for all known worker threads
         if self.receive_worker:
             self.receive_worker.stop()
+            self.receive_worker.wait()
+        if hasattr(self, 'log_worker') and self.log_worker:
+            self.log_worker.stop()
+            self.log_worker.wait()
         if hasattr(self, 'syslog_worker') and self.syslog_worker:
             self.syslog_worker.stop()
+            self.syslog_worker.wait()
+            self.syslog_worker = None
+        if hasattr(self.midi_handler, 'midi_send_worker') and self.midi_handler.midi_send_worker:
+            self.midi_handler.midi_send_worker.stop()
+            self.midi_handler.midi_send_worker.wait()
+        # Device discovery worker (service_discovery_worker.py)
+        if hasattr(self, 'device_discovery_worker') and self.device_discovery_worker:
+            self.device_discovery_worker.quit()
+            self.device_discovery_worker.wait()
+        # Updater workers (from updater_dialog, updater_worker)
+        if hasattr(self, 'updater_worker') and self.updater_worker:
+            self.updater_worker.quit()
+            self.updater_worker.wait()
+        # File load/save workers (from workers.py)
+        if hasattr(self, 'file_load_worker') and self.file_load_worker:
+            self.file_load_worker.quit()
+            self.file_load_worker.wait()
+        if hasattr(self, 'file_save_worker') and self.file_save_worker:
+            self.file_save_worker.quit()
+            self.file_save_worker.wait()
+        # Any other background workers (add more as needed)
         self.midi_handler.close()
-        self.log_worker.stop()
         event.accept()
 
     def start_receiving(self):

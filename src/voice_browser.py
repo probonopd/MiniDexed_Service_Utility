@@ -221,14 +221,11 @@ class VoiceBrowser(QDialog):
         def after_download(syx_data, voice_name, error):
             if error:
                 return
-            midi_outport = getattr(self.main_window, 'midi_handler', None)
-            if midi_outport and hasattr(midi_outport, 'outport'):
-                midi_outport = midi_outport.outport
-            # Send the voice via MIDI before opening the editor
-            if midi_outport:
+            midi_handler = getattr(self.main_window, 'midi_handler', None)
+            if midi_handler and hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
                 import mido
                 msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
-                midi_outport.send(msg)
+                midi_handler.midi_send_worker.send(msg)
                 self.set_status(f"Sent '{voice_name}' to MIDI Out.")
             from voice_editor import VoiceEditor
             # --- Ensure valid 161-byte SysEx for the editor ---
@@ -241,7 +238,7 @@ class VoiceBrowser(QDialog):
             elif len(syx_data) == 155:
                 syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
             # ---
-            VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
+            VoiceEditor.show_singleton(parent=self, midi_outport=midi_handler, voice_bytes=syx_data)
             editor = VoiceEditor.get_instance()
             if hasattr(editor, 'channel_combo'):
                 idx_ch = self.channel_combo.currentIndex()
@@ -262,8 +259,6 @@ class VoiceBrowser(QDialog):
                 self.set_status(f"Failed to download voice: {error}", error=True)
                 return
             midi_outport = getattr(self.main_window, 'midi_handler', None)
-            if midi_outport and hasattr(midi_outport, 'outport'):
-                midi_outport = midi_outport.outport
             from voice_editor_panel import VoiceEditorPanel
             # Ensure valid 161-byte SysEx for the editor
             if isinstance(syx_data, list):
@@ -313,7 +308,11 @@ class VoiceBrowser(QDialog):
             if midi_outport:
                 import mido
                 msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
-                midi_outport.send(msg)
+                mw = self.main_window
+                if hasattr(mw.midi_handler, 'midi_send_worker') and mw.midi_handler.midi_send_worker:
+                    mw.midi_handler.midi_send_worker.send(msg)
+                else:
+                    mw.midi_handler.outport.send(msg)
                 self.set_status(f"Sent '{voice_name}' to MIDI Out.")
         self.download_worker.finished.connect(after_download)
         self.download_worker.start()
@@ -329,8 +328,6 @@ class VoiceBrowser(QDialog):
                 self._active_workers.remove(worker)
                 return
             midi_outport = getattr(self.main_window, 'midi_handler', None)
-            if midi_outport and hasattr(midi_outport, 'outport'):
-                midi_outport = midi_outport.outport
             from voice_editor import VoiceEditor
             # --- Ensure valid 161-byte SysEx for the editor ---
             if isinstance(syx_data, list):
@@ -439,7 +436,10 @@ class VoiceBrowser(QDialog):
                         try:
                             data = sysex[1:-1] if sysex[0] == 0xF0 and sysex[-1] == 0xF7 else sysex
                             msg = mido.Message('sysex', data=data)
-                            mw.midi_handler.outport.send(msg)
+                            if hasattr(mw.midi_handler, 'midi_send_worker') and mw.midi_handler.midi_send_worker:
+                                mw.midi_handler.midi_send_worker.send(msg)
+                            else:
+                                mw.midi_handler.outport.send(msg)
                             self.set_status(f"Sent '{voice['name']}' directly to MIDI Out.")
                         except Exception as e:
                             self.set_status(f"Failed to send MIDI: {e}", error=True)

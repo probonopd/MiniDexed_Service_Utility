@@ -1,12 +1,15 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter
 from PySide6.QtCore import Qt
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtGui import QResizeEvent, QPalette, QColor
+from PySide6.QtGui import QResizeEvent, QPalette, QColor, QFontDatabase, QFont, QPainter
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from envelope_widget import EnvelopeWidget
 from keyboard_scaling_widget import KeyboardScalingWidget
+from param_info_panel import ParamInfoPanel
 import os
 import mido
+import json
+from PySide6.QtWidgets import QApplication
 
 # --- Static definitions and tables ---
 
@@ -19,8 +22,9 @@ VALUE_LABELS = {
     'LFKS': {0: 'Off', 1: 'On'},
     'LFW': {0: 'Sine', 1: 'Triangle', 2: 'Sawtooth Down', 3: 'Sawtooth Up', 4: 'Square', 5: 'Sample and Hold'},
     'PM': {0: 'Ratio', 1: 'Fixed'},
-    'LC': {0: 'Linear', 1: 'Exponential Negative', 2: 'Exponential Positive', 3: 'Logarithmic'},
-    'RC': {0: 'Linear', 1: 'Exponential Negative', 2: 'Exponential Positive', 3: 'Logarithmic'},
+    # Corrected LC/RC mappings to match DX7 spec and VCED.json
+    'LC': {0: '+LIN', 1: '-EXP', 2: '+EXP', 3: '-LIN'},
+    'RC': {0: '+LIN', 1: '-EXP', 2: '+EXP', 3: '-LIN'},
 }
 
 GLOBAL_PARAM_DEFS = [
@@ -65,7 +69,10 @@ class VoiceEditorPanel(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Voice Editor")
         self.resize(400, 600)
-        self.setStyleSheet("background-color: #23272e; color: #e0e0e0;")
+        self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #17777a, stop:1 #223c36); border-radius: 2px;"
+        self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
+        self.gradient_global = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
+        self.setStyleSheet("background-color: #332b28; color: #e0e0e0;")
         self.midi_outport = midi_outport
         self.voice_bytes = voice_bytes or self.init_patch_bytes()
         self.decoder = SingleVoiceDumpDecoder(self.voice_bytes)
@@ -78,12 +85,10 @@ class VoiceEditorPanel(QDialog):
         self.status_bar.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.status_bar.setWordWrap(False)
         self.status_bar.setStyleSheet("background: transparent; color: #e0e0e0; padding: 4px;")
-        self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #17677a, stop:1 #222c36); border-radius: 2px;"
-        self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2d3640, stop:1 #23272e); border-radius: 2px;"
-        self.gradient_global = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2d3640, stop:1 #23272e); border-radius: 2px;"
-        self.gradient_slider = "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23272e, stop:1 #2d3640)"
         self.gradient_status = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fffde8, stop:0.5 #fffad7, stop:1 #f3eeb2); color: #000000; padding: 4px; border-top: 1px solid #d4cc99; border-radius: 2px;"
         self.status_bar.setStyleSheet(self.gradient_status)
+        self.status_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.status_bar.mousePressEvent = self._on_status_bar_click
         self.init_ui()
 
     def update_status_bar(self, text, lcd_value=None):
@@ -97,12 +102,14 @@ class VoiceEditorPanel(QDialog):
         else:
             self.lcd_number.display("")
 
-    def status_bar_clicked(self, event):
-        current_name = self.get_patch_name()
-        new_name, ok = QInputDialog.getText(self, "Rename Voice", "Enter new voice name (max 10 chars):", text=current_name)
-        if ok and new_name:
-            self.name_edit.setText(new_name[:10])
-            self.update_status_bar("")
+    def _on_status_bar_click(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            current_name = self.get_patch_name()
+            new_name, ok = QInputDialog.getText(self, "Rename Voice", "Enter new voice name (max 10 chars):", text=current_name)
+            if ok and new_name:
+                for i, c in enumerate(new_name.ljust(10)[:10]):
+                    self.set_param(f'VNAM{i+1}', ord(c))
+                self.update_status_bar("")
 
     def get_carrier_ops(self, alg_idx):
         return DX7_CARRIER_MAP[alg_idx] if 0 <= alg_idx < 32 else []
@@ -127,6 +134,8 @@ class VoiceEditorPanel(QDialog):
             val = s.value()
             label_val = self.get_value_label(k, val) if k else str(val)
             self.update_status_bar(f"{d}: {label_val}", lcd_value=val)
+            if k:
+                self._show_param_info(k)
             # Highlight in envelope widget if rate or level
             if k and k.startswith('R') and k[1:].isdigit():
                 idx = int(k[1:]) - 1
@@ -147,6 +156,7 @@ class VoiceEditorPanel(QDialog):
                 self.ks_widget.set_highlight('right_curve')
         def leaveEvent(event, s=slider, d=description, k=param_key):
             self.update_status_bar("")
+            self.param_info_panel.setText("")
             # Remove highlight
             self.env_widget.clear_highlight()
             self.ks_widget.clear_highlight()
@@ -185,7 +195,16 @@ class VoiceEditorPanel(QDialog):
         return line
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        # --- Load VCED.json for parameter info (must be first!) ---
+        self._vced_param_info = None
+        try:
+            with open(os.path.join(os.path.dirname(__file__), 'data', 'VCED.json'), 'r', encoding='utf-8') as f:
+                self._vced_param_info = {p['key']: p for p in json.load(f)}
+        except Exception as e:
+            self._vced_param_info = {}
+        layout = QHBoxLayout(self)  # Use horizontal layout for main area
+        # --- Main editor area (was layout = QVBoxLayout(self)) ---
+        main_vbox = QVBoxLayout()
         # --- Top bar layout ---
         topbar_layout = QHBoxLayout()
         topbar_layout.setContentsMargins(0, 0, 0, 0)
@@ -272,13 +291,7 @@ class VoiceEditorPanel(QDialog):
         ch_widget = QWidget()
         ch_widget.setLayout(ch_col)
         topbar_layout.addWidget(ch_widget)
-        layout.addLayout(topbar_layout)
-        # Patch name edit
-        self.name_edit = QLineEdit()
-        self.name_edit.setMaxLength(10)
-        self.name_edit.setText(self.get_patch_name())
-        self.name_edit.setMinimumWidth(120)
-        self.name_edit.textChanged.connect(self.on_name_changed)
+        main_vbox.addLayout(topbar_layout)
         # Operator grid
         op_grid = QGridLayout()
         op_grid.setContentsMargins(0, 0, 0, 0)
@@ -304,50 +317,57 @@ class VoiceEditorPanel(QDialog):
             self.operator_spacer_items.append(spacer_item)
             operator_row_layout.addWidget(spacer_item)
             # Add E (Enable) slider
+            e_short = self._vced_param_info.get('E', {}).get('short', 'E')
             operator_row_layout.addWidget(self._make_slider(
                 self.get_op_param(tg, 'E', 1), 0, 1,
                 lambda v, o=tg: (self.set_op_param(o, 'E', v), self.handle_op_enabled()),
-                'Operator Enable', '#8ecae6', 'E', param_key='E'
+                'Operator Enable', '#8ecae6', e_short, param_key='E'
             ))
             operator_row_layout.addWidget(self._make_vline())
-
             # Frequency
-            for key, full_name, short_lbl, max_val in OP_FREQ_DEFS:
+            for key, full_name, _short_lbl, max_val in OP_FREQ_DEFS:
+                short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
                     self.get_op_param(tg, key), 0, max_val,
                     lambda v, o=tg, k=key: self.set_op_param(o, k, v),
-                    full_name, '#8ecae6', short_lbl, param_key=key
+                    full_name, '#8ecae6', short_label, param_key=key
                 ))
             operator_row_layout.addWidget(self._make_vline())
             # Level
-            for key, full_name, short_lbl, max_val in OP_LEVEL_DEFS:
+            for key, full_name, _short_lbl, max_val in OP_LEVEL_DEFS:
+                short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
                     self.get_op_param(tg, key), 0, max_val,
                     lambda v, o=tg, k=key: self.set_op_param(o, k, v),
-                    full_name, '#8ecae6', short_lbl, param_key=key
+                    full_name, '#8ecae6', short_label, param_key=key
                 ))
             operator_row_layout.addWidget(self._make_vline())
             # EG Level (L1-L4)
             for i in range(4):
+                key = f'L{i+1}'
+                short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
-                    self.get_op_param(tg, f'L{i+1}'), 0, 99,
+                    self.get_op_param(tg, key), 0, 99,
                     lambda v, o=tg, idx=i: self.set_op_param(o, f'L{idx+1}', v),
-                    f'Envelope Generator Level {i+1}', '#ffb703', f'L{i+1}', param_key=f'L{i+1}'
+                    f'Envelope Generator Level {i+1}', '#ffb703', short_label, param_key=key
                 ))
             # EG Rate (R1-R4)
             for i in range(4):
+                key = f'R{i+1}'
+                short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
-                    self.get_op_param(tg, f'R{i+1}'), 0, 99,
+                    self.get_op_param(tg, key), 0, 99,
                     lambda v, o=tg, idx=i: self.set_op_param(o, f'R{idx+1}', v),
-                    f'Envelope Generator Rate {i+1}', '#8ecae6', f'R{i+1}', param_key=f'R{i+1}'
+                    f'Envelope Generator Rate {i+1}', '#8ecae6', short_label, param_key=key
                 ))
             operator_row_layout.addWidget(self._make_vline())
             # Keyboard Scaling
-            for key, full_name, short_lbl, max_val in OP_KS_DEFS:
+            for key, full_name, _short_lbl, max_val in OP_KS_DEFS:
+                short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
                     self.get_op_param(tg, key), 0, max_val,
                     lambda v, o=tg, k=key: self.set_op_param(o, k, v),
-                    full_name, '#8ecae6', short_lbl, param_key=key
+                    full_name, '#8ecae6', short_label, param_key=key
                 ))
             op_grid.addWidget(tg_bg, row, 0, 1, op_col_count)
 
@@ -376,29 +396,35 @@ class VoiceEditorPanel(QDialog):
         self.global_spacer_item = QWidget()
         self.global_spacer_item.setMinimumWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
         global_layout.addWidget(self.global_spacer_item)
+        # Global row
         for i in range(4):
+            key = f'PR{i+1}'
+            short_label = self._vced_param_info.get(key, {}).get('short', key)
             global_layout.addWidget(
                 self._make_slider(
-                    self.get_param(f'PR{i+1}', 0), 0, 99,
-                    lambda v, k=f'PR{i+1}': self.set_param(k, v),
-                    f'Envelope Generator Rate {i+1}', '#8ecae6', f'R{i+1}'
+                    self.get_param(key, 0), 0, 99,
+                    lambda v, k=key: self.set_param(k, v),
+                    f'Envelope Generator Rate {i+1}', '#8ecae6', short_label, param_key=key
                 )
             )
         for i in range(4):
+            key = f'PL{i+1}'
+            short_label = self._vced_param_info.get(key, {}).get('short', key)
             global_layout.addWidget(
                 self._make_slider(
-                    self.get_param(f'PL{i+1}', 0), 0, 99,
-                    lambda v, k=f'PL{i+1}': self.set_param(k, v),
-                    f'Envelope Generator Level {i+1}', '#ffb703', f'L{i+1}'
+                    self.get_param(key, 0), 0, 99,
+                    lambda v, k=key: self.set_param(k, v),
+                    f'Envelope Generator Level {i+1}', '#ffb703', short_label, param_key=key
                 )
             )
         global_layout.addWidget(self._make_vline())
-        for label, key, min_val, max_val, tooltip in GLOBAL_PARAM_DEFS:
+        for _label, key, min_val, max_val, tooltip in GLOBAL_PARAM_DEFS:
+            short_label = self._vced_param_info.get(key, {}).get('short', key)
             global_layout.addWidget(
                 self._make_slider(
                     self.get_param(key, 0), min_val, max_val,
                     lambda v, k=key: self.set_param(k, v),
-                    tooltip, '#8ecae6', label, param_key=key
+                    tooltip, '#8ecae6', short_label, param_key=key
                 )
             )
         op_grid.addWidget(global_bg, global_row, 0, 1, op_col_count)
@@ -410,9 +436,31 @@ class VoiceEditorPanel(QDialog):
         self.svg_overlay.setStyleSheet("background: transparent;")
         self.svg_overlay.setVisible(True)
         self.svg_overlay.raise_()
-        layout.addWidget(op_table_widget)
+        main_vbox.addWidget(op_table_widget)
+        # At the end, create a QWidget for the main editor area
+        main_editor_widget = QWidget()
+        main_editor_widget.setLayout(main_vbox)
+        # --- Contextual Side Panel ---
+        self.param_info_panel = ParamInfoPanel()
+        # --- Splitter to allow resizing ---
+        splitter = QSplitter()
+        splitter.addWidget(main_editor_widget)
+        splitter.addWidget(self.param_info_panel)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        layout.addWidget(splitter)
         self.setLayout(layout)
         self.update_svg_overlay()
+        # --- Load VCED.json for parameter info ---
+        self._vced_param_info = None
+        try:
+            with open(os.path.join(os.path.dirname(__file__), 'data', 'VCED.json'), 'r', encoding='utf-8') as f:
+                self._vced_param_info = {p['key']: p for p in json.load(f)}
+        except Exception as e:
+            self._vced_param_info = {}
+
+    def _show_param_info(self, param_key):
+        self.param_info_panel.show_param_info(self._vced_param_info, param_key)
 
     def resizeEvent(self, event: QResizeEvent):
         super().resizeEvent(event)
@@ -490,7 +538,7 @@ class VoiceEditorPanel(QDialog):
         self.params['operators'][op][key] = value
         param_num = self._get_operator_param_num(op, key)
         if param_num is not None:
-            self.send_sysex(key, value, param_num)
+            self.send_sysex(key, value, param_num, op_idx=op)
         # Update envelope widget if this is the hovered operator and key is R1-R4 or L1-L4
         if self._hovered_op_idx == op and (key in [f'R{i+1}' for i in range(4)] or key in [f'L{i+1}' for i in range(4)]):
             self._update_env_widget_for_operator(op)
@@ -515,11 +563,22 @@ class VoiceEditorPanel(QDialog):
                 return self.params['operators'][op].get(key, default)
         return default
 
-    def send_sysex(self, key, value, param_num):
-        print(f"[DEBUG] send_sysex called with key={key}, value={value}, param_num={param_num}")
+    def _get_rtpc_number(self, key, op_idx=None):
+        # Look up the RTPC number for a parameter (and operator index if operator param)
+        param_info = self._vced_param_info.get(key)
+        if not param_info:
+            return None
+        rtpc = param_info.get('rtpc_number')
+        if isinstance(rtpc, list) and op_idx is not None:
+            return rtpc[op_idx]
+        elif isinstance(rtpc, int):
+            return rtpc
+        return None
+
+    def send_sysex(self, key, value, param_num, op_idx=None):
+        print(f"[DEBUG] send_sysex called with key={key}, value={value}, param_num={param_num}, op_idx={op_idx}")
+        ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
         if param_num is not None and value is not None:
-            ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
-            print(f"[DEBUG] Using MIDI channel index {ch}")
             if 0 <= param_num <= 155:
                 group = 0x00
                 if param_num <= 127:
@@ -536,18 +595,15 @@ class VoiceEditorPanel(QDialog):
                 print(f"[VOICE EDITOR PANEL] Unsupported parameter number: {param_num}")
                 return
             sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
-            print(f"[DEBUG] Constructed SysEx: {' '.join(f'{b:02X}' for b in sysex)}")
-            if self.midi_outport:
-                try:
-                    msg = mido.Message('sysex', data=sysex[1:-1])
-                    print(f"[DEBUG] Sending SysEx via mido on channel {ch+1}")
-                    self.midi_outport.send(msg)
-                except Exception as e:
-                    print(f"[VOICE EDITOR PANEL] Failed to send SysEx: {e}")
+            if self.midi_outport and hasattr(self.midi_outport, 'midi_send_worker'):
+                import mido
+                msg = mido.Message('sysex', data=sysex[1:-1])
+                print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {ch+1})")
+                self.midi_outport.midi_send_worker.send(msg)
             else:
-                print("[DEBUG] midi_outport is not set, cannot send SysEx.")
+                print("[VOICE EDITOR PANEL] midi_outport or midi_send_worker not set, cannot send SysEx.")
         else:
-            print("[VOICE EDITOR PANEL] No valid parameter or mapping for SysEx.")
+            print(f"[VOICE EDITOR PANEL] No valid param_num for {key} (op_idx={op_idx})")
 
     def _get_param_num(self, key):
         param_map = {
@@ -591,12 +647,10 @@ class VoiceEditorPanel(QDialog):
         # Send DX7 operator enable/disable SysEx
         sysex = [0xF0, 0x43, 0x10, 0x01, 0x1B, bitfield, 0xF7]
         print(f"[DX7 OP ENABLE] Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)}")
-        if self.midi_outport:
-            try:
-                msg = mido.Message('sysex', data=sysex[1:-1])
-                self.midi_outport.send(msg)
-            except Exception as e:
-                print(f"[DX7 OP ENABLE] Failed to send SysEx: {e}")
+        if self.midi_outport and hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
+            import mido
+            msg = mido.Message('sysex', data=sysex[1:-1])
+            self.midi_outport.midi_send_worker.send(msg)
         else:
             print("[DX7 OP ENABLE] midi_outport is not set, cannot send SysEx.")
 
@@ -608,3 +662,17 @@ class VoiceEditorPanel(QDialog):
     def _reset_env_widget(self):
         # Optionally, reset to a default or global envelope, or just clear
         self.env_widget.set_envelope([50, 50, 50, 50], [99, 70, 40, 0])
+
+    # --- Load parameter definitions ---
+        self._param_formats = {}
+        vced_path = os.path.join(os.path.dirname(__file__), 'data', 'VCED.json')
+        try:
+            with open(vced_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, dict) and 'format' in data and 'parameters' in data:
+                    fmt = data['format']
+                    self._param_formats[fmt] = {p['key']: p for p in data['parameters']}
+        except Exception as e:
+            self._param_formats = {}
+        # Default to VCED for now
+        self._vced_param_info = self._param_formats.get('VCED', {})

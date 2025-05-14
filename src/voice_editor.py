@@ -166,7 +166,6 @@ class VoiceEditor(QDialog):
             ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
             # Determine parameter group and parameter number for correct mapping
             if 0 <= param_num <= 155:
-                # Voice parameter change (g=0)
                 group = 0x00
                 if param_num <= 127:
                     group_byte = group
@@ -175,7 +174,6 @@ class VoiceEditor(QDialog):
                     group_byte = group | 0x01  # set pp bits for 128-155
                     param_byte = param_num - 128
             elif 64 <= param_num <= 77:
-                # Function parameter change (g=2)
                 group = 0x20
                 group_byte = group
                 param_byte = param_num
@@ -183,11 +181,11 @@ class VoiceEditor(QDialog):
                 print(f"[VOICE EDITOR] Unsupported parameter number: {param_num}")
                 return
             sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
-            if self.midi_outport:
+            if self.midi_outport and hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
                 import mido
                 msg = mido.Message('sysex', data=sysex[1:-1])
                 print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {ch+1})")
-                self.midi_outport.send(msg)
+                self.midi_outport.midi_send_worker.send(msg)
         else:
             print("[VOICE EDITOR] No valid parameter or mapping for SysEx.")
 
