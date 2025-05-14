@@ -69,9 +69,9 @@ jobs:
     - name: Build Executable (Nuitka)
       run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
+            python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --enable-plugin=zeroconf._listener --enable-plugin=zeroconf._services.info --enable-plugin=zeroconf._utils.ipaddress --follow-imports --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
           else
-            python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --onefile 'src/MiniDexed Service Utility.py'
+            python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --enable-plugin=zeroconf._listener --enable-plugin=zeroconf._services.info --enable-plugin=zeroconf._utils.ipaddress --follow-imports --onefile 'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
           rm -rf dist_nuitka/*dist
