@@ -5,8 +5,9 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel,
     QScrollArea, QHBoxLayout, QComboBox, QCheckBox, QWidget, QSizePolicy, QApplication
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor
+from PySide6.QtCore import QTimer
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
 
@@ -78,9 +79,6 @@ class PerformanceEditor(QDialog):
         self.main_window = main_window
         self.resize(800, 950)
         layout = QVBoxLayout(self)
-        # Add red warning label above the table
-        warning = QLabel("<span style='color: red;'>Work in progress, only works with firmware from  https://github.com/probonopd/MiniDexed/pull/915</span>")
-        layout.addWidget(warning)
         self.table = QTableWidget(len(PERFORMANCE_FIELDS), 8, self)
         self.table.setHorizontalHeaderLabels(TG_LABELS)
         self.table.setVerticalHeaderLabels(PERFORMANCE_FIELDS)
@@ -215,8 +213,6 @@ class PerformanceEditor(QDialog):
         # Move initialization logic from showEvent here
         from PySide6.QtWidgets import QApplication
         app = QApplication.instance()
-        if app:
-            app.setOverrideCursor(Qt.CursorShape.BusyCursor)
         self.setEnabled(False)
         self.hide()  # Hide until data is loaded
         self._sysex_data_buffer = {}
@@ -297,29 +293,22 @@ class PerformanceEditor(QDialog):
         dlg.activateWindow()
 
     def on_spin_changed(self, row, col, value):
-        import logging
         if self._block_signal:
-            logging.debug(f"[on_spin_changed] Blocked: row={row}, col={col}, value={value}")
             return
-        logging.debug(f"[on_spin_changed] row={row}, col={col}, value={value}, field={PERFORMANCE_FIELDS[row]}")
-        # Update the QTableWidgetItem if present (for consistency)
         if self.table.item(row, col):
             self.table.item(row, col).setText(str(value))
         field = PERFORMANCE_FIELDS[row]
         self.send_midi_for_field(field, col, value)
 
     def on_cell_changed(self, row, col):
-        import logging
         if self._block_signal:
-            logging.debug(f"[on_cell_changed] Blocked: row={row}, col={col}")
             return
         field = PERFORMANCE_FIELDS[row]
         value = self.table.item(row, col).text()
-        logging.debug(f"[on_cell_changed] row={row}, col={col}, value={value}, field={field}")
         self.send_midi_for_field(field, col, value)
 
     def send_midi_for_field(self, field, tg_index, value):
-        # [DEBUG] send_sysex style log
+
         try:
             # MiniDexed SysEx mapping for all fields in PERFORMANCE_FIELDS
             field_to_param = {
@@ -383,7 +372,6 @@ class PerformanceEditor(QDialog):
                 else:
                     sysex = [0xF0, 0x7D, 0x21, tg_index, pp1, pp2, vv1, vv2, 0xF7]
 
-                print(f"[DEBUG] send_sysex called with field={field}, value={value}, tg_index={tg_index}")
                 print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {tg_index+1})")
                 if self.main_window and hasattr(self.main_window, "midi_handler"):
                     midi_handler = self.main_window.midi_handler
@@ -441,6 +429,14 @@ class PerformanceEditor(QDialog):
                 self.main_window.receive_worker.sysex_received.connect(self._on_voice_dump)
         self._pending_voice_dumps = set(range(8))
         self._voice_dump_data = {}
+
+        # Start a timer to check for timeout after 2 seconds
+        def check_timeout():
+            if not self.isEnabled():
+                from dialogs import Dialogs
+                self.close()
+                Dialogs.show_error(self, "Timeout", "Not all responses to the dump requests were received within 2 seconds.\nThis feature only works with firmware from https://github.com/probonopd/MiniDexed/pull/915")
+        QTimer.singleShot(2000, check_timeout)
 
     def _send_next_sysex_request(self):
         if self._sysex_request_index < len(self._sysex_request_queue):
