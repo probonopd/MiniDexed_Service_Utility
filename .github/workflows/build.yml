@@ -73,8 +73,8 @@ jobs:
           else
             python -m nuitka --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --onefile 'src/MiniDexed Service Utility.py'
           fi
-          rm -rf dist_nuitka/*.build
-          rm -rf dist_nuitka/*.dist
+          rm -rf dist_nuitka/*build
+          rm -rf dist_nuitka/*dist
       env:
           PYTHONOPTIMIZE: 2
       shell: bash   
@@ -84,7 +84,7 @@ jobs:
       with:
         name: ${{ runner.os }}-${{ runner.arch }}
         path: |
-          dist_nuitka/MiniDexed*
+          dist_nuitka/*
         retention-days: 1
 
   release:
