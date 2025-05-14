@@ -1,3 +1,13 @@
+# nuitka-project: --include-package=zeroconf
+# nuitka-project: --include-package=zeroconf._protocol
+# nuitka-project: --include-package=zeroconf._services
+# nuitka-project: --include-package=zeroconf._dns
+# nuitka-project: --include-package=zeroconf._listener
+# nuitka-project: --include-package=zeroconf._record_update
+# nuitka-project: --include-package=zeroconf._updates
+# nuitka-project: --include-package=zeroconf._history
+# nuitka-project: --include-package=zeroconf._utils
+
 import sys
 import time
 import platform
@@ -14,6 +24,17 @@ except ImportError:
     def key_pressed():
         dr, dw, de = select.select([sys.stdin], [], [], 0)
         return dr != []
+
+try:
+    import zeroconf._protocol.incoming
+    import zeroconf._protocol.outgoing
+    import zeroconf._dns
+    import zeroconf._listener
+    import zeroconf._services
+    import zeroconf._record_update
+    print("All zeroconf submodules successfully imported.")
+except ImportError as e:
+    print(f"Missing submodule: {e}")
 
 def print_system_info():
     print("System Information:")
