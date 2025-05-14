@@ -24,16 +24,6 @@ def print_system_info():
     except Exception:
         zeroconf_version = 'unknown'
     print(f"  Zeroconf version: {zeroconf_version}")
-    nuitka_version = None
-    if hasattr(sys, 'nuitka_compiled') and sys.nuitka_compiled:
-        try:
-            nuitka_version = importlib.metadata.version('nuitka')
-        except Exception:
-            nuitka_version = 'unknown'
-        print(f"  Nuitka compiled: Yes")
-        print(f"  Nuitka version: {nuitka_version}")
-    else:
-        print(f"  Nuitka compiled: No")
     print()
 
 class ServiceTypeListener:
@@ -46,6 +36,8 @@ class ServiceTypeListener:
         if name not in self.seen_types:
             self.seen_types.add(name)
             self.browsers[name] = ServiceBrowser(zeroconf, name, ServiceInstanceListener(zeroconf, name))
+    def update_service(self, zeroconf, type, name):
+        pass
 
 class ServiceInstanceListener:
     def __init__(self, zeroconf, type):
