@@ -78,7 +78,7 @@ jobs:
             python -m nuitka --prefer-source-code --include-module=zeroconf --assume-yes-for-downloads --follow-imports 'src/zeroconftest.py' --output-dir=dist_nuitka --standalone
           fi
           rm -rf dist_nuitka/*build
-          rm -rf dist_nuitka/*dist
+          # rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
 
       env:
           PYTHONOPTIMIZE: 2
