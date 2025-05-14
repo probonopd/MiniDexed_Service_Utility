@@ -1,3 +1,5 @@
+# nuitka-project: --include-module=zeroconf._handlers.answers
+# nuitka-project: --include-module=zeroconf._utils.ipaddress
 # nuitka-project: --include-package=zeroconf
 # nuitka-project: --include-package=zeroconf._protocol
 # nuitka-project: --include-package=zeroconf._services
