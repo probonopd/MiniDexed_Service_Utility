@@ -1,10 +1,14 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel
+import sys
+import warnings
+import logging
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QPushButton, QLabel,
+    QScrollArea, QHBoxLayout, QComboBox, QCheckBox, QWidget, QSizePolicy, QApplication
+)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
-import sys
-import warnings
 
 # Define global and TG-specific fields explicitly in the order they should appear
 # Add a new Voice field at the top of TG_FIELDS
@@ -315,8 +319,7 @@ class PerformanceEditor(QDialog):
         self.send_midi_for_field(field, col, value)
 
     def send_midi_for_field(self, field, tg_index, value):
-        import logging
-        logging.debug(f"[send_midi_for_field] field={field}, tg_index={tg_index}, value={value}")
+        # [DEBUG] send_sysex style log
         try:
             # MiniDexed SysEx mapping for all fields in PERFORMANCE_FIELDS
             field_to_param = {
@@ -379,6 +382,9 @@ class PerformanceEditor(QDialog):
                     sysex = [0xF0, 0x7D, 0x20, pp1, pp2, vv1, vv2, 0xF7]
                 else:
                     sysex = [0xF0, 0x7D, 0x21, tg_index, pp1, pp2, vv1, vv2, 0xF7]
+
+                print(f"[DEBUG] send_sysex called with field={field}, value={value}, tg_index={tg_index}")
+                print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {tg_index+1})")
                 if self.main_window and hasattr(self.main_window, "midi_handler"):
                     midi_handler = self.main_window.midi_handler
                     if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
@@ -457,10 +463,9 @@ class PerformanceEditor(QDialog):
             if not data or data[0] != 0x7D:
                 print(f"[PERF EDITOR DEBUG] Not a MiniDexed SysEx dump (missing 0x7D): {' '.join(f'{b:02X}' for b in data)}")
                 from PySide6.QtWidgets import QMessageBox
-                QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data. Aborting Performance Editor.")
+                QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data.")
                 self._sysex_request_queue = []
                 self._sysex_request_index = 9999
-                self.reject()
                 return
             # Global response: F0 7D 20 ... F7
             if len(data) > 2 and data[1] == 0x20:
@@ -474,10 +479,9 @@ class PerformanceEditor(QDialog):
             else:
                 print(f"[PERF EDITOR DEBUG] Unrecognized MiniDexed SysEx format: {' '.join(f'{b:02X}' for b in data)}")
                 from PySide6.QtWidgets import QMessageBox
-                QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data. Aborting Performance Editor.")
+                QMessageBox.critical(self, "SysEx Error", "Received invalid or unrecognized SysEx data.")
                 self._sysex_request_queue = []
                 self._sysex_request_index = 9999
-                self.reject()
                 return
             print(f"[PERF EDITOR DEBUG] Buffer state: {self._sysex_data_buffer}")
             # When all expected responses are received, show window
