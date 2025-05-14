@@ -301,7 +301,6 @@ def setup_menus(main_window):
     about_action.triggered.connect(lambda: main_window.file_ops.menu_about())
 
     # File Menu ordering and grouping
-    file_menu.clear()
     file_menu.addAction(open_action)
     file_menu.addSeparator()
     file_menu.addAction(send_mid_action)
