@@ -74,8 +74,8 @@ jobs:
             # python -m nuitka --prefer-source-code --include-module=zeroconf --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
             python -m nuitka --prefer-source-code --include-module=zeroconf --assume-yes-for-downloads --follow-imports --macos-create-app-bundle 'src/zeroconftest.py' --output-dir=dist_nuitka
           else
-            # python -m nuitka --prefer-source-code --include-module=zeroconf --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --onefile 'src/MiniDexed Service Utility.py'
-            python -m nuitka --prefer-source-code --include-module=zeroconf --assume-yes-for-downloads --follow-imports 'src/zeroconftest.py' --output-dir=dist_nuitka --onefile
+            # python -m nuitka --prefer-source-code --include-module=zeroconf --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --standalone 'src/MiniDexed Service Utility.py'
+            python -m nuitka --prefer-source-code --include-module=zeroconf --assume-yes-for-downloads --follow-imports 'src/zeroconftest.py' --output-dir=dist_nuitka --standalone
           fi
           rm -rf dist_nuitka/*build
           rm -rf dist_nuitka/*dist
