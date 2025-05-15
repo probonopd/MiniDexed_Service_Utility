@@ -460,7 +460,11 @@ class VoiceEditorPanel(QDialog):
             self._vced_param_info = {}
 
     def _show_param_info(self, param_key):
-        self.param_info_panel.show_param_info(self._vced_param_info, param_key)
+        # Determine if this is an operator parameter and if so, pass hovered_op_idx and carrier_ops
+        hovered_op_idx = getattr(self, '_hovered_op_idx', None)
+        alg_idx = self.get_param('ALS', 0)
+        carrier_ops = self.get_carrier_ops(alg_idx) if hovered_op_idx is not None else None
+        self.param_info_panel.show_param_info(self._vced_param_info, param_key, hovered_op_idx, carrier_ops)
 
     def resizeEvent(self, event: QResizeEvent):
         super().resizeEvent(event)
