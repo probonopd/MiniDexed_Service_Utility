@@ -6,6 +6,7 @@ class MidiOps:
     def __init__(self, main_window):
         self.main_window = main_window
         self.midi_send_worker = None
+        self._repeat_blocked = False  # Initialize the repeat blocked flag
 
         # Connect UI buttons
         ui = main_window.ui
@@ -53,6 +54,7 @@ class MidiOps:
 
     def stop_sending(self):
         if self.midi_send_worker and self.midi_send_worker.isRunning():
+            self._repeat_blocked = True  # Block repeat after stop
             self.midi_send_worker.stop()
             self.main_window.show_status("Stop requested.")
             # Do not send all notes off here; wait until finished
@@ -79,6 +81,9 @@ class MidiOps:
         # Repeat logic: check if the Repeat menu entry is checked
         repeat_action = getattr(self.main_window, 'repeat_action', None)
         repeat_enabled = repeat_action.isChecked() if repeat_action else False
+        if getattr(self, '_repeat_blocked', False):
+            self._repeat_blocked = False
+            return  # Do not repeat if stopped by user
         if repeat_enabled and self.main_window.file_ops.loaded_midi:
             if not self.main_window.midi_handler.outport:
                 from dialogs import Dialogs
@@ -115,8 +120,19 @@ class MidiOps:
             if not self.main_window.midi_handler.outport:
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
+            # If a MIDI file is already being sent, stop it first, then start the new one
             if self.midi_send_worker and self.midi_send_worker.isRunning():
-                Dialogs.show_error(self.main_window, "Error", "MIDI file is already being sent.")
+                self._repeat_blocked = True
+                self.midi_send_worker.stop()
+                self.main_window.show_status("Stopping previous MIDI file...")
+                # Wait for the old worker to finish before starting new one
+                def start_new_worker():
+                    self.main_window.show_status("Sending MIDI file with timing...")
+                    self.midi_send_worker = MidiSendWorker(self.main_window.midi_handler.outport, midi)
+                    self.midi_send_worker.log.connect(self.main_window.show_status)
+                    self.midi_send_worker.finished.connect(self.on_midi_send_finished)
+                    self.midi_send_worker.start()
+                self.midi_send_worker.finished.connect(start_new_worker)
                 return
             self.main_window.show_status("Sending MIDI file with timing...")
             self.midi_send_worker = MidiSendWorker(self.main_window.midi_handler.outport, midi)

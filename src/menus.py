@@ -7,6 +7,7 @@ import json
 import re
 from dialogs import PreferencesDialog
 from performance_editor import PerformanceEditor
+from mid_browser import MidBrowser
 
 def setup_menus(main_window):
     menubar = main_window.menuBar()
@@ -145,6 +146,20 @@ def setup_menus(main_window):
                 return
         from voice_browser import VoiceBrowser
         VoiceBrowser.show_singleton(main_window=main_window)
+
+    def show_mid_browser():
+        if hasattr(main_window, 'mid_browser_dialog') and main_window.mid_browser_dialog is not None:
+            if not main_window.mid_browser_dialog.isVisible():
+                main_window.mid_browser_dialog = None
+            else:
+                main_window.mid_browser_dialog.raise_()
+                main_window.mid_browser_dialog.activateWindow()
+                return
+        main_window.mid_browser_dialog = MidBrowser(main_window=main_window)
+        main_window.mid_browser_dialog.setModal(False)
+        main_window.mid_browser_dialog.show()
+        main_window.mid_browser_dialog.raise_()
+        main_window.mid_browser_dialog.activateWindow()
 
     def show_midi_command_dialog(cmd):
         # If there are no parameters or all parameters are fixed, skip dialog
@@ -291,6 +306,10 @@ def setup_menus(main_window):
         patch_browser_action = QAction("DX7 Voices...", main_window)
         midi_commands_menu.addAction(patch_browser_action)
         patch_browser_action.triggered.connect(show_patch_browser)
+        midi_commands_menu.addSeparator()
+        mid_browser_action = QAction("MIDI File Browser...", main_window)
+        midi_commands_menu.addAction(mid_browser_action)
+        mid_browser_action.triggered.connect(show_mid_browser)
 
     midi_commands_menu.aboutToShow.connect(populate_midi_commands_menu)
 
