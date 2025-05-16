@@ -1,14 +1,14 @@
-# nuitka-project: --include-module=zeroconf._handlers.answers
-# nuitka-project: --include-module=zeroconf._utils.ipaddress
+#!/bin/env python3
+# -*- coding: utf-8 -*-
+# nuitka-project: --enable-plugin=pyside6
 # nuitka-project: --include-package=zeroconf
-# nuitka-project: --include-package=zeroconf._protocol
-# nuitka-project: --include-package=zeroconf._services
-# nuitka-project: --include-package=zeroconf._dns
-# nuitka-project: --include-package=zeroconf._listener
-# nuitka-project: --include-package=zeroconf._record_update
-# nuitka-project: --include-package=zeroconf._updates
-# nuitka-project: --include-package=zeroconf._history
-# nuitka-project: --include-package=zeroconf._utils
+# nuitka-project: --include-package=rtmidi
+# nuitka-project: --include-package=mido.backends.rtmidi
+# nuitka-project: --include-data-dir=src/midi_commands=midi_commands
+# nuitka-project: --include-data-dir=src/data=data
+# nuitka-project: --include-data-dir=src/images=images
+# nuitka-project: --prefer-source-code
+# nuitka-project: --include-package=comtypes.client
 
 import sys
 from PySide6.QtWidgets import QApplication

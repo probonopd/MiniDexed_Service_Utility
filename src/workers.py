@@ -188,3 +188,10 @@ class MidiMessageSendWorker(QThread):
         self.running = False
         self.msg_queue.put(None)
         self.wait()
+
+class FirewallCheckWorker(QThread):
+    result = Signal(bool, str, list, set, set, bool)  # has_rule, current_profile, rule_profiles, enabled_profiles, disabled_profiles, has_block
+    def run(self):
+        from windows_firewall_checker import WindowsFirewallChecker
+        has_rule, current_profile, rule_profiles, enabled_profiles, disabled_profiles, has_block = WindowsFirewallChecker.check_firewall_rule(verbose=True)
+        self.result.emit(has_rule, current_profile, rule_profiles, enabled_profiles, disabled_profiles, has_block)

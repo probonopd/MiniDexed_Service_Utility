@@ -6,12 +6,15 @@ from menus import setup_menus
 from file_ops import FileOps
 from midi_ops import MidiOps
 from midi_handler import MIDIHandler
-from workers import LogWorker, MIDIReceiveWorker, MidiSendWorker, SyslogWorker
+from workers import LogWorker, MIDIReceiveWorker, MidiSendWorker, SyslogWorker, FirewallCheckWorker
 from dialogs import Dialogs
 from PySide6.QtCore import QSettings
 import re
 from updater_dialog import UpdaterDialog, UpdaterProgressDialog
 from updater_worker import UpdaterWorker, DeviceDiscoveryWorker
+import sys
+import subprocess
+from windows_firewall_checker import WindowsFirewallChecker
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -38,6 +41,20 @@ class MainWindow(QMainWindow):
         self.device_discovery_worker.log.connect(self.show_status)
         self.device_discovery_worker.start()
         self.device_dialogs = []  # Track open device selection dialogs
+        self.firewall_worker = FirewallCheckWorker()
+        self.firewall_worker.result.connect(self.handle_firewall_check_result)
+        self.firewall_worker.start()
+
+    def handle_firewall_check_result(self, has_rule, current_profile, rule_profiles, enabled_profiles, disabled_profiles, has_block):
+        profile_display = current_profile.capitalize() if current_profile else "Unknown"
+        needs_dialog = (not has_rule) or (current_profile in disabled_profiles) or has_block
+        if not needs_dialog:
+            print(f"Firewall rule exists for this application and current network profile: {profile_display}")
+        else:
+            # Log to the status bar that the Windows firewall is preventing the application from discovering devices on the network
+            msg = f"Windows firewall is preventing the application from discovering devices on the network."
+            self.statusBar().showMessage(msg)
+            print(msg)
 
     def init_workers(self):
         self.receive_worker = None

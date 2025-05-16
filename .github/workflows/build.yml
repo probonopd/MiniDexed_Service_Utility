@@ -71,11 +71,9 @@ jobs:
           python -m nuitka --version
           python -m pip list -v
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            python -m nuitka --prefer-source-code --include-module=zeroconf --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
-            python -m nuitka --prefer-source-code --include-module=zeroconf --assume-yes-for-downloads --follow-imports --macos-create-app-bundle 'src/zeroconftest.py' --output-dir=dist_nuitka
+            python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
           else
-            python -m nuitka --prefer-source-code --include-module=zeroconf --windows-console-mode=attach --assume-yes-for-downloads --include-package=rtmidi --include-package=mido.backends.rtmidi --standalone --output-dir=dist_nuitka --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --enable-plugin=pyside6 --follow-imports --standalone 'src/MiniDexed Service Utility.py'
-            python -m nuitka --prefer-source-code --include-module=zeroconf --assume-yes-for-downloads --follow-imports 'src/zeroconftest.py' --output-dir=dist_nuitka --standalone
+            python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --standalone --windows-console-mode=attach 'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
           # rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
