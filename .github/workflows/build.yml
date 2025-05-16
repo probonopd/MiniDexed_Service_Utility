@@ -73,10 +73,10 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
           else
-            python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --standalone --windows-console-mode=attach 'src/MiniDexed Service Utility.py'
+            python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --windows-console-mode=attach 'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
-          # rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
+          rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
 
       env:
           PYTHONOPTIMIZE: 2
