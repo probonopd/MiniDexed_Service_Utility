@@ -11,6 +11,7 @@
 # nuitka-project: --include-package=zeroconf._utils
 
 import sys
+sys.flags.verbose = 1
 import time
 import platform
 import importlib.metadata
