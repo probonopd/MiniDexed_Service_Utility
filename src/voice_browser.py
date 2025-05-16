@@ -3,6 +3,7 @@ import requests
 import os
 import hashlib
 import json
+import re
 from PySide6.QtCore import QThread, Signal, Qt, QSettings
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLineEdit, QListWidget, QHBoxLayout, QComboBox, QPushButton, QLabel, QApplication, QListWidgetItem, QStatusBar, QMenuBar, QMenu
@@ -11,6 +12,7 @@ from PySide6.QtGui import QAction
 from voice_editor import VoiceEditor
 from voice_editor_panel import VoiceEditorPanel
 from main_window import MainWindow
+from singleton_dialog import SingletonDialog
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"
 VOICE_LIST_CACHE_NAME = "patch_list.json"
@@ -71,7 +73,7 @@ class VoiceJsonDownloadWorker(QThread):
         except Exception as e:
             self.finished.emit({}, self.voice_name, e)
 
-class VoiceBrowser(QDialog):
+class VoiceBrowser(SingletonDialog):
     _instance = None
 
     @classmethod
@@ -198,11 +200,14 @@ class VoiceBrowser(QDialog):
             self.set_status(f"Failed to load voices: {e}", error=True)
 
     def filter_voices(self):
-        query = self.search_box.text().lower()
+        query = re.sub(r'\s+', ' ', self.search_box.text().lower().strip())
         self.list_widget.clear()
-        self.filtered_voices = [v for v in self.voices if query in v["name"].lower() or query in v.get("author", "").lower()]
+        def norm(s):
+            return re.sub(r'\s+', ' ', s.lower().strip())
+        self.filtered_voices = [v for v in self.voices if query in norm(v["name"]) or query in norm(v.get("author", ""))]
         for idx, voice in enumerate(self.filtered_voices):
-            item = QListWidgetItem(f"{voice['name']} - {voice.get('author', '')}")
+            display_name = re.sub(r'\s+', ' ', voice['name'])
+            item = QListWidgetItem(f"{display_name} - {voice.get('author', '')}")
             self.list_widget.addItem(item)
         self._update_action_buttons()
 
@@ -228,21 +233,12 @@ class VoiceBrowser(QDialog):
                 midi_handler.midi_send_worker.send(msg)
                 self.set_status(f"Sent '{voice_name}' to MIDI Out.")
             from voice_editor import VoiceEditor
-            # --- Ensure valid 161-byte SysEx for the editor ---
-            if isinstance(syx_data, list):
-                syx_data = bytes(syx_data)
-            if len(syx_data) == 159:
-                syx_data = b'\xF0' + syx_data + b'\xF7'
-            elif len(syx_data) == 161 and syx_data[0] != 0xF0:
-                syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
-            elif len(syx_data) == 155:
-                syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
-            # ---
-            VoiceEditor.show_singleton(parent=self, midi_outport=midi_handler, voice_bytes=syx_data)
-            editor = VoiceEditor.get_instance()
-            if hasattr(editor, 'channel_combo'):
-                idx_ch = self.channel_combo.currentIndex()
-                editor.channel_combo.setCurrentIndex(idx_ch)
+            editor = VoiceEditor(parent=self, midi_outport=midi_handler, voice_bytes=syx_data)
+            editor.setModal(False)
+            editor.show()
+            editor.raise_()
+            editor.activateWindow()
+            return
         self.download_worker.finished.connect(after_download)
         self.download_worker.start()
 

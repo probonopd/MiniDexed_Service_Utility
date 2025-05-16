@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon
 from dialogs import Dialogs
 from mido import Message
+from midi_functions import set_tg_to_channels
 
 MIDBROWSER_API_URL = "https://gifx.co/chip/browse?path="
 MIDBROWSER_CACHE_NAME = "midbrowser_cache.json"
@@ -73,21 +74,14 @@ class MidBrowser(QDialog):
         self.current_path = "/"
         self.dir_stack = []
         self.entries = []
-        self.in_search_mode = False
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
         self.list_widget.itemSelectionChanged.connect(self.update_buttons)
         self.send_button.clicked.connect(self.send_selected_mid)
-        self.search_box.textChanged.connect(self.on_search_text_changed)
+        self.search_box.returnPressed.connect(self._do_search)
         self.load_directory(self.current_path)
-
-        self.search_debounce_timer = QTimer(self)
-        self.search_debounce_timer.setSingleShot(True)
-        self.search_debounce_timer.timeout.connect(self._do_search)
-        self._pending_search_text = ''
-
         self.filter_bank_checkbox = QCheckBox("Filter out bank/voice changes", self)
         self.filter_bank_checkbox.setChecked(True)
-        layout.insertWidget(1, self.filter_bank_checkbox)  # Place below search box
+        layout.insertWidget(1, self.filter_bank_checkbox)
 
     def set_status(self, msg, error=False):
         self.status_bar.showMessage(msg)
@@ -97,22 +91,17 @@ class MidBrowser(QDialog):
             print(msg)
 
     def load_directory(self, path):
-        if not self.in_search_mode:
-            self.list_widget.clear()
-            self.entries = []
-            self.breadcrumb_label.setText("")
-            self.set_status("")
-            return
-        self.set_status(f"Loading {path} ...")
+        import logging
+        logging.debug(f"load_directory called with path={path}")
         self.list_widget.clear()
         self.entries = []
         self.breadcrumb_label.setText(f"Path: {path}")
+        self.set_status(f"Loading {path} ...")
         try:
             url = MIDBROWSER_API_URL + requests.utils.quote(path)
             resp = requests.get(url)
             resp.raise_for_status()
             entries = resp.json()
-            # Only show .mid or .midi files and directories
             entries = [e for e in entries if e['type'] == 'directory' or e['path'].lower().endswith('.mid') or e['path'].lower().endswith('.midi')]
             entries.sort(key=lambda e: (e['type'] != 'directory', not (e['path'].lower().endswith('.mid') or e['path'].lower().endswith('.midi')), e['path'].lower()))
             self.entries = entries
@@ -121,41 +110,33 @@ class MidBrowser(QDialog):
                 if entry['type'] == 'directory':
                     item = QListWidgetItem(QIcon.fromTheme('folder'), name)
                 elif name.lower().endswith('.mid') or name.lower().endswith('.midi'):
-                    item = QListWidgetItem(QIcon.fromTheme('media-playback-start'), name)
+                    item = QListWidgetItem(name)
                 else:
-                    continue  # Should not happen
+                    continue
                 self.list_widget.addItem(item)
             self.set_status(f"{len(entries)} items.")
         except Exception as e:
             self.set_status(f"Failed to load directory: {e}", error=True)
 
-    def on_search_text_changed(self, text):
-        text = text.strip()
-        self._pending_search_text = text
-        if text:
-            self.search_debounce_timer.start(400)  # 400ms debounce
-        else:
-            self.search_debounce_timer.stop()
-            self.in_search_mode = False
-            self.load_directory(self.current_path)
-
     def _do_search(self):
-        text = self._pending_search_text
+        text = self.search_box.text().strip()
         if text:
-            self.in_search_mode = True
             self.load_search_results(text)
 
     def load_search_results(self, query):
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
         self.set_status(f"Searching for '{query}' ...")
         self.list_widget.clear()
         self.entries = []
         self.breadcrumb_label.setText(f"Search: {query}")
         try:
             url = f"https://gifx.co/chip/search?query={requests.utils.quote(query)}&limit=100"
+            logging.debug(f"Search URL: {url}")
             resp = requests.get(url)
             resp.raise_for_status()
             entries = resp.json()
-            # Handle new search result format
+            logging.debug(f"Raw search response: {entries}")
             if isinstance(entries, dict):
                 if 'items' in entries:
                     items = entries['items']
@@ -165,24 +146,28 @@ class MidBrowser(QDialog):
                 elif 'results' in entries:
                     entries = entries['results']
                 else:
+                    logging.error(f"Unexpected search result format: {entries}")
                     raise Exception(entries.get('error', 'Unexpected search result format'))
             if not isinstance(entries, list):
+                logging.error(f"Entries is not a list: {entries}")
                 raise Exception('Unexpected search result format')
-            # Only show .mid or .midi files and directories
             entries = [e for e in entries if e.get('type') == 'directory' or e['path'].lower().endswith('.mid') or e['path'].lower().endswith('.midi')]
+            logging.debug(f"Filtered entries: {entries}")
             entries.sort(key=lambda e: (e.get('type') != 'directory', not (e['path'].lower().endswith('.mid') or e['path'].lower().endswith('.midi')), e['path'].lower()))
             self.entries = entries
             for entry in entries:
                 name = os.path.basename(entry['path'])
+                logging.debug(f"Adding entry to list: {entry}")
                 if entry.get('type') == 'directory':
                     item = QListWidgetItem(QIcon.fromTheme('folder'), name)
                 elif name.lower().endswith('.mid') or name.lower().endswith('.midi'):
-                    item = QListWidgetItem(QIcon.fromTheme('media-playback-start'), name)
+                    item = QListWidgetItem(name)
                 else:
-                    continue  # Should not happen
+                    continue
                 self.list_widget.addItem(item)
             self.set_status(f"{len(entries)} items found.")
         except Exception as e:
+            logging.error(f"Search failed: {e}")
             self.set_status(f"Search failed: {e}", error=True)
 
     def on_item_double_clicked(self, item):
@@ -191,26 +176,13 @@ class MidBrowser(QDialog):
             return
         entry = self.entries[idx]
         if entry['type'] == 'directory':
-            if self.in_search_mode:
-                # In search mode, jump to directory
-                self.in_search_mode = False
-                self.search_box.clear()
-                self.dir_stack.append(self.current_path)
-                self.current_path = entry['path']
-                self.load_directory(self.current_path)
-            else:
-                self.dir_stack.append(self.current_path)
-                self.current_path = entry['path']
-                self.load_directory(self.current_path)
+            self.dir_stack.append(self.current_path)
+            self.current_path = entry['path']
+            self.load_directory(self.current_path)
         elif entry['path'].lower().endswith('.mid'):
             self.download_and_send_mid(entry)
 
     def go_up(self):
-        if self.in_search_mode:
-            self.in_search_mode = False
-            self.search_box.clear()
-            self.load_directory(self.current_path)
-            return
         if self.current_path == "/":
             return
         if self.dir_stack:
@@ -253,9 +225,25 @@ class MidBrowser(QDialog):
         try:
             midi = mido.MidiFile(local_path)
             class TrackChannelDialog(QDialog):
+                _instance = None
+                def __new__(cls, *args, **kwargs):
+                    if cls._instance is not None and cls._instance.isVisible():
+                        cls._instance.raise_()
+                        cls._instance.activateWindow()
+                        return cls._instance
+                    instance = super().__new__(cls)
+                    cls._instance = instance
+                    return instance
+                def closeEvent(self, event):
+                    type(self)._instance = None
+                    super().closeEvent(event)
                 def __init__(self, midi, parent=None):
+                    if hasattr(self, '_initialized') and self._initialized:
+                        return
+                    self._initialized = True
                     super().__init__(parent)
                     self.setWindowTitle("Assign Tracks to MIDI Channels")
+                    self.setModal(False)
                     layout = QVBoxLayout(self)
                     form = QFormLayout()
                     self.channel_boxes = []
@@ -299,8 +287,7 @@ class MidBrowser(QDialog):
                     for idx, (i, track) in enumerate(filtered_tracks):
                         label = f"Track {i}: {track.name if hasattr(track, 'name') and track.name else ''}".strip()
                         combo = QComboBox()
-                        combo.addItems([str(ch+1) for ch in range(16)])
-                        # Set default selection: 1 for first, 2 for second, etc.
+                        combo.addItems([str(ch+1) for ch in range(16)] + ["None"])
                         combo.setCurrentIndex(idx if idx < 16 else 15)
                         self.channel_boxes.append(combo)
                         # Suggestion label
@@ -329,7 +316,9 @@ class MidBrowser(QDialog):
                 def get_assignments(self):
                     return [box.currentIndex()+1 for box in self.channel_boxes]
                 def auto_assign(self):
-                    # Queue the respective voices to be sent to the selected MIDI channels
+                    # Set TG1-8 to MIDI channel 1-8 before assigning voices
+                    set_tg_to_channels(self.parent().table, self.parent().PERFORMANCE_FIELDS) if hasattr(self.parent(), 'table') and hasattr(self.parent(), 'PERFORMANCE_FIELDS') else None
+                    # Assign each voice to only one track (no duplicates)
                     if self.parent() and hasattr(self.parent(), 'main_window'):
                         mw = self.parent().main_window
                         if mw and hasattr(mw, 'midi_handler'):
@@ -340,8 +329,9 @@ class MidBrowser(QDialog):
                                 with open(cache_path, 'r', encoding='utf-8') as f:
                                     voices = json.load(f)
                             send_queue = []
+                            used_voices = set()
                             for sugg, box in zip(self.suggestions, self.channel_boxes):
-                                if not sugg:
+                                if not sugg or sugg in used_voices:
                                     continue
                                 v = next((v for v in voices if v.get('name','').lower().strip() == sugg.lower().strip()), None)
                                 if not v:
@@ -352,6 +342,7 @@ class MidBrowser(QDialog):
                                 url = f"https://patches.fm/patches/single-voice/dx7/{sig[:2]}/{sig}.syx"
                                 channel = box.currentIndex() + 1
                                 send_queue.append((url, sugg, channel))
+                                used_voices.add(sugg)
                             self._voice_workers = []
                             def send_next():
                                 if not send_queue:
@@ -372,7 +363,6 @@ class MidBrowser(QDialog):
                                             data = data[:-1]
                                         return [b & 0x7F for b in data]
                                     sanitized = sanitize_sysex(syx_data)
-                                    # Patch SysEx channel byte (4th byte, index 3) for DX7: 0x00 for channel 1, 0x01 for channel 2, ... 0x0F for channel 16
                                     if sanitized and len(sanitized) > 3:
                                         sanitized[1] = (channel - 1) & 0x0F
                                     msg = Message('sysex', data=sanitized)
@@ -429,6 +419,7 @@ class MidBrowser(QDialog):
                 return
             midi_ops = mw.midi_ops
             # Stop any currently playing MIDI file, and wait for it to finish before starting new one
+            midi_ops.stop_sending()  # Stop all playback before sending new MIDI file
             def start_new_worker():
                 mw.show_status("Sending MIDI file with timing...")
                 from workers import MidiSendWorker

@@ -57,7 +57,7 @@ class MidiOps:
             self._repeat_blocked = True  # Block repeat after stop
             self.midi_send_worker.stop()
             self.main_window.show_status("Stop requested.")
-            # Do not send all notes off here; wait until finished
+            self.send_all_notes_off()  # Send All Notes Off immediately
         else:
             self.main_window.show_status("No MIDI file is currently being sent.")
 
@@ -120,6 +120,8 @@ class MidiOps:
             if not self.main_window.midi_handler.outport:
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
+            # Send All Notes Off before starting new MIDI file
+            self.send_all_notes_off()
             # If a MIDI file is already being sent, stop it first, then start the new one
             if self.midi_send_worker and self.midi_send_worker.isRunning():
                 self._repeat_blocked = True

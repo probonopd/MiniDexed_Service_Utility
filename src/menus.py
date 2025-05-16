@@ -137,15 +137,13 @@ def setup_menus(main_window):
     midi_commands_dir = os.path.join(os.path.dirname(__file__), "midi_commands")
 
     def show_patch_browser():
-        if hasattr(main_window, 'voice_browser_dialog') and main_window.voice_browser_dialog is not None:
-            if not main_window.voice_browser_dialog.isVisible():
-                main_window.voice_browser_dialog = None
-            else:
-                main_window.voice_browser_dialog.raise_()
-                main_window.voice_browser_dialog.activateWindow()
-                return
         from voice_browser import VoiceBrowser
-        VoiceBrowser.show_singleton(main_window=main_window)
+        editor = VoiceBrowser(main_window=main_window)
+        editor.setModal(False)
+        editor.show()
+        editor.raise_()
+        editor.activateWindow()
+        return
 
     def show_mid_browser():
         if hasattr(main_window, 'mid_browser_dialog') and main_window.mid_browser_dialog is not None:
@@ -337,8 +335,12 @@ def setup_menus(main_window):
     performance_editor_action = QAction("Performance Editor...", main_window)
     file_menu.addAction(performance_editor_action)
     def show_performance_editor():
-        dlg = PerformanceEditor(main_window=main_window)
-        dlg.show()
+        editor = PerformanceEditor(main_window=main_window)
+        editor.setModal(False)
+        editor.show()
+        editor.raise_()
+        editor.activateWindow()
+        return
     performance_editor_action.triggered.connect(show_performance_editor)
     file_menu.addAction(update_action)
     file_menu.addSeparator()

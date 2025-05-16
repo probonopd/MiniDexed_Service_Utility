@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtCore import QTimer
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
+from singleton_dialog import SingletonDialog
 
 # Define global and TG-specific fields explicitly in the order they should appear
 # Add a new Voice field at the top of TG_FIELDS
@@ -66,7 +67,28 @@ PERFORMANCE_FIELD_RANGES = {
 
 TG_LABELS = [f"TG{i+1}" for i in range(8)]
 
-class PerformanceEditor(QDialog):
+class PerformanceEditor(SingletonDialog):
+    _instance = None
+
+    @classmethod
+    def get_instance(cls, parent=None, main_window=None):
+        if main_window is None and parent is not None and hasattr(parent, 'midi_handler'):
+            main_window = parent
+            parent = None
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = PerformanceEditor(parent, main_window=main_window)
+            cls._instance.finished.connect(lambda: setattr(cls, '_instance', None))
+        return cls._instance
+
+    @classmethod
+    def show_singleton(cls, parent=None, main_window=None):
+        dlg = cls.get_instance(parent, main_window)
+        dlg.setModal(False)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        return dlg
+
     def __init__(self, parent=None, main_window=None):
         # If only one argument is passed and it's a MainWindow, treat it as main_window
         from main_window import MainWindow
@@ -719,3 +741,7 @@ class PerformanceEditor(QDialog):
         editor = VoiceEditor.get_instance()
         if hasattr(editor, 'channel_combo'):
             editor.channel_combo.setCurrentIndex(channel - 1)
+
+    def closeEvent(self, event):
+        type(self)._instance = None
+        super().closeEvent(event)

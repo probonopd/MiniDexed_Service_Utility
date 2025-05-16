@@ -10,6 +10,7 @@ import os
 import mido
 import json
 from PySide6.QtWidgets import QApplication
+from singleton_dialog import SingletonDialog
 
 # --- Static definitions and tables ---
 
@@ -64,7 +65,7 @@ OP_KS_DEFS = [
 
 # --- VoiceEditorPanel class ---
 
-class VoiceEditorPanel(QDialog):
+class VoiceEditorPanel(SingletonDialog):
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Voice Editor")

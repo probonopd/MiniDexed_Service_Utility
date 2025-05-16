@@ -2,8 +2,9 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetIt
 from PySide6.QtCore import Qt
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 import mido
+from singleton_dialog import SingletonDialog
 
-class VoiceEditor(QDialog):
+class VoiceEditor(SingletonDialog):
     _instance = None
 
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
