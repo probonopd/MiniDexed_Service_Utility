@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QIcon
 from dialogs import Dialogs
+from mido import Message
 
 MIDBROWSER_API_URL = "https://gifx.co/chip/browse?path="
 MIDBROWSER_CACHE_NAME = "midbrowser_cache.json"
@@ -287,11 +288,20 @@ class MidBrowser(QDialog):
                             if tn and tn in v.get('name','').lower():
                                 return v['name']
                         return None
+                    # Filter tracks: only include those with at least one note_on
+                    filtered_tracks = []
+                    filtered_track_indices = []
                     for i, track in enumerate(midi.tracks):
+                        has_note_on = any(getattr(msg, 'type', None) == 'note_on' and getattr(msg, 'velocity', 0) > 0 for msg in track)
+                        if has_note_on:
+                            filtered_tracks.append((i, track))
+                            filtered_track_indices.append(i)
+                    for idx, (i, track) in enumerate(filtered_tracks):
                         label = f"Track {i}: {track.name if hasattr(track, 'name') and track.name else ''}".strip()
                         combo = QComboBox()
                         combo.addItems([str(ch+1) for ch in range(16)])
-                        combo.setCurrentIndex(i if i < 16 else 0)
+                        # Set default selection: 1 for first, 2 for second, etc.
+                        combo.setCurrentIndex(idx if idx < 16 else 15)
                         self.channel_boxes.append(combo)
                         # Suggestion label
                         suggestion = suggest_voice(getattr(track, 'name', ''))
@@ -314,7 +324,8 @@ class MidBrowser(QDialog):
                     self.setLayout(layout)
                     self.voices = voices
                     self.midi = midi
-                    self.suggestions = [suggest_voice(getattr(track, 'name', '')) for track in midi.tracks]
+                    self.filtered_track_indices = filtered_track_indices
+                    self.suggestions = [suggest_voice(getattr(midi.tracks[i], 'name', '')) for i in filtered_track_indices]
                 def get_assignments(self):
                     return [box.currentIndex()+1 for box in self.channel_boxes]
                 def auto_assign(self):
@@ -329,7 +340,7 @@ class MidBrowser(QDialog):
                                 with open(cache_path, 'r', encoding='utf-8') as f:
                                     voices = json.load(f)
                             send_queue = []
-                            for i, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
+                            for sugg, box in zip(self.suggestions, self.channel_boxes):
                                 if not sugg:
                                     continue
                                 v = next((v for v in voices if v.get('name','').lower().strip() == sugg.lower().strip()), None)
@@ -361,12 +372,17 @@ class MidBrowser(QDialog):
                                             data = data[:-1]
                                         return [b & 0x7F for b in data]
                                     sanitized = sanitize_sysex(syx_data)
-                                    import mido
-                                    msg = mido.Message('sysex', data=sanitized)
+                                    # Patch SysEx channel byte (4th byte, index 3) for DX7: 0x00 for channel 1, 0x01 for channel 2, ... 0x0F for channel 16
+                                    if sanitized and len(sanitized) > 3:
+                                        sanitized[1] = (channel - 1) & 0x0F
+                                    msg = Message('sysex', data=sanitized)
                                     if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
                                         midi_handler.midi_send_worker.send(msg)
                                     else:
                                         midi_handler.outport.send(msg)
+                                    mw.show_status(f"Sending '{voice_name}'...")
+                                    hex_str = ' '.join(f'{b:02X}' for b in msg.data)
+                                    mw.show_status(f"Sent SysEx: sysex data=F0 {hex_str} F7")
                                     self._voice_workers.remove(worker)
                                     send_next()
                                 worker.finished.connect(after_download)
@@ -379,23 +395,32 @@ class MidBrowser(QDialog):
             new_midi = mido.MidiFile()
             new_midi.ticks_per_beat = midi.ticks_per_beat
             filter_bank = self.filter_bank_checkbox.isChecked()
+            # Only assign channels to filtered tracks (those shown in the dialog)
+            # Copy other tracks as-is
+            filtered_set = set(dlg.filtered_track_indices)
+            assign_map = dict(zip(dlg.filtered_track_indices, assignments))
             for i, track in enumerate(midi.tracks):
                 new_track = mido.MidiTrack()
-                channel = assignments[i] - 1
-                for msg in track:
-                    if filter_bank:
-                        # Filter out program changes and bank select (CC 0/32)
-                        if msg.type == "program_change":
-                            continue
-                        if msg.type == "control_change" and hasattr(msg, 'control') and msg.control in (0, 32):
-                            continue
-                    # Copy all other messages, updating channel if appropriate
-                    if hasattr(msg, 'channel'):
-                        msg_out = msg.copy(channel=channel)
-                    else:
-                        # Meta messages and others: just append as-is
-                        msg_out = msg
-                    new_track.append(msg_out)
+                if i in assign_map:
+                    channel = assign_map[i] - 1
+                    for msg in track:
+                        if filter_bank:
+                            # Filter out program changes and bank select (CC 0/32)
+                            if msg.type == "program_change":
+                                continue
+                            if msg.type == "control_change" and hasattr(msg, 'control') and msg.control in (0, 32):
+                                continue
+                        # Copy all other messages, updating channel if appropriate
+                        if hasattr(msg, 'channel'):
+                            msg_out = msg.copy(channel=channel)
+                        else:
+                            # Meta messages and others: just append as-is
+                            msg_out = msg
+                        new_track.append(msg_out)
+                else:
+                    # Not a filtered track: copy as-is
+                    for msg in track:
+                        new_track.append(msg)
                 new_midi.tracks.append(new_track)
             # Use main_window.midi_ops to send, so stop button and all-notes-off work
             mw = self.main_window

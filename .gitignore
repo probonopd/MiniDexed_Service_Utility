@@ -1,2 +1,4 @@
 *.pyc
 ._layout.json
+dist_nuitka
+__pycache__/

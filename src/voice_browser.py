@@ -143,7 +143,7 @@ class VoiceBrowser(QDialog):
         layout.addWidget(self.status_bar)
         self.voices = []
         self.filtered_voices = []
-        self.search_box.textChanged.connect(self.filter_voices)
+        self.search_box.returnPressed.connect(self.filter_voices)
         self.send_button.clicked.connect(self.send_voice)
         self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
         self.list_widget.itemClicked.connect(self.send_voice_on_click)
