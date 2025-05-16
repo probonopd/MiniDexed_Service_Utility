@@ -63,8 +63,12 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -U "https://github.com/Nuitka/Nuitka/archive/develop.zip" # Develop version
+        python -m pip install -U "https://github.com/Nuitka/Nuitka/archive/develop.zip"
         pip install -r src/requirements.txt
+
+    - name: Install comtypes (Windows only)
+      if: runner.os == 'Windows'
+      run: pip install comtypes
 
     - name: Build Executable (Nuitka)
       run: |
