@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon
 from dialogs import Dialogs
 from mido import Message
-from midi_functions import set_tg_to_channels
+from voice_browser import get_cache_dir, VOICE_LIST_CACHE_NAME, VoiceDownloadWorker
 
 MIDBROWSER_API_URL = "https://gifx.co/chip/browse?path="
 MIDBROWSER_CACHE_NAME = "midbrowser_cache.json"
@@ -313,71 +313,71 @@ class MidBrowser(QDialog):
                     self.midi = midi
                     self.filtered_track_indices = filtered_track_indices
                     self.suggestions = [suggest_voice(getattr(midi.tracks[i], 'name', '')) for i in filtered_track_indices]
+                    # After creating self.suggestions and self.channel_boxes, assign same channel to same voice
+                    voice_to_channel = {}
+                    used_channels = set()
+                    for sugg in self.suggestions:
+                        if not sugg:
+                            continue
+                        if sugg not in voice_to_channel:
+                            for ch in range(16):
+                                if ch not in used_channels:
+                                    voice_to_channel[sugg] = ch
+                                    used_channels.add(ch)
+                                    break
+                    for idx, sugg in enumerate(self.suggestions):
+                        if sugg and sugg in voice_to_channel:
+                            self.channel_boxes[idx].setCurrentIndex(voice_to_channel[sugg])
                 def get_assignments(self):
                     return [box.currentIndex()+1 for box in self.channel_boxes]
                 def auto_assign(self):
-                    # Set TG1-8 to MIDI channel 1-8 before assigning voices
-                    set_tg_to_channels(self.parent().table, self.parent().PERFORMANCE_FIELDS) if hasattr(self.parent(), 'table') and hasattr(self.parent(), 'PERFORMANCE_FIELDS') else None
-                    # Assign each voice to only one track (no duplicates)
+                    # Send MIDI channel assignment SysEx for all channels before assigning voices
+                    mw = self.parent().main_window if self.parent() and hasattr(self.parent(), 'main_window') else None
+                    if mw and hasattr(mw, 'midi_handler'):
+                        midi_handler = mw.midi_handler
+                        for ch in range(8):
+                            sysex = [0xF0, 0x7D, 0x21, ch + 1, 0x00, 0x02, 0x00, ch, 0xF7]
+                            msg = mido.Message('sysex', data=sysex[1:-1])
+                            if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
+                                midi_handler.midi_send_worker.send(msg)
+                            else:
+                                midi_handler.outport.send(msg)
+                    # Assign the same MIDI channel to all tracks with the same suggested voice
+                    voice_to_channel = {}
+                    used_channels = set()
+                    for sugg in self.suggestions:
+                        if not sugg:
+                            continue
+                        if sugg not in voice_to_channel:
+                            # Find the first unused channel
+                            for ch in range(16):
+                                if ch not in used_channels:
+                                    voice_to_channel[sugg] = ch
+                                    used_channels.add(ch)
+                                    break
+                    # Set the channel for all tracks with this voice (do not assign different numbers for same voice)
+                    for idx, sugg in enumerate(self.suggestions):
+                        if sugg and sugg in voice_to_channel:
+                            self.channel_boxes[idx].setCurrentIndex(voice_to_channel[sugg])
+                    # Use parent main_window to send channel assignments
                     if self.parent() and hasattr(self.parent(), 'main_window'):
                         mw = self.parent().main_window
                         if mw and hasattr(mw, 'midi_handler'):
-                            from voice_browser import get_cache_dir, VOICE_LIST_CACHE_NAME, VoiceDownloadWorker
-                            cache_path = os.path.join(get_cache_dir(), VOICE_LIST_CACHE_NAME)
-                            voices = []
-                            if os.path.exists(cache_path):
-                                with open(cache_path, 'r', encoding='utf-8') as f:
-                                    voices = json.load(f)
-                            send_queue = []
-                            used_voices = set()
-                            for sugg, box in zip(self.suggestions, self.channel_boxes):
-                                if not sugg or sugg in used_voices:
+                            midi_handler = mw.midi_handler
+                            for idx, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
+                                if not sugg:
                                     continue
-                                v = next((v for v in voices if v.get('name','').lower().strip() == sugg.lower().strip()), None)
-                                if not v:
-                                    continue
-                                sig = v.get('signature')
-                                if not sig:
-                                    continue
-                                url = f"https://patches.fm/patches/single-voice/dx7/{sig[:2]}/{sig}.syx"
                                 channel = box.currentIndex() + 1
-                                send_queue.append((url, sugg, channel))
-                                used_voices.add(sugg)
-                            self._voice_workers = []
-                            def send_next():
-                                if not send_queue:
-                                    return
-                                url, name, channel = send_queue.pop(0)
-                                worker = VoiceDownloadWorker(url, name)
-                                self._voice_workers.append(worker)
-                                def after_download(syx_data, voice_name, error):
-                                    if error:
-                                        self._voice_workers.remove(worker)
-                                        send_next()
-                                        return
-                                    midi_handler = mw.midi_handler
-                                    def sanitize_sysex(data):
-                                        if data and data[0] == 0xF0:
-                                            data = data[1:]
-                                        if data and data[-1] == 0xF7:
-                                            data = data[:-1]
-                                        return [b & 0x7F for b in data]
-                                    sanitized = sanitize_sysex(syx_data)
-                                    if sanitized and len(sanitized) > 3:
-                                        sanitized[1] = (channel - 1) & 0x0F
-                                    msg = Message('sysex', data=sanitized)
-                                    if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
-                                        midi_handler.midi_send_worker.send(msg)
-                                    else:
-                                        midi_handler.outport.send(msg)
-                                    mw.show_status(f"Sending '{voice_name}'...")
-                                    hex_str = ' '.join(f'{b:02X}' for b in msg.data)
-                                    mw.show_status(f"Sent SysEx: sysex data=F0 {hex_str} F7")
-                                    self._voice_workers.remove(worker)
-                                    send_next()
-                                worker.finished.connect(after_download)
-                                worker.start()
-                            send_next()
+                                if channel <= 0 or channel > 16:
+                                    continue
+                                # Send channel assignment SysEx
+                                sysex = [0xF0, 0x7D, 0x21, channel, 0x00, 0x02, 0x00, channel-1, 0xF7]
+                                msg = mido.Message('sysex', data=sysex[1:-1])
+                                if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
+                                    midi_handler.midi_send_worker.send(msg)
+                                else:
+                                    midi_handler.outport.send(msg)
+                    self.set_status("Auto-assigned MIDI channels to tracks.")
             dlg = TrackChannelDialog(midi, self)
             if not dlg.exec():
                 return

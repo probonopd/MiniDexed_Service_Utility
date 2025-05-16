@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction
 from voice_editor import VoiceEditor
 from voice_editor_panel import VoiceEditorPanel
-from main_window import MainWindow
 from singleton_dialog import SingletonDialog
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"
@@ -507,3 +506,12 @@ class VoiceBrowser(SingletonDialog):
         self.edit_button.setEnabled(has_selection)
         self.edit_panel_button.setEnabled(has_selection)
         self.send_button.setEnabled(has_selection)
+
+    def get_main_window(self):
+        parent = self.parent()
+        while parent is not None:
+            # Check for a unique MainWindow attribute, e.g., 'midi_handler'
+            if hasattr(parent, 'midi_handler'):
+                return parent
+            parent = parent.parent() if hasattr(parent, 'parent') else None
+        return None

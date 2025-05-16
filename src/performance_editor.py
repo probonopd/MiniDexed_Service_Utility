@@ -416,8 +416,7 @@ class PerformanceEditor(SingletonDialog):
                 widget.setCurrentIndex(col)
             elif isinstance(widget, QSpinBox):
                 widget.setValue(col + 1)
-            # Send SysEx for each TG, value should be 0-indexed (0-15 for channels 1-16)
-            self.send_midi_for_field("MIDIChannel", col, col)
+        # Removed explicit call to send_midi_for_field to avoid duplicate SysEx messages
 
     def set_all_tg_to_ch1(self):
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
@@ -428,8 +427,7 @@ class PerformanceEditor(SingletonDialog):
                 widget.setCurrentIndex(0)
             elif isinstance(widget, QSpinBox):
                 widget.setValue(1)
-            # Send SysEx for each TG, value should be 0 (for channel 1)
-            self.send_midi_for_field("MIDIChannel", col, 0)
+        # Removed explicit call to send_midi_for_field to avoid duplicate SysEx messages
 
     def showEvent(self, event):
         super().showEvent(event)
