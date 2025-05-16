@@ -12,6 +12,7 @@ from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
 from singleton_dialog import SingletonDialog
 from performance_fields import TG_FIELDS, GLOBAL_FIELDS, PERFORMANCE_FIELDS, PERFORMANCE_FIELD_RANGES, TG_LABELS
+from voice_management import select_voice_dialog, open_voice_editor, on_voice_dump
 
 # Initialize PERFORMANCE_VALUES with default values (0) for all fields and TGs
 PERFORMANCE_VALUES = [
@@ -74,12 +75,12 @@ class PerformanceEditor(SingletonDialog):
                         btn = QPushButton(str(value))
                         btn.setObjectName(f"voice_btn_{col}")
                         btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-                        btn.clicked.connect(lambda checked, r=row, c=col: self.select_voice_dialog(r, c))
+                        btn.clicked.connect(lambda checked, r=row, c=col: select_voice_dialog(self.table, self.main_window, r, c))
                         edit_btn = QPushButton("e")
                         edit_btn.setObjectName(f"edit_btn_{col}")
                         edit_btn.setFixedWidth(22)
                         edit_btn.setToolTip("Edit this voice")
-                        edit_btn.clicked.connect(lambda checked, r=row, c=col: self.open_voice_editor(r, c))
+                        edit_btn.clicked.connect(lambda checked, r=row, c=col: open_voice_editor(self.table, self.main_window, r, c, getattr(self, '_voice_dump_data', {})))
                         h_layout.addWidget(btn)
                         h_layout.addWidget(edit_btn)
                         # No stretch, so buttons are flush
@@ -185,64 +186,6 @@ class PerformanceEditor(SingletonDialog):
         import logging
         logging.basicConfig(level=logging.DEBUG)
         self._debug = True
-
-    def select_voice_dialog(self, row, col):
-        from voice_browser import VoiceBrowser
-        # Use the singleton show method
-        dlg = VoiceBrowser.show_singleton(main_window=self.main_window)
-        # Preselect channel in VoiceBrowser to match the MIDIChannel for this TG
-        midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
-        channel_widget = self.table.cellWidget(midi_channel_row, col)
-        # Support both QSpinBox (legacy) and QComboBox (current)
-        channel_index = None
-        if channel_widget is not None:
-            if channel_widget.metaObject().className() == "QComboBox":
-                idx = channel_widget.currentIndex()
-                if idx < 16:
-                    channel_index = idx  # 0-15 for channels 1-16
-                else:
-                    channel_index = 16  # Omni
-            elif isinstance(channel_widget, QSpinBox):
-                channel_value = channel_widget.value()
-                if 1 <= channel_value <= 16:
-                    channel_index = channel_value - 1
-                else:
-                    channel_index = 16  # Omni
-        if channel_index is not None and hasattr(dlg, "channel_combo"):
-            dlg.channel_combo.setCurrentIndex(channel_index)
-        def on_voice_selected():
-            idx = dlg.list_widget.currentRow()
-            if idx >= 0 and idx < len(dlg.filtered_voices):
-                voice = dlg.filtered_voices[idx]
-                name = voice['name']
-                # Only update the button(s) for the selected channel
-                midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
-                for c in range(8):
-                    channel_widget = self.table.cellWidget(midi_channel_row, c)
-                    channel_index = None
-                    if channel_widget is not None:
-                        if channel_widget.metaObject().className() == "QComboBox":
-                            idx_ch = channel_widget.currentIndex()
-                            if idx_ch < 16:
-                                channel_index = idx_ch
-                            else:
-                                channel_index = 16
-                        elif isinstance(channel_widget, QSpinBox):
-                            channel_value = channel_widget.value()
-                            if 1 <= channel_value <= 16:
-                                channel_index = channel_value - 1
-                            else:
-                                channel_index = 16
-                    # Compare with the channel selected in the VoiceBrowser
-                    vb_channel_idx = dlg.channel_combo.currentIndex()
-                    if channel_index == vb_channel_idx:
-                        btn = self.table.cellWidget(PERFORMANCE_FIELDS.index("Voice"), c)
-                        if isinstance(btn, QPushButton):
-                            btn.setText(name)
-        dlg.list_widget.itemDoubleClicked.connect(lambda _: on_voice_selected())
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
 
     def on_spin_changed(self, row, col, value):
         if self._block_signal:
@@ -465,63 +408,10 @@ class PerformanceEditor(SingletonDialog):
             print(f"[PERF EDITOR] Exception in _on_performance_sysex: {e}", file=sys.stderr)
 
     def _on_voice_dump(self, data):
-        # Strip F0/F7 if present (SysEx start/end) before any logging or checks
-        if data and data[0] == 0xF0:
-            data = data[1:]
-        if data and data[-1] == 0xF7:
-            data = data[:-1]
-        print(f"[PERF EDITOR] _on_voice_dump called with data: {' '.join(f'{b:02X}' for b in data)}")
-        print(f"[PERF EDITOR] Data length: {len(data) if data else 'None'}")
-        if not data or len(data) < 155:
-            print(f"[PERF EDITOR] Early return: data is None or too short")
-            return
-        print(f"[PERF EDITOR] Data[0]: {data[0]:02X}")
-        if data[0] != 0x43:
-            print(f"[PERF EDITOR] Early return: data[0] != 0x43")
-            return
-        # Extract MIDI channel from the SysEx (second byte: 0x2n or 0x1n, n = channel)
-        midi_channel = data[1] & 0x0F  # 0-indexed
-        print(f"[PERF EDITOR] Voice dump MIDI channel: {midi_channel}")
-        decoder = SingleVoiceDumpDecoder(data)
-        if not decoder.is_valid():
-            print(f"[PERF EDITOR] Decoder did not validate the data.")
-            return
-        voice_row = PERFORMANCE_FIELDS.index("Voice")
-        midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")
-        voice_name = decoder.get_param("VNAM")
-        # Update all TGs that listen on this MIDI channel
-        for tg in range(8):
-            channel_widget = self.table.cellWidget(midi_channel_row, tg)
-            tg_channel = None
-            if channel_widget is not None:
-                if channel_widget.metaObject().className() == "QComboBox":
-                    idx = channel_widget.currentIndex()
-                    if idx < 16:
-                        tg_channel = idx  # 0-15 for channels 1-16
-                    else:
-                        tg_channel = None  # Omni, skip for now
-                elif isinstance(channel_widget, QSpinBox):
-                    channel_value = channel_widget.value()
-                    if 1 <= channel_value <= 16:
-                        tg_channel = channel_value - 1
-                    else:
-                        tg_channel = None
-            if tg_channel is not None and tg_channel == midi_channel:
-                cell_widget = self.table.cellWidget(voice_row, tg)
-                # If cell_widget is a QWidget with a layout, get the first QPushButton
-                btn = None
-                if cell_widget is not None:
-                    for child in cell_widget.findChildren(QPushButton):
-                        # The first QPushButton is the voice name button
-                        btn = child
-                        break
-                if btn is not None:
-                    btn.setText(str(voice_name))
-                self._voice_dump_data[tg] = data
-                self._pending_voice_dumps.discard(tg)
+        # Use the imported on_voice_dump function
+        on_voice_dump(self.table, self.main_window, data, getattr(self, '_voice_dump_data', {}), getattr(self, '_pending_voice_dumps', set()))
         # If all TGs have received a voice dump, disconnect
-        if not self._pending_voice_dumps:
-            print(f"[PERF EDITOR] All pending voice dumps received, disconnecting signal.")
+        if hasattr(self, '_pending_voice_dumps') and not self._pending_voice_dumps:
             if self.main_window and hasattr(self.main_window, "midi_handler"):
                 if hasattr(self.main_window, "receive_worker") and self.main_window.receive_worker:
                     try:
