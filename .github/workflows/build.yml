@@ -75,7 +75,7 @@ jobs:
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --include-package=comtypes.client 'src/MiniDexed Service Utility.py' # --windows-console-mode=attach
           else
-             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka 'src/MiniDexed Service Utility.py'
+             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile 'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
           rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
