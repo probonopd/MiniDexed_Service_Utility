@@ -8,7 +8,6 @@
 # nuitka-project: --include-data-dir=src/data=data
 # nuitka-project: --include-data-dir=src/images=images
 # nuitka-project: --prefer-source-code
-# nuitka-project: --include-package=comtypes.client
 
 import sys
 from PySide6.QtWidgets import QApplication
