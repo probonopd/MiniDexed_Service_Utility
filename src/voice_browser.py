@@ -280,7 +280,43 @@ class VoiceBrowser(SingletonDialog):
         if idx < 0 or idx >= len(self.filtered_voices):
             self.set_status("No voice selected.", error=True)
             return
-        self.download_and_send_voice(idx)
+        # Always send to the channel selected in the channel_combo (UI is 1-indexed, MIDI is 0-indexed)
+        channel_idx = self.channel_combo.currentIndex()  # 0-based
+        if channel_idx >= 16:  # 'Omni' selected
+            self.set_status("Cannot send to 'Omni' channel. Please select a specific MIDI channel.", error=True)
+            return
+        voice = self.filtered_voices[idx]
+        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
+        self.download_worker = VoiceDownloadWorker(url, voice["name"])
+        def after_download(syx_data, voice_name, error):
+            if error:
+                self.set_status(f"Failed to download voice: {error}", error=True)
+                return
+            midi_outport = getattr(self.main_window, 'midi_handler', None)
+            if midi_outport and hasattr(midi_outport, 'outport'):
+                midi_outport = midi_outport.outport
+            if midi_outport:
+                import mido
+                # Patch the channel byte in the SysEx (3rd byte, index 2)
+                if isinstance(syx_data, list):
+                    syx_data = bytes(syx_data)
+                if syx_data[0] == 0xF0:
+                    sysex = list(syx_data)
+                else:
+                    sysex = [0xF0] + list(syx_data)
+                if sysex[-1] != 0xF7:
+                    sysex.append(0xF7)
+                if len(sysex) > 3:
+                    sysex[2] = 0x10 | (channel_idx & 0x0F)  # 0x10 is DX7 base, channel is 0-indexed
+                msg = mido.Message('sysex', data=sysex[1:-1])
+                mw = self.main_window
+                if hasattr(mw.midi_handler, 'midi_send_worker') and mw.midi_handler.midi_send_worker:
+                    mw.midi_handler.midi_send_worker.send(msg)
+                else:
+                    mw.midi_handler.outport.send(msg)
+                self.set_status(f"Sent '{voice_name}' to MIDI Out on channel {channel_idx+1}.")
+        self.download_worker.finished.connect(after_download)
+        self.download_worker.start()
 
     def open_voice_in_editor_on_double_click(self, item):
         idx = self.list_widget.currentRow()
