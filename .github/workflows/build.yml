@@ -72,7 +72,7 @@ jobs:
           python -m pip list -v
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --macos-create-app-bundle 'src/MiniDexed Service Utility.py'
-          else if [[ "$RUNNER_OS" == "Windows" ]]; then
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --include-package=comtypes.client 'src/MiniDexed Service Utility.py' # --windows-console-mode=attach
           else
              python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka 'src/MiniDexed Service Utility.py'
