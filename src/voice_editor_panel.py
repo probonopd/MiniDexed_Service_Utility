@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter
-from PySide6.QtCore import Qt, QObject, QEvent
+from PySide6.QtCore import Qt, QObject, QEvent, Signal, QPoint
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtGui import QResizeEvent, QPalette, QColor, QFontDatabase, QFont, QPainter
+from PySide6.QtGui import QResizeEvent, QPalette, QColor, QFontDatabase, QFont, QPainter, QMouseEvent
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from envelope_widget import EnvelopeWidget
 from keyboard_scaling_widget import KeyboardScalingWidget
@@ -64,6 +64,61 @@ OP_KS_DEFS = [
 ]
 
 # --- VoiceEditorPanel class ---
+
+class DraggableValueLabel(QLabel):
+    valueChanged = Signal(int)
+    def __init__(self, value, min_val, max_val, get_label, parent=None):
+        super().__init__(str(value), parent)
+        self.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self._min = min_val
+        self._max = max_val
+        self._get_label = get_label
+        self._dragging = False
+        self._last_pos = None
+        self._value = value
+        self.setCursor(Qt.CursorShape.SizeVerCursor)
+        self.setMouseTracking(True)
+
+    def setValue(self, value):
+        self._value = value
+        self.setText(str(self._get_label(value)))
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._last_pos = event.globalPosition().toPoint() if hasattr(event, 'globalPosition') else event.globalPos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._dragging and self._last_pos is not None:
+            pos = event.globalPosition().toPoint() if hasattr(event, 'globalPosition') else event.globalPos()
+            dy = self._last_pos.y() - pos.y()
+            dx = pos.x() - self._last_pos.x()
+            delta = dy if abs(dy) > abs(dx) else dx
+            if abs(delta) >= 2:
+                new_val = max(self._min, min(self._max, self._value + int(delta / 2)))
+                if new_val != self._value:
+                    self._value = new_val
+                    self.setText(str(self._get_label(self._value)))
+                    self.valueChanged.emit(self._value)
+                self._last_pos = pos
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if self._dragging:
+            self._dragging = False
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        if delta != 0:
+            step = 1 if delta > 0 else -1
+            new_val = max(self._min, min(self._max, self._value + step))
+            if new_val != self._value:
+                self._value = new_val
+                self.setText(str(self._get_label(self._value)))
+                self.valueChanged.emit(self._value)
+        super().wheelEvent(event)
 
 class VoiceEditorPanel(SingletonDialog):
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
@@ -149,18 +204,15 @@ class VoiceEditorPanel(SingletonDialog):
             col = QVBoxLayout()
             col.setSpacing(0)
             col.setContentsMargins(0, 0, 0, 0)
-            value_lbl = QLabel(str(value))
-            value_lbl.setStyleSheet("font-size: 8pt; background: transparent;")
-            value_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            value_lbl = DraggableValueLabel(value, min_val, max_val, lambda v: self.get_value_label(param_key, v))
+            value_lbl.setText(str(self.get_value_label(param_key, value)))
+            value_lbl.valueChanged.connect(slider.setValue)
+            slider.valueChanged.connect(value_lbl.setValue)
             col.addWidget(value_lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
-            def update_value_lbl(val):
-                label_val = self.get_value_label(param_key, val) if param_key else str(val)
-                value_lbl.setText(str(label_val))
-            slider.valueChanged.connect(update_value_lbl)
             col.addWidget(slider, alignment=Qt.AlignmentFlag.AlignHCenter)
             lbl = QLabel(label)
             # Dynamically set font size based on label length
-            font_size = 8 if len(label) <= 2 else 6
+            font_size = 8 if len(label) <= 2 else 7
             lbl.setStyleSheet(f"font-size: {font_size}pt; background: transparent;")
             col.addWidget(lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
             w = QWidget()

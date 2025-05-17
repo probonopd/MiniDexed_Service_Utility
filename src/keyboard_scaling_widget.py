@@ -307,7 +307,7 @@ class KeyboardScalingWidget(QWidget):
             drag = dx if abs(dx) > abs(dy) else -dy
             if self._drag_label == 'LC':
                 orig = self.left_curve
-                delta = int(drag / 8)  # more sensitive drag
+                delta = int(drag / 8) # more sensitive drag
                 if delta != 0:
                     new_val = (orig + delta) % 4
                     if new_val != self.left_curve:
@@ -360,6 +360,11 @@ class KeyboardScalingWidget(QWidget):
                 self.labelHovered.emit(hovered)
             else:
                 self.labelHovered.emit("")
+        # Set cursor if hovering over a label
+        if hovered:
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            self.unsetCursor()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -370,9 +375,16 @@ class KeyboardScalingWidget(QWidget):
         self._last_mouse_pos = None
         super().mouseReleaseEvent(event)
 
+    def enterEvent(self, event):
+        # Show vertical resize cursor when hovering over a draggable label
+        if getattr(self, '_hovered_label', None) is not None:
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            self.unsetCursor()
+        super().enterEvent(event)
+
     def leaveEvent(self, event):
-        self._hovered_label = None
-        self.labelHovered.emit("")
+        self.unsetCursor()
         super().leaveEvent(event)
 
     def _dx7_curve(self, rel, depth, curve, h, margin, left=True):

@@ -243,11 +243,23 @@ class EnvelopeWidget(QWidget):
                 self.labelHovered.emit(hovered)
             else:
                 self.labelHovered.emit("")
+        # Set cursor if hovering over a label
+        if hovered:
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            self.unsetCursor()
         super().mouseMoveEvent(event)
 
+    def enterEvent(self, event):
+        # Show vertical resize cursor when hovering over a draggable label
+        if self._hovered_label is not None:
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            self.unsetCursor()
+        super().enterEvent(event)
+
     def leaveEvent(self, event):
-        self._hovered_label = None
-        self.labelHovered.emit("")
+        self.unsetCursor()
         super().leaveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
