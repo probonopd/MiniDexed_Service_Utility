@@ -59,7 +59,8 @@ class MIDIHandler:
             print(f"[MIDI LOG] Skipping SysEx: bytes out of range 0..127: {' '.join(f'{b:02X}' for b in data)}")
             return
         if self.outport and self._midi_send_worker:
-            print(f"[MIDI LOG] Sending SysEx: {' '.join(f'{b:02X}' for b in data)}")
+            data_wrapped = [0xF0] + data + [0xF7]
+            print(f"[MIDI LOG] Sending SysEx: {' '.join(f'{b:02X}' for b in data_wrapped)}")
             msg = Message('sysex', data=data)
             self._midi_send_worker.send(msg)
 
@@ -237,10 +238,8 @@ class MIDIHandler:
             return ' '.join(f'{b:02X}' for b in data)
 
     def send_cc(self, channel, control, value):
-        print("[MIDI LOG] send_cc called")
         if self.outport:
-            print(f"[MIDI LOG] Sending CC: channel={channel+1} control={control} value={value}")
-            import mido
+            print(f"[MIDI LOG] Sending CC: {' '.join(f'{b:02X}' for b in [0xB0 | (channel & 0x0F), control, value])} (channel={channel+1} control={control} value={value})")
             msg = mido.Message('control_change', channel=channel, control=control, value=value)
             if hasattr(self.outport, 'send'):
                 self.outport.send(msg)

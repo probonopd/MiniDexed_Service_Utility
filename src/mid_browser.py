@@ -240,6 +240,11 @@ class MidBrowser(QDialog):
                 return
             # Always stop any current playback before starting new one
             QApplication.instance().midi_handler.stop_midi_file()
+            # Set TGs to MIDI channels 1-16 (0-15):
+            for i in range(15):
+                sysex = [0xF0, 0x7D, 0x20 + i, 0x01, 0x00, 0x02, 0x00, i, 0xF7]
+                QApplication.instance().midi_handler.send_sysex(sysex)
+            # Set TGs to MIDI channels
             assignments = dlg.get_assignments()
             new_midi = mido.MidiFile()
             new_midi.ticks_per_beat = midi.ticks_per_beat
@@ -328,25 +333,6 @@ class MidBrowser(QDialog):
                         for msg in track:
                             new_track.append(msg)
                     new_midi.tracks.append(new_track)
-                # Remove any silence from the beginning of the new MIDI file
-                # by checking the first message of each track and then removing that time
-                # on each track (same amount for all tracks)
-                silence_time = min(track[0].time for track in new_midi.tracks if len(track) > 0)
-                for track in new_midi.tracks:
-                    if len(track) > 0:
-                        track[0].time -= silence_time
-                # Move all messages forward by the silence time
-                for track in new_midi.tracks:
-                    for msg in track:
-                        if hasattr(msg, 'time'):
-                            msg.time += silence_time
-                # Remove any silence from the end of the new MIDI file
-                # by checking the last message of each track and then removing that time
-                # on each track (same amount for all tracks)
-                silence_time = min(track[-1].time for track in new_midi.tracks if len(track) > 0)
-                for track in new_midi.tracks:
-                    if len(track) > 0:
-                        track[-1].time -= silence_time
                 mw = self.main_window
                 if mw is None or not hasattr(mw, 'midi_ops') or not hasattr(mw.midi_handler, 'outport') or not mw.midi_handler.outport:
                     Dialogs.show_error(self, "Error", "No MIDI Out port selected in main window.")
