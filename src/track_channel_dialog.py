@@ -33,16 +33,32 @@ class TrackChannelDialog(QDialog):
         self.suggestion_labels = []
         # Load voices from patch_list.json (cached by VoiceBrowser)
         voices = []
+        dx7_voice_names = set()
+        try:
+            # Load DX7 voice names
+            dx7_path = os.path.join(os.path.dirname(__file__), 'data', 'dx7_voices.json')
+            if os.path.exists(dx7_path):
+                with open(dx7_path, 'r', encoding='utf-8') as f:
+                    dx7_voice_names = set(n.strip().upper() for n in json.load(f).get('dx7_voices', []))
+            else:
+                logging.warning(f"DX7 voices file not found: {dx7_path}")
+        except Exception as e:
+            logging.error(f"Error loading DX7 voices: {e}")
+            dx7_voice_names = set()
         try:
             cache_path = os.path.join(get_cache_dir(), VOICE_LIST_CACHE_NAME)
             if os.path.exists(cache_path):
                 with open(cache_path, 'r', encoding='utf-8') as f:
-                    voices = json.load(f)
-            logging.debug(f"Loaded {len(voices)} voices from {cache_path}")
+                    all_voices = json.load(f)
+                # Only keep voices whose name is in BOTH the DX7 list and patch_list.json
+                patch_voice_names = set(v.get('name', '').strip().upper() for v in all_voices)
+                valid_names = dx7_voice_names & patch_voice_names
+                voices = [v for v in all_voices if v.get('name', '').strip().upper() in valid_names]
+            logging.debug(f"Loaded {len(voices)} voices present in BOTH patch_list.json and dx7_voices.json from {cache_path}")
             if voices:
                 logging.debug(f"Sample voice: {voices[0]}")
             else:
-                logging.warning("Voice list is empty after loading.")
+                logging.warning("Voice list is empty after intersection filtering.")
         except Exception as e:
             voices = []
             logging.error(f"Error loading voices: {e}")
@@ -52,22 +68,22 @@ class TrackChannelDialog(QDialog):
                 logging.debug(f"No track name provided for suggestion.")
                 return None
             tn = track_name.lower().strip()
-            # Always assign 'melody' to 'E.Piano 1'
-            if tn == 'melody':
+            # Always assign 'melody' to 'E.Piano 1' if it's in the DX7 list
+            if tn == 'melody' and 'E.PIANO 1' in dx7_voice_names:
                 logging.debug(f"Track name 'melody' matched. Forcing suggestion to 'E.Piano 1'.")
                 return 'E.Piano 1'
-            # Exact match
+            # Exact match (case-insensitive, DX7 only)
             for v in voices:
                 if v.get('name','').lower().strip() == tn:
                     logging.debug(f"Exact match for track '{track_name}': {v.get('name','')}")
                     return v['name']
-            # Fuzzy: best match by similarity
+            # Fuzzy: best match by similarity (DX7 only)
             voice_names = [v.get('name','') for v in voices]
             matches = difflib.get_close_matches(track_name, voice_names, n=1, cutoff=0.6)
             if matches:
                 logging.debug(f"Fuzzy match for track '{track_name}': {matches[0]}")
                 return matches[0]
-            # Fuzzy: contains
+            # Fuzzy: contains (DX7 only)
             for v in voices:
                 if tn and tn in v.get('name','').lower():
                     logging.debug(f"Contains match for track '{track_name}': {v.get('name','')}")

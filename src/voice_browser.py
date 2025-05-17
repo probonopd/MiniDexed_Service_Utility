@@ -482,12 +482,22 @@ class VoiceBrowser(SingletonDialog):
     def closeEvent(self, event):
         # Ensure any running worker threads are finished before closing
         try:
+            # Stop and wait for download_worker and json_worker if present
             if hasattr(self, 'download_worker') and self.download_worker is not None:
                 self.download_worker.quit()
                 self.download_worker.wait()
             if hasattr(self, 'json_worker') and self.json_worker is not None:
                 self.json_worker.quit()
                 self.json_worker.wait()
+            # Stop and wait for any workers in _active_workers
+            if hasattr(self, '_active_workers'):
+                for worker in list(self._active_workers):
+                    try:
+                        worker.quit()
+                        worker.wait()
+                    except Exception:
+                        pass
+                self._active_workers.clear()
         except Exception:
             pass
         VoiceBrowser._instance = None
