@@ -1,11 +1,11 @@
 from dialogs import Dialogs
 import mido
 from workers import MidiSendWorker
+from PySide6.QtWidgets import QApplication
 
 class MidiOps:
     def __init__(self, main_window):
         self.main_window = main_window
-        self.midi_send_worker = None
         self._repeat_blocked = False  # Initialize the repeat blocked flag
 
         # Connect UI buttons
@@ -22,10 +22,7 @@ class MidiOps:
             for line in lines:
                 try:
                     msg = mido.Message.from_str(line)
-                    if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
-                        self.main_window.midi_handler.midi_send_worker.send(msg)
-                    else:
-                        self.main_window.midi_handler.outport.send(msg)
+                    QApplication.instance().midi_handler.send_sysex(msg.bytes())
                     self.main_window.show_status(f"Sent MIDI: {msg}")
                     continue
                 except Exception:
@@ -34,18 +31,12 @@ class MidiOps:
                 if data:
                     if data[0] == 0xF0:
                         msg = mido.Message('sysex', data=data[1:-1] if data[-1] == 0xF7 else data[1:])
-                        if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
-                            self.main_window.midi_handler.midi_send_worker.send(msg)
-                        else:
-                            self.main_window.midi_handler.outport.send(msg)
+                        QApplication.instance().midi_handler.send_sysex(msg.bytes())
                         hex_str = ' '.join(f'{b:02X}' for b in data)
                         self.main_window.show_status(f"Sent SysEx: sysex data={hex_str}")
                     else:
                         msg = mido.Message.from_bytes(data)
-                        if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
-                            self.main_window.midi_handler.midi_send_worker.send(msg)
-                        else:
-                            self.main_window.midi_handler.outport.send(msg)
+                        QApplication.instance().midi_handler.send_sysex(msg.bytes())
                         self.main_window.show_status(f"Sent MIDI bytes: {msg}")
                 else:
                     Dialogs.show_error(self.main_window, "Error", f"Invalid MIDI/SysEx data: {line}")
@@ -53,31 +44,20 @@ class MidiOps:
             Dialogs.show_error(self.main_window, "Error", f"Failed to send MIDI: {e}")
 
     def stop_sending(self):
-        if self.midi_send_worker and self.midi_send_worker.isRunning():
-            self._repeat_blocked = True  # Block repeat after stop
-            self.midi_send_worker.stop()
-            self.main_window.show_status("Stop requested.")
-            self.send_all_notes_off()  # Send All Notes Off immediately
-        else:
-            self.main_window.show_status("No MIDI file is currently being sent.")
+        QApplication.instance().midi_handler.stop_midi_file()
+        self.main_window.show_status("Stop requested.")
+        self.send_all_notes_off()  # Send All Notes Off immediately
 
     def send_all_notes_off(self):
         try:
-            # Send All Notes Off for all 16 channels
             for ch in range(16):
-                msg = mido.Message('control_change', channel=ch, control=123, value=0)
-                if hasattr(self.main_window.midi_handler, 'midi_send_worker') and self.main_window.midi_handler.midi_send_worker:
-                    self.main_window.midi_handler.midi_send_worker.send(msg)
-                else:
-                    self.main_window.midi_handler.outport.send(msg)
+                QApplication.instance().midi_handler.send_cc(ch, 123, 0)
             self.main_window.show_status("Sent All Notes Off (CC123) to all channels.")
         except Exception as e:
             Dialogs.show_error(self.main_window, "Error", f"Failed to send All Notes Off: {e}")
 
     def on_midi_send_finished(self):
         self.main_window.show_status("Finished sending MIDI file.")
-        self.midi_send_worker = None
-        self.send_all_notes_off()  # Now send All Notes Off after the file is done
         # Repeat logic: check if the Repeat menu entry is checked
         repeat_action = getattr(self.main_window, 'repeat_action', None)
         repeat_enabled = repeat_action.isChecked() if repeat_action else False
@@ -85,16 +65,12 @@ class MidiOps:
             self._repeat_blocked = False
             return  # Do not repeat if stopped by user
         if repeat_enabled and self.main_window.file_ops.loaded_midi:
-            if not self.main_window.midi_handler.outport:
+            if not QApplication.instance().midi_handler.outport:
                 from dialogs import Dialogs
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
-            from workers import MidiSendWorker
             self.main_window.show_status("Repeating MIDI file send...")
-            self.midi_send_worker = MidiSendWorker(self.main_window.midi_handler.outport, self.main_window.file_ops.loaded_midi)
-            self.midi_send_worker.log.connect(self.main_window.show_status)
-            self.midi_send_worker.finished.connect(self.on_midi_send_finished)
-            self.midi_send_worker.start()
+            QApplication.instance().midi_handler.send_sysex(self.main_window.file_ops.loaded_midi)
 
     def clear_out(self):
         self.main_window.ui.out_text.clear()
@@ -106,7 +82,6 @@ class MidiOps:
         self.main_window.show_status("Cleared In area.")
 
     def send_file(self):
-        # This method was previously called by the removed btn_send_file, now used by the File menu
         path = Dialogs.get_file_open(self.main_window, "MIDI Files (*.mid)")
         if not path:
             self.main_window.show_status("MIDI file open canceled.")
@@ -120,27 +95,13 @@ class MidiOps:
             if not self.main_window.midi_handler.outport:
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
-            # Send All Notes Off before starting new MIDI file
             self.send_all_notes_off()
-            # If a MIDI file is already being sent, stop it first, then start the new one
-            if self.midi_send_worker and self.midi_send_worker.isRunning():
-                self._repeat_blocked = True
-                self.midi_send_worker.stop()
-                self.main_window.show_status("Stopping previous MIDI file...")
-                # Wait for the old worker to finish before starting new one
-                def start_new_worker():
-                    self.main_window.show_status("Sending MIDI file with timing...")
-                    self.midi_send_worker = MidiSendWorker(self.main_window.midi_handler.outport, midi)
-                    self.midi_send_worker.log.connect(self.main_window.show_status)
-                    self.midi_send_worker.finished.connect(self.on_midi_send_finished)
-                    self.midi_send_worker.start()
-                self.midi_send_worker.finished.connect(start_new_worker)
-                return
-            self.main_window.show_status("Sending MIDI file with timing...")
-            self.midi_send_worker = MidiSendWorker(self.main_window.midi_handler.outport, midi)
-            self.midi_send_worker.log.connect(self.main_window.show_status)
-            self.midi_send_worker.finished.connect(self.on_midi_send_finished)
-            self.midi_send_worker.start()
+            # Use MIDIHandler to send the MIDI file and handle repeat logic
+            def on_finished():
+                self.on_midi_send_finished()
+            def on_log(msg):
+                self.main_window.show_status(msg)
+            QApplication.instance().midi_handler.send_midi_file(midi, on_finished=on_finished, on_log=on_log)
         self.file_load_worker.loaded.connect(on_loaded)
         self.file_load_worker.error.connect(lambda e: Dialogs.show_error(self.main_window, "Error", f"Failed to load .mid: {e}"))
         self.file_load_worker.start()

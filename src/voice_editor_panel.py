@@ -198,11 +198,15 @@ class VoiceEditorPanel(SingletonDialog):
     def init_ui(self):
         # --- Load VCED.json for parameter info (must be first!) ---
         self._vced_param_info = None
+        self._tx816perf_param_info = None
         try:
             with open(os.path.join(os.path.dirname(__file__), 'data', 'VCED.json'), 'r', encoding='utf-8') as f:
-                self._vced_param_info = {p['key']: p for p in json.load(f)}
+                vced_json = json.load(f)
+                self._vced_param_info = {p['key']: p for p in vced_json.get('parameters', [])}
+                self._tx816perf_param_info = {p['key']: p for p in vced_json.get('TX816Perf', [])}
         except Exception as e:
             self._vced_param_info = {}
+            self._tx816perf_param_info = {}
         layout = QHBoxLayout(self)  # Use horizontal layout for main area
         # --- Main editor area (was layout = QVBoxLayout(self)) ---
         main_vbox = QVBoxLayout()
@@ -429,6 +433,33 @@ class VoiceEditorPanel(SingletonDialog):
                 )
             )
         op_grid.addWidget(global_bg, global_row, 0, 1, op_col_count)
+
+        # --- TX816/TX216 Performance SysEx row ---
+        perf_row = global_row + 1
+        perf_bg = QWidget()
+        perf_bg.setStyleSheet(self.gradient_global)
+        perf_layout = QHBoxLayout(perf_bg)
+        perf_layout.setContentsMargins(0, 0, 0, 0)
+        perf_layout.setSpacing(0)
+        tx816_params = [
+            (k, k, p['min'], p['max'], p.get('description', k), p['parameter_number'])
+            for k, p in self._tx816perf_param_info.items()
+        ]
+        for short, key, min_val, max_val, tooltip, param_num in tx816_params:
+            def make_setter(k, p):
+                return lambda v: (
+                    print(f"[DEBUG] send_sysex called with key={k}, value={v}, param_num={p}, op_idx=None"),
+                    self.set_param(k, v)
+                )
+            # Always use sliders, even for binary params
+            perf_layout.addWidget(
+                self._make_slider(
+                    self.get_param(key, min_val), min_val, max_val,
+                    make_setter(key, param_num),
+                    tooltip, '#8ecae6', short, param_key=key
+                )
+            )
+        op_grid.addWidget(perf_bg, perf_row, 0, 1, op_col_count)
         op_table_widget = QWidget()
         op_table_widget.setLayout(op_grid)
         op_table_widget.lower()
@@ -461,11 +492,14 @@ class VoiceEditorPanel(SingletonDialog):
             self._vced_param_info = {}
 
     def _show_param_info(self, param_key):
-        # Determine if this is an operator parameter and if so, pass hovered_op_idx and carrier_ops
         hovered_op_idx = getattr(self, '_hovered_op_idx', None)
         alg_idx = self.get_param('ALS', 0)
         carrier_ops = self.get_carrier_ops(alg_idx) if hovered_op_idx is not None else None
-        self.param_info_panel.show_param_info(self._vced_param_info, param_key, hovered_op_idx, carrier_ops)
+        # Prefer VCED, then TX816Perf
+        param_info = self._vced_param_info.get(param_key) if self._vced_param_info and param_key in self._vced_param_info else None
+        if not param_info and self._tx816perf_param_info and param_key in self._tx816perf_param_info:
+            param_info = self._tx816perf_param_info[param_key]
+        self.param_info_panel.show_param_info({param_key: param_info} if param_info else {}, param_key, hovered_op_idx, carrier_ops)
 
     def resizeEvent(self, event: QResizeEvent):
         super().resizeEvent(event)
@@ -478,9 +512,21 @@ class VoiceEditorPanel(SingletonDialog):
             svg_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "images", f"algorithm-{alg_idx:02d}.svg"))
             self.svg_overlay.load(svg_path)
         parent_height = self.svg_overlay.parent().height()
-        operator_rows = self.svg_overlay.parent().findChildren(QWidget)
-        operator_height = (parent_height) * 0.93
-        scale_factor = operator_height / self.svg_overlay.sizeHint().height()
+        # Subtract the height of the last row (performance row) to avoid covering it
+        perf_row_widget = None
+        op_grid = self.svg_overlay.parent().layout() if self.svg_overlay.parent() else None
+        if op_grid is not None:
+            # The last row is the performance row
+            perf_row_idx = op_grid.rowCount() - 1
+            for col in range(op_grid.columnCount()):
+                item = op_grid.itemAtPosition(perf_row_idx, col)
+                if item is not None and item.widget() is not None:
+                    perf_row_widget = item.widget()
+                    break
+        perf_row_height = perf_row_widget.height() if perf_row_widget is not None else 0
+        # Reduce the available height for the SVG overlay
+        operator_height = (parent_height - perf_row_height) * 0.93
+        scale_factor = operator_height / self.svg_overlay.sizeHint().height() if self.svg_overlay.sizeHint().height() > 0 else 1.0
         svg_width = int(self.svg_overlay.sizeHint().width() * scale_factor)
         svg_height = int(self.svg_overlay.sizeHint().height() * scale_factor)
         self.svg_overlay.resize(svg_width, svg_height)
@@ -600,13 +646,12 @@ class VoiceEditorPanel(SingletonDialog):
                 print(f"[VOICE EDITOR PANEL] Unsupported parameter number: {param_num}")
                 return
             sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
-            if self.midi_outport and hasattr(self.midi_outport, 'midi_send_worker'):
+            if self.midi_outport:
                 import mido
                 msg = mido.Message('sysex', data=sysex[1:-1])
-                print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {ch+1})")
-                self.midi_outport.midi_send_worker.send(msg)
+                self.midi_outport.send_sysex(sysex)
             else:
-                print("[VOICE EDITOR PANEL] midi_outport or midi_send_worker not set, cannot send SysEx.")
+                print("[VOICE EDITOR PANEL] midi_outport not set, cannot send SysEx.")
         else:
             print(f"[VOICE EDITOR PANEL] No valid param_num for {key} (op_idx={op_idx})")
 
@@ -616,6 +661,10 @@ class VoiceEditorPanel(SingletonDialog):
             'PL1': 125, 'PL2': 126, 'PL3': 127, 'PL4': 128,
             'FBL': 129, 'OPI': 130, 'ALS': 134, 'LFS': 137, 'LFD': 138, 'LPMD': 139, 'LAMD': 140,
             'LFKS': 141, 'LFW': 142, 'LPMS': 143, 'TRNP': 144,
+            # TX816/TX216 performance params
+            'SRC': 1, 'PMO': 2, 'PBR': 3, 'PBS': 4, 'PRT': 5, 'PGL': 6, 'PMD': 7,
+            'MWS': 9, 'MWA': 10, 'FCS': 11, 'FCA': 12, 'ATS': 13, 'ATA': 14, 'BCS': 15, 'BCA': 16,
+            'ATT': 26, 'MTU': 64,
         }
         if key.startswith('VNAM'):
             try:
@@ -652,10 +701,10 @@ class VoiceEditorPanel(SingletonDialog):
         # Send DX7 operator enable/disable SysEx
         sysex = [0xF0, 0x43, 0x10, 0x01, 0x1B, bitfield, 0xF7]
         print(f"[DX7 OP ENABLE] Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)}")
-        if self.midi_outport and hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
+        if self.midi_outport:
             import mido
             msg = mido.Message('sysex', data=sysex[1:-1])
-            self.midi_outport.midi_send_worker.send(msg)
+            self.midi_outport.send_sysex(sysex)
         else:
             print("[DX7 OP ENABLE] midi_outport is not set, cannot send SysEx.")
 

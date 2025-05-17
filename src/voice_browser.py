@@ -226,10 +226,8 @@ class VoiceBrowser(SingletonDialog):
             if error:
                 return
             midi_handler = getattr(self.main_window, 'midi_handler', None)
-            if midi_handler and hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
-                import mido
-                msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
-                midi_handler.midi_send_worker.send(msg)
+            if midi_handler:
+                midi_handler.send_sysex(msg.bytes())
                 self.set_status(f"Sent '{voice_name}' to MIDI Out.")
             from voice_editor import VoiceEditor
             editor = VoiceEditor(parent=self, midi_outport=midi_handler, voice_bytes=syx_data)
@@ -310,10 +308,7 @@ class VoiceBrowser(SingletonDialog):
                     sysex[2] = 0x10 | (channel_idx & 0x0F)  # 0x10 is DX7 base, channel is 0-indexed
                 msg = mido.Message('sysex', data=sysex[1:-1])
                 mw = self.main_window
-                if hasattr(mw.midi_handler, 'midi_send_worker') and mw.midi_handler.midi_send_worker:
-                    mw.midi_handler.midi_send_worker.send(msg)
-                else:
-                    mw.midi_handler.outport.send(msg)
+                mw.midi_handler.send_sysex(msg.bytes())
                 self.set_status(f"Sent '{voice_name}' to MIDI Out on channel {channel_idx+1}.")
         self.download_worker.finished.connect(after_download)
         self.download_worker.start()
@@ -340,10 +335,7 @@ class VoiceBrowser(SingletonDialog):
                 import mido
                 msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
                 mw = self.main_window
-                if hasattr(mw.midi_handler, 'midi_send_worker') and mw.midi_handler.midi_send_worker:
-                    mw.midi_handler.midi_send_worker.send(msg)
-                else:
-                    mw.midi_handler.outport.send(msg)
+                mw.midi_handler.send_sysex(msg.bytes())
                 self.set_status(f"Sent '{voice_name}' to MIDI Out.")
         self.download_worker.finished.connect(after_download)
         self.download_worker.start()
@@ -467,10 +459,7 @@ class VoiceBrowser(SingletonDialog):
                         try:
                             data = sysex[1:-1] if sysex[0] == 0xF0 and sysex[-1] == 0xF7 else sysex
                             msg = mido.Message('sysex', data=data)
-                            if hasattr(mw.midi_handler, 'midi_send_worker') and mw.midi_handler.midi_send_worker:
-                                mw.midi_handler.midi_send_worker.send(msg)
-                            else:
-                                mw.midi_handler.outport.send(msg)
+                            mw.midi_handler.send_sysex(msg.bytes())
                             self.set_status(f"Sent '{voice['name']}' directly to MIDI Out.")
                         except Exception as e:
                             self.set_status(f"Failed to send MIDI: {e}", error=True)

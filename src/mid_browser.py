@@ -5,10 +5,11 @@ import hashlib
 import requests
 import mido
 import difflib
+import logging
 from PySide6.QtCore import QThread, Signal, Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QListWidget, QHBoxLayout, QPushButton, QLabel, QStatusBar, QListWidgetItem, QLineEdit,
-    QDialogButtonBox, QComboBox, QSpinBox, QFormLayout, QCheckBox
+    QDialogButtonBox, QComboBox, QSpinBox, QFormLayout, QCheckBox, QApplication
 )
 from PySide6.QtGui import QIcon
 from dialogs import Dialogs
@@ -300,7 +301,7 @@ class MidBrowser(QDialog):
                         form.addRow(label, row_layout)
                     layout.addLayout(form)
                     btn_layout = QHBoxLayout()
-                    self.auto_btn = QPushButton("Auto Assign")
+                    self.auto_btn = QPushButton("Send Voices")
                     self.auto_btn.clicked.connect(self.auto_assign)
                     btn_layout.addWidget(self.auto_btn)
                     self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -331,17 +332,9 @@ class MidBrowser(QDialog):
                 def get_assignments(self):
                     return [box.currentIndex()+1 for box in self.channel_boxes]
                 def auto_assign(self):
-                    # Send MIDI channel assignment SysEx for all channels before assigning voices
-                    mw = self.parent().main_window if self.parent() and hasattr(self.parent(), 'main_window') else None
-                    if mw and hasattr(mw, 'midi_handler'):
-                        midi_handler = mw.midi_handler
-                        for ch in range(8):
-                            sysex = [0xF0, 0x7D, 0x21, ch + 1, 0x00, 0x02, 0x00, ch, 0xF7]
-                            msg = mido.Message('sysex', data=sysex[1:-1])
-                            if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
-                                midi_handler.midi_send_worker.send(msg)
-                            else:
-                                midi_handler.outport.send(msg)
+                    # Use global midi_handler from QApplication
+                    app = QApplication.instance()
+                    midi_handler = getattr(app, "midi_handler", None)
                     # Assign the same MIDI channel to all tracks with the same suggested voice
                     voice_to_channel = {}
                     used_channels = set()
@@ -349,35 +342,51 @@ class MidBrowser(QDialog):
                         if not sugg:
                             continue
                         if sugg not in voice_to_channel:
-                            # Find the first unused channel
                             for ch in range(16):
                                 if ch not in used_channels:
                                     voice_to_channel[sugg] = ch
                                     used_channels.add(ch)
                                     break
-                    # Set the channel for all tracks with this voice (do not assign different numbers for same voice)
                     for idx, sugg in enumerate(self.suggestions):
                         if sugg and sugg in voice_to_channel:
                             self.channel_boxes[idx].setCurrentIndex(voice_to_channel[sugg])
-                    # Use parent main_window to send channel assignments
-                    if self.parent() and hasattr(self.parent(), 'main_window'):
-                        mw = self.parent().main_window
-                        if mw and hasattr(mw, 'midi_handler'):
-                            midi_handler = mw.midi_handler
-                            for idx, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
-                                if not sugg:
-                                    continue
-                                channel = box.currentIndex() + 1
-                                if channel <= 0 or channel > 16:
-                                    continue
-                                # Send channel assignment SysEx
-                                sysex = [0xF0, 0x7D, 0x21, channel, 0x00, 0x02, 0x00, channel-1, 0xF7]
-                                msg = mido.Message('sysex', data=sysex[1:-1])
-                                if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
-                                    midi_handler.midi_send_worker.send(msg)
-                                else:
-                                    midi_handler.outport.send(msg)
-                    self.set_status("Auto-assigned MIDI channels to tracks.")
+                    # Send channel assignment SysEx
+                    for idx, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
+                        if not sugg:
+                            continue
+                        channel = box.currentIndex() + 1
+                        if channel <= 0 or channel > 16:
+                            continue
+                        sysex = [0xF0, 0x7D, 0x21, channel, 0x00, 0x02, 0x00, channel-1, 0xF7]
+                        msg = mido.Message('sysex', data=sysex[1:-1])
+
+                        logging.info(f"Setting TG{channel-1} to MIDI channel {channel}")
+                        QApplication.instance().midi_handler.send_sysex(msg.bytes())
+                    # Send voice SysEx for each channel/voice assignment
+                    for idx, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
+                        if not sugg:
+                            continue
+                        channel = box.currentIndex() + 1
+                        if channel <= 0 or channel > 16:
+                            continue
+                        voice_obj = next((v for v in self.voices if v.get('name') == sugg and v.get('syx')), None)
+                        if not voice_obj:
+                            continue
+                        syx_data = voice_obj['syx']
+                        if isinstance(syx_data, str):
+                            syx_data = [int(x, 16) for x in syx_data.split() if x.strip()]
+                        elif isinstance(syx_data, bytes):
+                            syx_data = list(syx_data)
+                        if len(syx_data) > 3:
+                            syx_data[2] = 0x10 | ((channel-1) & 0x0F)
+                        if syx_data[0] != 0xF0:
+                            syx_data = [0xF0] + syx_data
+                        if syx_data[-1] != 0xF7:
+                            syx_data = syx_data + [0xF7]
+                        msg = mido.Message('sysex', data=syx_data[1:-1])
+                        logging.info(f"Sending FF FF format SysEx to MIDI channel {channel}")
+                        QApplication.instance().midi_handler.send_sysex(msg.bytes())
+
             dlg = TrackChannelDialog(midi, self)
             if not dlg.exec():
                 return
@@ -412,40 +421,24 @@ class MidBrowser(QDialog):
                     for msg in track:
                         new_track.append(msg)
                 new_midi.tracks.append(new_track)
-            # Use main_window.midi_ops to send, so stop button and all-notes-off work
+
             mw = self.main_window
             if mw is None or not hasattr(mw, 'midi_ops') or not hasattr(mw.midi_handler, 'outport') or not mw.midi_handler.outport:
                 Dialogs.show_error(self, "Error", "No MIDI Out port selected in main window.")
                 return
             midi_ops = mw.midi_ops
             # Stop any currently playing MIDI file, and wait for it to finish before starting new one
-            midi_ops.stop_sending()  # Stop all playback before sending new MIDI file
-            def start_new_worker():
+            def start_new_file():
                 mw.show_status("Sending MIDI file with timing...")
-                from workers import MidiSendWorker
-                midi_ops.midi_send_worker = MidiSendWorker(mw.midi_handler.outport, new_midi)
-                midi_ops.midi_send_worker.log.connect(mw.show_status)
-                midi_ops.midi_send_worker.finished.connect(midi_ops.on_midi_send_finished)
-                midi_ops.midi_send_worker.start()
-            if midi_ops.midi_send_worker and midi_ops.midi_send_worker.isRunning():
-                midi_ops._repeat_blocked = True
-                # Disconnect any previous finished handler to avoid multiple triggers
-                try:
-                    midi_ops.midi_send_worker.finished.disconnect()
-                except Exception:
-                    pass
-                def on_stopped_then_start():
-                    midi_ops.midi_send_worker.finished.disconnect(on_stopped_then_start)
-                    # Set as loaded_midi for repeat/stop logic
-                    mw.file_ops.loaded_midi = new_midi
-                    start_new_worker()
-                midi_ops.midi_send_worker.finished.connect(on_stopped_then_start)
-                midi_ops.midi_send_worker.stop()
-                mw.show_status("Stopping previous MIDI file...")
-                return
-            # Set as loaded_midi for repeat/stop logic
-            mw.file_ops.loaded_midi = new_midi
-            start_new_worker()
+                mw.file_ops.loaded_midi = new_midi
+                QApplication.instance().midi_handler.send_midi_file(new_midi, on_finished=midi_ops.on_midi_send_finished, on_log=mw.show_status)
+            # Use a flag to block repeat if needed
+            if hasattr(midi_ops, '_repeat_blocked') and getattr(midi_ops, '_repeat_blocked', False):
+                midi_ops._repeat_blocked = False
+            # Always stop any current playback before starting new one
+            QApplication.instance().midi_handler.stop_midi_file()
+            # Start new file after a short delay to ensure stop is processed
+            QTimer.singleShot(100, start_new_file)
         except Exception as e:
             Dialogs.show_error(self, "MIDI Error", f"Failed to parse/send MIDI: {e}")
 

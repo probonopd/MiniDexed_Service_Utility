@@ -7,8 +7,13 @@ from dialogs import Dialogs
 from file_utils import FileUtils
 
 class MIDIReceiveWorker(QThread):
-    sysex_received = Signal(list)
     log = Signal(str)
+    # Signals for different MIDI message types
+    sysex_received = Signal(list)
+    note_on_received = Signal(object)
+    note_off_received = Signal(object)
+    control_change_received = Signal(object)
+    other_message_received = Signal(object)
 
     def __init__(self, midi_handler):
         super().__init__()
@@ -16,13 +21,26 @@ class MIDIReceiveWorker(QThread):
         self.running = True
 
     def run(self):
-        while self.running:
-            self.midi_handler.receive_sysex(self.handle_sysex)
-            self.msleep(50)
-
-    def handle_sysex(self, data):
-        self.sysex_received.emit(list(data))
-        self.log.emit(f"Received SysEx: {len(data)} bytes")
+        inport = self.midi_handler.inport
+        if inport is None:
+            self.log.emit("No MIDI input port open.")
+            return
+        try:
+            for msg in inport:
+                if not self.running:
+                    break
+                if msg.type == 'sysex':
+                    self.sysex_received.emit(list(msg.data))
+                elif msg.type == 'note_on':
+                    self.note_on_received.emit(msg)
+                elif msg.type == 'note_off':
+                    self.note_off_received.emit(msg)
+                elif msg.type == 'control_change':
+                    self.control_change_received.emit(msg)
+                else:
+                    self.other_message_received.emit(msg)
+        except Exception as e:
+            self.log.emit(f"MIDI receive error: {e}")
 
     def stop(self):
         self.running = False
@@ -60,9 +78,9 @@ class MidiSendWorker(QThread):
             if self._stop:
                 self.log.emit("MIDI sending stopped by user.")
                 break
-            # Use the global midi_send_worker if available
-            if hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
-                self.midi_outport.midi_send_worker.send(msg)
+            # Use the global MIDIHandler send_sysex if available
+            if hasattr(self.midi_outport, 'send_sysex'):
+                self.midi_outport.send_sysex(msg.bytes())
             else:
                 self.midi_outport.send(msg)
         elapsed = time.time() - start_time
@@ -175,9 +193,9 @@ class MidiMessageSendWorker(QThread):
                 msg = self.msg_queue.get(timeout=0.1)
                 if msg is None:
                     break
-                # Use the global midi_send_worker if available
-                if hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
-                    self.midi_outport.midi_send_worker.send(msg)
+                # Use the global MIDIHandler send_sysex if available
+                if hasattr(self.midi_outport, 'send_sysex'):
+                    self.midi_outport.send_sysex(msg.bytes())
                 else:
                     self.midi_outport.send(msg)
             except queue.Empty:

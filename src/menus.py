@@ -271,12 +271,12 @@ def setup_menus(main_window):
         if dlg.exec():
             values = dlg.get_values()
             # Instead of sending, put the resulting SysEx or MIDI hex string in the MIDI Out text field
-            sysex_hex = main_window.midi_handler.get_command_hex(cmd, values)
+            sysex_hex = QApplication.instance().midi_handler.get_command_hex(cmd, values)
             if sysex_hex:
                 main_window.ui.out_text.setPlainText(sysex_hex)
             # If not a SysEx, fallback to sending as before
             else:
-                main_window.midi_handler.send_custom_midi_command(cmd, values)
+                QApplication.instance().midi_handler.send_custom_midi_command(cmd, values)
 
     def load_midi_commands_from_file(json_path):
         try:

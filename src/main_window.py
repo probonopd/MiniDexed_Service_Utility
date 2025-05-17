@@ -1,5 +1,5 @@
 import os
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QFileDialog
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QFileDialog, QApplication
 from PySide6.QtGui import QAction
 from ui_main_window import UiMainWindow
 from menus import setup_menus
@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("MiniDexed Service Utility")
         self.resize(800, 500)
         self.settings = QSettings("MIDISend", "MIDISendApp")
-        self.midi_handler = MIDIHandler()
+        self.midi_handler = getattr(QApplication.instance(), "midi_handler", None)
         self.ui = UiMainWindow(self)
         self.file_ops = FileOps(self)
         self.midi_ops = MidiOps(self)
@@ -113,25 +113,6 @@ class MainWindow(QMainWindow):
             self.syslog_worker.stop()
             self.syslog_worker.wait()
             self.syslog_worker = None
-        if hasattr(self.midi_handler, 'midi_send_worker') and self.midi_handler.midi_send_worker:
-            self.midi_handler.midi_send_worker.stop()
-            self.midi_handler.midi_send_worker.wait()
-        # Device discovery worker (service_discovery_worker.py)
-        if hasattr(self, 'device_discovery_worker') and self.device_discovery_worker:
-            self.device_discovery_worker.quit()
-            self.device_discovery_worker.wait()
-        # Updater workers (from updater_dialog, updater_worker)
-        if hasattr(self, 'updater_worker') and self.updater_worker:
-            self.updater_worker.quit()
-            self.updater_worker.wait()
-        # File load/save workers (from workers.py)
-        if hasattr(self, 'file_load_worker') and self.file_load_worker:
-            self.file_load_worker.quit()
-            self.file_load_worker.wait()
-        if hasattr(self, 'file_save_worker') and self.file_save_worker:
-            self.file_save_worker.quit()
-            self.file_save_worker.wait()
-        # Any other background workers (add more as needed)
         self.midi_handler.close()
         event.accept()
 

@@ -182,11 +182,8 @@ class VoiceEditor(SingletonDialog):
                 print(f"[VOICE EDITOR] Unsupported parameter number: {param_num}")
                 return
             sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
-            if self.midi_outport and hasattr(self.midi_outport, 'midi_send_worker') and self.midi_outport.midi_send_worker:
-                import mido
-                msg = mido.Message('sysex', data=sysex[1:-1])
-                print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {ch+1})")
-                self.midi_outport.midi_send_worker.send(msg)
+            if self.midi_outport:
+                self.midi_outport.send_sysex(sysex)
         else:
             print("[VOICE EDITOR] No valid parameter or mapping for SysEx.")
 

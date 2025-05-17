@@ -20,6 +20,8 @@ PERFORMANCE_VALUES = [
 ]
 
 class PerformanceEditor(SingletonDialog):
+    _instance = None
+
     def __init__(self, parent=None, main_window=None):
         # If only one argument is passed and it's a MainWindow, treat it as main_window
         from main_window import MainWindow
@@ -269,13 +271,11 @@ class PerformanceEditor(SingletonDialog):
 
                 print(f"Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)} (MIDI channel {tg_index+1})")
                 if self.main_window and hasattr(self.main_window, "midi_handler"):
-                    midi_handler = self.main_window.midi_handler
-                    if hasattr(midi_handler, 'midi_send_worker') and midi_handler.midi_send_worker:
-                        import mido
-                        msg = mido.Message('sysex', data=sysex[1:-1])
-                        midi_handler.midi_send_worker.send(msg)
-                    else:
-                        midi_handler.send_sysex(sysex)
+                    midi_handler = QApplication.instance().midi_handler
+                    import mido
+                    msg = mido.Message('sysex', data=sysex[1:-1])
+                    midi_handler.send_sysex(msg.bytes())
+
                 return
         except Exception as e:
             print(f"Failed to send MIDI for {field} TG{tg_index+1}: {e}", file=sys.stderr)
@@ -331,7 +331,7 @@ class PerformanceEditor(SingletonDialog):
                 Dialogs.show_error(self, "Timeout", "Not all responses to the dump requests were received within 2 seconds.\nThis feature only works with firmware from https://github.com/probonopd/MiniDexed/pull/915")
         QTimer.singleShot(2000, check_timeout)
 
-    def _send_next_sysex_request(self):
+    def _send_next_sysex_request(self, data=None):
         if self._sysex_request_index < len(self._sysex_request_queue):
             msg = self._sysex_request_queue[self._sysex_request_index]
             self._sysex_request_index += 1
@@ -534,6 +534,28 @@ class PerformanceEditor(SingletonDialog):
                     i += 4
         # After all programmatic changes, ensure _block_signal is False
         self._block_signal = False
+
+    @classmethod
+    def show_singleton(cls, parent=None, main_window=None):
+        if cls._instance is not None:
+            # If already exists, bring to front
+            cls._instance.raise_()
+            cls._instance.activateWindow()
+            cls._instance.show()
+            return cls._instance
+        inst = cls(parent=parent, main_window=main_window)
+        cls._instance = inst
+        inst.show()
+        return inst
+
+    @classmethod
+    def get_instance(cls):
+        return cls._instance
+
+    def closeEvent(self, event):
+        type(self)._instance = None
+        super().closeEvent(event)
+
     def open_voice_editor(self, row, col):
         # Get the voice name and MIDI channel for this TG
         midi_channel_row = PERFORMANCE_FIELDS.index("MIDIChannel")

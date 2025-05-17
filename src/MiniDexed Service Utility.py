@@ -9,13 +9,18 @@
 # nuitka-project: --include-data-dir=src/images=images
 # nuitka-project: --prefer-source-code
 
-import sys
 from PySide6.QtWidgets import QApplication
-from main_window import MainWindow
 
 if __name__ == "__main__":
+    import sys
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+
+    from midi_handler import MIDIHandler
+    midi_handler = MIDIHandler()  # or your actual initialization
+    app.midi_handler = midi_handler  # Set as global
+
+    from main_window import MainWindow
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

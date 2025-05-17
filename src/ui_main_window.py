@@ -3,6 +3,7 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem, QAction, QKeySequen
 from PySide6.QtCore import Qt
 import re
 from dialogs import Dialogs
+from PySide6.QtWidgets import QApplication
 
 class UiMainWindow:
     def __init__(self, main_window):
@@ -146,7 +147,7 @@ class UiMainWindow:
     def set_out_port_from_menu(self, port):
         import re
         try:
-            self.main_window.midi_handler.open_output(port)
+            QApplication.instance().midi_handler.open_output(port)
             # Remove trailing numbers from port name for display
             display_port = re.sub(r'\s*\d+$', '', str(port))
             if hasattr(self.main_window, 'show_status'):
@@ -159,7 +160,7 @@ class UiMainWindow:
     def set_in_port_from_menu(self, port):
         import re
         try:
-            self.main_window.midi_handler.open_input(port)
+            QApplication.instance().midi_handler.open_input(port)
             # Remove trailing numbers from port name for display
             display_port = re.sub(r'\s*\d+$', '', str(port))
             if hasattr(self.main_window, 'show_status'):
