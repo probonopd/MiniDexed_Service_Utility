@@ -37,11 +37,6 @@ class WindowsFirewallChecker:
         exe_path = _get_executable_path()
         if verbose:
             print(f"[FirewallChecker] Checking firewall rule for application: {exe_path}")
-        if 'comtypes' not in locals() or comtypes is None:
-            if verbose:
-                print("[FirewallChecker] comtypes not installed, cannot check firewall rules.")
-            print("Please check your Windows Firewall settings manually. Make sure to allow this application through the firewall for all network profiles.")
-            return False, None, [], set(), set(), False
         try:
             comtypes.CoInitialize()
             policy = comtypes.client.CreateObject('HNetCfg.FwPolicy2')
