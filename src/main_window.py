@@ -101,19 +101,36 @@ class MainWindow(QMainWindow):
             self.ui.set_in_port_from_menu(last_in)
 
     def closeEvent(self, event):
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        logging.debug('closeEvent: Stopping MIDI sending')
         self.midi_ops.stop_sending()
-        # Stop and wait for all known worker threads
+        logging.debug('closeEvent: Stopping receive_worker')
         if self.receive_worker:
             self.receive_worker.stop()
             self.receive_worker.wait()
+        logging.debug('closeEvent: Stopping log_worker')
         if hasattr(self, 'log_worker') and self.log_worker:
             self.log_worker.stop()
             self.log_worker.wait()
+        logging.debug('closeEvent: Stopping syslog_worker')
         if hasattr(self, 'syslog_worker') and self.syslog_worker:
             self.syslog_worker.stop()
             self.syslog_worker.wait()
             self.syslog_worker = None
+        logging.debug('closeEvent: Stopping device_discovery_worker')
+        if hasattr(self, 'device_discovery_worker') and self.device_discovery_worker:
+            self.device_discovery_worker.quit()
+            self.device_discovery_worker.wait()
+            self.device_discovery_worker = None
+        logging.debug('closeEvent: Stopping firewall_worker')
+        if hasattr(self, 'firewall_worker') and self.firewall_worker:
+            self.firewall_worker.quit()
+            self.firewall_worker.wait()
+            self.firewall_worker = None
+        logging.debug('closeEvent: Closing midi_handler')
         self.midi_handler.close()
+        logging.debug('closeEvent: Accepting event')
         event.accept()
 
     def start_receiving(self):

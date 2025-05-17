@@ -21,13 +21,17 @@ class MIDIReceiveWorker(QThread):
         self.running = True
 
     def run(self):
+        import logging
+        logging.debug('MIDIReceiveWorker.run: started')
         inport = self.midi_handler.inport
         if inport is None:
             self.log.emit("No MIDI input port open.")
+            logging.debug('MIDIReceiveWorker.run: no inport, exiting')
             return
         try:
             for msg in inport:
                 if not self.running:
+                    logging.debug('MIDIReceiveWorker.run: self.running is False, breaking loop')
                     break
                 if msg.type == 'sysex':
                     self.sysex_received.emit(list(msg.data))
@@ -41,10 +45,31 @@ class MIDIReceiveWorker(QThread):
                     self.other_message_received.emit(msg)
         except Exception as e:
             self.log.emit(f"MIDI receive error: {e}")
+            logging.debug(f'MIDIReceiveWorker.run: exception {e}')
+        logging.debug('MIDIReceiveWorker.run: exiting')
 
     def stop(self):
+        import logging
+        logging.debug('MIDIReceiveWorker.stop: called')
         self.running = False
-        self.wait()
+        # Try to close the MIDI input port to unblock the thread
+        if hasattr(self.midi_handler, 'inport') and self.midi_handler.inport:
+            try:
+                self.midi_handler.inport.close()
+                logging.debug('MIDIReceiveWorker.stop: inport closed')
+            except Exception as e:
+                logging.debug(f'MIDIReceiveWorker.stop: error closing inport: {e}')
+        else:
+            logging.debug('MIDIReceiveWorker.stop: no inport to close')
+        # Wait for thread to finish, but timeout after 2 seconds
+        finished = self.wait(2000)
+        if finished:
+            logging.debug('MIDIReceiveWorker.stop: finished cleanly')
+        else:
+            logging.debug('MIDIReceiveWorker.stop: did not finish, forcing terminate')
+            self.terminate()
+            self.wait()
+            logging.debug('MIDIReceiveWorker.stop: forcibly terminated')
 
 class LogWorker(QThread):
     log = Signal(str)

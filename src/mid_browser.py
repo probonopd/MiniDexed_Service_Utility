@@ -1,3 +1,4 @@
+print("=== mid_browser.py loaded ===")
 import sys
 import os
 import json
@@ -385,7 +386,10 @@ class MidBrowser(QDialog):
                             syx_data = syx_data + [0xF7]
                         msg = mido.Message('sysex', data=syx_data[1:-1])
                         logging.info(f"Sending FF FF format SysEx to MIDI channel {channel}")
-                        QApplication.instance().midi_handler.send_sysex(msg.bytes())
+                        print(f"[DEBUG] About to send SysEx to channel {channel}, syx_data: {syx_data}")
+                        app = QApplication.instance()
+                        midi_handler = getattr(app, "midi_handler", None)
+                        midi_handler.send_sysex(msg.bytes())
 
             dlg = TrackChannelDialog(midi, self)
             if not dlg.exec():
