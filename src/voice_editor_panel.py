@@ -82,7 +82,9 @@ class VoiceEditorPanel(SingletonDialog):
         self.op_count = 6
         self.tg_bg_widgets = []
         self.status_bar = QLabel("")
-        self.status_bar.setMinimumHeight(48)
+        self.status_bar.setFixedHeight(48)
+        self.status_bar.setFixedWidth(220)
+        self.status_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.status_bar.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.status_bar.setWordWrap(False)
         self.status_bar.setStyleSheet("background: transparent; color: #e0e0e0; padding: 4px;")
@@ -128,7 +130,7 @@ class VoiceEditorPanel(SingletonDialog):
         slider.setPageStep(1)
         slider.setValue(value)
         slider.setStyleSheet(f"QSlider::groove:vertical {{background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23272e, stop:1 #2d3640); border: 1px solid #444;}} QSlider::handle:vertical {{background: {color}; border-radius: 2px;}}")
-        slider.setMinimumHeight(30)
+        slider.setMinimumHeight(20)
         slider.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         slider.valueChanged.connect(slot)
         def enterEvent(event, s=slider, d=description, k=param_key):
@@ -167,6 +169,7 @@ class VoiceEditorPanel(SingletonDialog):
         if label:
             col = QVBoxLayout()
             col.setSpacing(0)
+            col.setContentsMargins(0, 0, 0, 0)  # Remove left/right margin in layout
             col.addWidget(slider, alignment=Qt.AlignmentFlag.AlignHCenter)
             lbl = QLabel(label)
             lbl.setStyleSheet("font-size: 8pt; background: transparent;")
@@ -174,6 +177,7 @@ class VoiceEditorPanel(SingletonDialog):
             w = QWidget()
             w.setLayout(col)
             w.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+            w.setContentsMargins(0, 5, 0, 5)  # Remove left/right margin in widget
             def w_enterEvent(event, s=slider):
                 s.enterEvent(event)
             def w_leaveEvent(event, s=slider):
@@ -262,7 +266,8 @@ class VoiceEditorPanel(SingletonDialog):
         topbar_layout.addWidget(self.lcd_number, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         self.status_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_bar.setFixedWidth(0)
+        self.status_bar.setFixedWidth(180)
+        self.status_bar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         topbar_layout.addWidget(self.status_bar, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         topbar_layout.addStretch(3)
@@ -523,7 +528,6 @@ class VoiceEditorPanel(SingletonDialog):
 
     def resizeEvent(self, event: QResizeEvent):
         super().resizeEvent(event)
-        self.status_bar.setFixedWidth(300)
         self.update_svg_overlay(resize_only=True)
 
     def update_all_spacer_widths(self, width=None):
