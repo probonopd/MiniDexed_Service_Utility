@@ -385,3 +385,8 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         from dialogs import Dialogs
                         Dialogs.show_error(self, "FTP Error", f"Failed to upload minidexed.ini: {e}")
+
+    def menu_about(self):
+        from dialogs import AboutDialog
+        dlg = AboutDialog(self)
+        dlg.exec()

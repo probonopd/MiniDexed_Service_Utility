@@ -92,9 +92,6 @@ class FileOps:
         midi.save(path)
         self.main_window.ui.append_log(f"Saved MIDI In as .mid file: {path}")
 
-    def menu_about(self):
-        Dialogs.show_message(self.main_window, "About", "MiniDexed Service Utility\n(c) 2025")
-
     def parse_sysex_text(self, text):
         try:
             parts = text.replace(',', ' ').split()

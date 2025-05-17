@@ -99,3 +99,28 @@ class DeviceSelectDialog(QDialog):
         layout.addWidget(self.buttons)
     def get_selected_ip(self):
         return self.device_combo.currentData() or self.device_combo.currentText()
+
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("About MiniDexed Service Utility")
+        self.setMinimumWidth(500)
+        layout = QVBoxLayout(self)
+        about_text = QTextEdit()
+        about_text.setReadOnly(True)
+        about_text.setHtml(
+            """
+            <p>This application is a utility for interacting with MiniDexed and other MIDI devices.</p>
+            <p><b>Online Services Notice:</b><br>
+            This application accesses the following online services to provide additional content:</p>
+            <ul>
+                <li>DX7 Voices: <a href='https://patches.fm/'>https://patches.fm/</a></li>
+                <li>MIDI Files: <a href='https://chiptune.app/'>https://chiptune.app/</a></li>
+            </ul>
+            <p>These services are not operated by the application authors.</p>
+            """
+        )
+        layout.addWidget(about_text)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(self.accept)
+        layout.addWidget(buttons)

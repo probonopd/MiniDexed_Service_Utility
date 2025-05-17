@@ -315,7 +315,7 @@ def setup_menus(main_window):
     help_menu = menubar.addMenu("Help")
     about_action = QAction("About", main_window)
     help_menu.addAction(about_action)
-    about_action.triggered.connect(lambda: main_window.file_ops.menu_about())
+    about_action.triggered.connect(main_window.menu_about)
 
     # File Menu ordering and grouping
     file_menu.addAction(open_action)
