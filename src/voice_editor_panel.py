@@ -335,10 +335,11 @@ class VoiceEditorPanel(SingletonDialog):
             operator_row_layout.addWidget(env_widget)
             # Connect envelopeChanged to MIDI update
             def make_env_handler(op_idx):
-                def handler(rates, levels):
+                def handler(rates, levels, send=True):
                     for i in range(4):
-                        self.set_op_param(op_idx, f'R{i+1}', int(rates[i]))
-                        self.set_op_param(op_idx, f'L{i+1}', int(levels[i]))
+                        if send:
+                            self.set_op_param(op_idx, f'R{i+1}', int(rates[i]))
+                            self.set_op_param(op_idx, f'L{i+1}', int(levels[i]))
                     # Show value for hovered label if any, else last changed
                     widget = self.op_env_widgets[op_idx]
                     hovered = getattr(widget, '_hovered_label', None)

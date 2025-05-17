@@ -3,7 +3,7 @@ from PySide6.QtGui import QPainter, QPen, QColor, QFont, QMouseEvent
 from PySide6.QtCore import Qt, QRectF, Signal
 
 class EnvelopeWidget(QWidget):
-    envelopeChanged = Signal(list, list)  # Emits (rates, levels) when changed by user
+    envelopeChanged = Signal(list, list, bool)  # Emits (rates, levels, send) when changed by user
     labelHovered = Signal(str)  # Emits param_key when hovering over a label
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -141,6 +141,44 @@ class EnvelopeWidget(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent):
         points, x_points, margin, w, h = self._get_points()
         x, y = event.position().x(), event.position().y()
+        # --- Drag logic ---
+        if self._drag_idx is not None and self._last_mouse_pos is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            idx = self._drag_idx
+            if idx in [1,2,3,5]:
+                if idx == 5:
+                    lidx = 3
+                    # Only vertical for L4
+                    y = max(margin, min(y, margin + h))
+                    level = int(99 * (1 - (y - margin) / h))
+                    level = max(0, min(99, level))
+                    self.levels[lidx] = level
+                else:
+                    lidx = idx - 1
+                    # Vertical drag: level
+                    y = max(margin, min(y, margin + h))
+                    level = int(99 * (1 - (y - margin) / h))
+                    level = max(0, min(99, level))
+                    self.levels[lidx] = level
+                    # Horizontal drag: rate
+                    # Clamp x to widget area
+                    x = max(margin, min(x, margin + w))
+                    # Compute new rate based on x position
+                    # The x_points for L1, L2, L3 are at indices 1,2,3
+                    prev_x = x_points[idx-1]
+                    next_x = x_points[idx+1] if idx+1 < len(x_points) else x_points[idx]
+                    # Prevent division by zero
+                    if next_x != prev_x:
+                        rel = (x - prev_x) / (next_x - prev_x)
+                        rel = max(0.0, min(1.0, rel))
+                        # Map rel to rate (1-99, higher rate = shorter time = closer to prev_x)
+                        rate = int(99 - rel * 98)
+                        rate = max(1, min(99, rate))
+                        self.rates[lidx] = rate
+                self.update()
+                # Change envelopeChanged to emit send=False during drag
+                self.envelopeChanged.emit(self.rates, self.levels, False)
+                self._last_mouse_pos = (x, y)
+                return
         num_levels = 4
         num_rates = 4
         # Calculate label rects for levels (top) and rates (bottom)
@@ -176,6 +214,9 @@ class EnvelopeWidget(QWidget):
         super().leaveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
+        # Only emit envelopeChanged with send=True on release
+        if self._drag_idx is not None:
+            self.envelopeChanged.emit(self.rates, self.levels, True)
         self._drag_idx = None
         self._last_mouse_pos = None
         super().mouseReleaseEvent(event)
@@ -202,7 +243,7 @@ class EnvelopeWidget(QWidget):
                 delta = 1 if event.angleDelta().y() > 0 else -1
                 self.levels[i] = max(0, min(99, self.levels[i] + delta))
                 self.update()
-                self.envelopeChanged.emit(self.rates, self.levels)
+                self.envelopeChanged.emit(self.rates, self.levels, True)
                 return
         # Check if mouse is over a rate label
         for i, rect in enumerate(rate_rects):
@@ -210,7 +251,7 @@ class EnvelopeWidget(QWidget):
                 delta = 1 if event.angleDelta().y() > 0 else -1
                 self.rates[i] = max(1, min(99, self.rates[i] + delta))
                 self.update()
-                self.envelopeChanged.emit(self.rates, self.levels)
+                self.envelopeChanged.emit(self.rates, self.levels, True)
                 return
         # Otherwise, pass event to base class
         super().wheelEvent(event)
@@ -218,8 +259,8 @@ class EnvelopeWidget(QWidget):
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication
     import sys
-    def on_env_changed(rates, levels):
-        print("Rates:", rates, "Levels:", levels)
+    def on_env_changed(rates, levels, send):
+        print("Rates:", rates, "Levels:", levels, "Send:", send)
     app = QApplication(sys.argv)
     w = EnvelopeWidget()
     w.set_envelope([80, 40, 60, 30], [99, 60, 30, 0])
