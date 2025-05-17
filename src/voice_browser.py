@@ -143,7 +143,7 @@ class VoiceBrowser(SingletonDialog):
         self.voices = []
         self.filtered_voices = []
         self.search_box.returnPressed.connect(self.filter_voices)
-        self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
+        self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
         self.list_widget.itemClicked.connect(self.send_voice_on_click)
         self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
         self.search_box.setMinimumWidth(0)
@@ -270,7 +270,8 @@ class VoiceBrowser(SingletonDialog):
                 syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
             elif len(syx_data) == 155:
                 syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
-            editor = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
+            # Use the singleton method to show the editor panel
+            editor = VoiceEditorPanel.show_singleton(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
             editor.setModal(False)
             editor.show()
             editor.raise_()

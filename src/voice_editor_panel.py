@@ -376,8 +376,19 @@ class VoiceEditorPanel(SingletonDialog):
             op_grid.addWidget(tg_bg, row, 0, 1, op_col_count)
 
             # --- Add event handlers for envelope preview on hover ---
-            def make_enter_event(op_idx):
-                def enterEvent(event, self=self, op_idx=op_idx):
+            def make_enter_event(op_idx, is_carrier):
+                def enterEvent(event, self=self, op_idx=op_idx, is_carrier=is_carrier):
+                    op_type = "Carrier" if is_carrier else "Modulator"
+                    print(f"[HOVER] Operator {op_idx+1} ({op_type}) row hovered")
+                    # Only show the name in the status bar
+                    self.update_status_bar(f"Operator {op_idx+1} ({op_type})")
+                    # Show detailed info in the side panel
+                    self.param_info_panel.show_param_info({
+                        f'OP{op_idx+1}': {
+                            'name': f'Operator {op_idx+1} ({op_type})',
+                            'description': f'Controls for operator {op_idx+1}, which is a {op_type.lower()} in the current algorithm.'
+                        }
+                    }, f'OP{op_idx+1}', op_idx, None)
                     self._hovered_op_idx = op_idx
                     self._update_env_widget_for_operator(op_idx)
                     self._update_ks_widget_for_operator(op_idx)
@@ -387,18 +398,22 @@ class VoiceEditorPanel(SingletonDialog):
                     self._hovered_op_idx = None
                     self._reset_env_widget()
                     self._reset_ks_widget()
+                    self.update_status_bar("")
                 return leaveEvent
-            tg_bg.enterEvent = make_enter_event(tg)
+            tg_bg.enterEvent = make_enter_event(tg, is_carrier)
             tg_bg.leaveEvent = make_leave_event()
+
         # Add global row at the bottom
         global_row = self.op_count + 1
         global_bg = QWidget()
         global_bg.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23242a, stop:1 #18191c); border-radius: 2px;")
+        global_bg.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         global_layout = QHBoxLayout(global_bg)
         global_layout.setContentsMargins(0, 0, 0, 0)
         global_layout.setSpacing(0)
         self.global_spacer_item = QWidget()
         self.global_spacer_item.setFixedWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
+        self.global_spacer_item.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         global_layout.addWidget(self.global_spacer_item)
         # Global row
         for i in range(4):
@@ -437,11 +452,13 @@ class VoiceEditorPanel(SingletonDialog):
         perf_row = global_row + 1
         perf_bg = QWidget()
         perf_bg.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23242a, stop:1 #18191c); border-radius: 2px;")
+        perf_bg.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         perf_layout = QHBoxLayout(perf_bg)
         perf_layout.setContentsMargins(0, 0, 0, 0)
         perf_layout.setSpacing(0)
         self.perf_spacer_item = QWidget()
         self.perf_spacer_item.setFixedWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
+        self.perf_spacer_item.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         perf_layout.addWidget(self.perf_spacer_item)
         # TX816 performance parameters
         tx816_params = [
