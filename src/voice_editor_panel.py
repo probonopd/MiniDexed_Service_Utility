@@ -69,7 +69,7 @@ class VoiceEditorPanel(SingletonDialog):
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Voice Editor")
-        self.resize(400, 600)
+        self.resize(800, 400)
         self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #17777a, stop:1 #223c36); border-radius: 2px;"
         self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
         self.gradient_global = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"

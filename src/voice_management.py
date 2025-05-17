@@ -76,9 +76,9 @@ def open_voice_editor(table, main_window, row, col, voice_dump_data):
     midi_outport = getattr(main_window, 'midi_handler', None)
     if midi_outport and hasattr(midi_outport, 'outport'):
         midi_outport = midi_outport.outport
-    from voice_editor import VoiceEditor
-    VoiceEditor.show_singleton(parent=main_window, midi_outport=midi_outport, voice_bytes=voice_bytes)
-    editor = VoiceEditor.get_instance()
+    from voice_editor_panel import VoiceEditorPanel
+    VoiceEditorPanel.show_singleton(parent=main_window, midi_outport=midi_outport, voice_bytes=voice_bytes)
+    editor = VoiceEditorPanel.get_instance()
     if hasattr(editor, 'channel_combo'):
         editor.channel_combo.setCurrentIndex(channel - 1)
 
