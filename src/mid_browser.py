@@ -65,9 +65,6 @@ class MidBrowser(QDialog):
         self.up_button = QPushButton("Clear", self)
         self.up_button.clicked.connect(self.go_up)
         nav_layout.addWidget(self.up_button)
-        self.send_button = QPushButton("Send", self)
-        self.send_button.setEnabled(False)
-        nav_layout.addWidget(self.send_button)
         layout.addLayout(nav_layout)
         self.status_bar = QStatusBar(self)
         layout.addWidget(self.status_bar)
@@ -76,7 +73,6 @@ class MidBrowser(QDialog):
         self.entries = []
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
         self.list_widget.itemSelectionChanged.connect(self.update_buttons)
-        self.send_button.clicked.connect(self.send_selected_mid)
         self.search_box.returnPressed.connect(self._do_search)
         self.load_directory(self.current_path)
         self.filter_bank_checkbox = QCheckBox("Filter out bank/voice changes", self)
@@ -222,7 +218,8 @@ class MidBrowser(QDialog):
         try:
             midi = mido.MidiFile(local_path)
             dlg = TrackChannelDialog(midi, self)
-            if not dlg.exec():
+            if not dlg.exec_():
+                self.set_status("MIDI channel assignment canceled.")
                 return
             assignments = dlg.get_assignments()
             new_midi = mido.MidiFile()
@@ -255,6 +252,26 @@ class MidBrowser(QDialog):
                     for msg in track:
                         new_track.append(msg)
                 new_midi.tracks.append(new_track)
+
+            # Remove any silence from the beginning of the new MIDI file
+            # by checking the first message of each track and then removing that time
+            # on each track (same amount for all tracks)
+            silence_time = min(track[0].time for track in new_midi.tracks if len(track) > 0)
+            for track in new_midi.tracks:
+                if len(track) > 0:
+                    track[0].time -= silence_time
+            # Move all messages forward by the silence time
+            for track in new_midi.tracks:
+                for msg in track:
+                    if hasattr(msg, 'time'):
+                        msg.time += silence_time
+            # Remove any silence from the end of the new MIDI file
+            # by checking the last message of each track and then removing that time
+            # on each track (same amount for all tracks)
+            silence_time = min(track[-1].time for track in new_midi.tracks if len(track) > 0)
+            for track in new_midi.tracks:
+                if len(track) > 0:
+                    track[-1].time -= silence_time
 
             mw = self.main_window
             if mw is None or not hasattr(mw, 'midi_ops') or not hasattr(mw.midi_handler, 'outport') or not mw.midi_handler.outport:

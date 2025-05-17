@@ -132,6 +132,7 @@ class MainWindow(QMainWindow):
         self.midi_handler.close()
         logging.debug('closeEvent: Accepting event')
         event.accept()
+        QApplication.quit()
 
     def start_receiving(self):
         if hasattr(self, 'receive_worker') and self.receive_worker:

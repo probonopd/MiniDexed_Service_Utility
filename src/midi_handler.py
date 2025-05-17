@@ -254,7 +254,9 @@ class MIDIHandler:
         if hasattr(self, '_midi_file_worker') and self._midi_file_worker and self._midi_file_worker.isRunning():
             self._midi_file_worker.stop()
             self._midi_file_worker.wait()
-        # Improved logging: show filename if available, else a description
+        # Send "All Notes Off" to all channels
+        for ch in range(16):
+            self.send_cc(ch, 123, 0)
         filename = getattr(midi_file, 'filename', None)
         if filename:
             desc = filename
