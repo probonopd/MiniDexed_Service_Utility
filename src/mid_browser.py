@@ -266,23 +266,25 @@ class MidBrowser(QDialog):
                                     syx_data, error = gm_voice_results.get(dx7_name, (None, None))
                                     if error or not syx_data:
                                         self.set_status(f"Failed to get SysEx for '{dx7_name}'", error=True)
-                                    else:
-                                        if len(syx_data) > 3:
-                                            syx_data[2] = 0x10 | (channel & 0x0F)
-                                        if syx_data[0] != 0xF0:
-                                            syx_data = [0xF0] + syx_data
-                                        if syx_data[-1] != 0xF7:
-                                            syx_data = syx_data + [0xF7]
-                                        msg_sysex = mido.Message('sysex', data=syx_data[1:-1])
-                                        mw = self.main_window
-                                        if mw and hasattr(mw, 'midi_handler') and mw.midi_handler.outport:
-                                            mw.midi_handler.send_sysex(msg_sysex.bytes())
-                                    continue  # Do not add the original program_change
+                                        continue  # Skip this program change
+                                    # Patch channel in sysex and REPLACE the program change with the SysEx
+                                    sysex = list(syx_data)
+                                    if len(sysex) > 3:
+                                        sysex[2] = 0x10 | (channel & 0x0F)
+                                    if sysex[0] != 0xF0:
+                                        sysex = [0xF0] + sysex
+                                    if sysex[-1] != 0xF7:
+                                        sysex = sysex + [0xF7]
+                                    # Insert SysEx at the same time as the program change, REPLACING it
+                                    msg_sysex = mido.Message('sysex', data=sysex[1:-1], time=msg.time)
+                                    new_track.append(msg_sysex)
+                                    continue  # Do NOT add the original program_change, only the SysEx
                             if filter_bank:
                                 if msg.type == "program_change":
                                     continue
                                 if msg.type == "control_change" and hasattr(msg, 'control') and msg.control in (0, 32):
                                     continue
+                            # Copy all other messages, updating channel if appropriate
                             if hasattr(msg, 'channel'):
                                 msg_out = msg.copy(channel=channel)
                             else:
