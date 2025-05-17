@@ -286,7 +286,8 @@ class VoiceEditorPanel(SingletonDialog):
         self.operator_spacer_items = []
         self.op_env_widgets = []  # Store per-operator EnvelopeWidget
         self.op_ks_widgets = []   # Store per-operator KeyboardScalingWidget
-        for row, tg in enumerate(range(self.op_count), start=1):
+        # Use reversed order so OP6 is top row, OP1 is bottom row
+        for row, tg in enumerate(reversed(range(self.op_count)), start=1):
             is_carrier = tg in self.get_carrier_ops(self.get_param('ALS', 0))
             op_bg = QWidget()
             op_bg.setStyleSheet(self.gradient_carrier if is_carrier else self.gradient_noncarrier)
@@ -668,7 +669,8 @@ class VoiceEditorPanel(SingletonDialog):
     def update_operator_bg_colors(self):
         alg_idx = self.alg_combo.currentIndex()
         carrier_ops = self.get_carrier_ops(alg_idx)
-        for op_idx, op_bg in enumerate(self.op_bg_widgets):
+        for widget_idx, op_bg in enumerate(self.op_bg_widgets):
+            op_idx = self.op_count - 1 - widget_idx  # Map widget row to operator index
             if op_idx in carrier_ops:
                 op_bg.setStyleSheet(self.gradient_carrier)
             else:
