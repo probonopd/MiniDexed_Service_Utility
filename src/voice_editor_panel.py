@@ -191,8 +191,7 @@ class VoiceEditorPanel(SingletonDialog):
         line.setStyleSheet("background: none; border: none; border-left: 2px solid #777;")
         line.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         line.setMinimumHeight(40)
-        line.setMinimumWidth(1)
-        line.setMaximumWidth(1)
+        line.setFixedWidth(1)
         return line
 
     def init_ui(self):
@@ -318,7 +317,7 @@ class VoiceEditorPanel(SingletonDialog):
             operator_row_layout.setContentsMargins(0, 0, 0, 0)
             operator_row_layout.setSpacing(0)
             spacer_item = QWidget()
-            spacer_item.setMinimumWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
+            spacer_item.setFixedWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
             self.operator_spacer_items.append(spacer_item)
             operator_row_layout.addWidget(spacer_item)
             # Add E (Enable) slider
@@ -394,12 +393,12 @@ class VoiceEditorPanel(SingletonDialog):
         # Add global row at the bottom
         global_row = self.op_count + 1
         global_bg = QWidget()
-        global_bg.setStyleSheet(self.gradient_global)
+        global_bg.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23242a, stop:1 #18191c); border-radius: 2px;")
         global_layout = QHBoxLayout(global_bg)
         global_layout.setContentsMargins(0, 0, 0, 0)
         global_layout.setSpacing(0)
         self.global_spacer_item = QWidget()
-        self.global_spacer_item.setMinimumWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
+        self.global_spacer_item.setFixedWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
         global_layout.addWidget(self.global_spacer_item)
         # Global row
         for i in range(4):
@@ -437,10 +436,14 @@ class VoiceEditorPanel(SingletonDialog):
         # --- TX816/TX216 Performance SysEx row ---
         perf_row = global_row + 1
         perf_bg = QWidget()
-        perf_bg.setStyleSheet(self.gradient_global)
+        perf_bg.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23242a, stop:1 #18191c); border-radius: 2px;")
         perf_layout = QHBoxLayout(perf_bg)
         perf_layout.setContentsMargins(0, 0, 0, 0)
         perf_layout.setSpacing(0)
+        self.perf_spacer_item = QWidget()
+        self.perf_spacer_item.setFixedWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
+        perf_layout.addWidget(self.perf_spacer_item)
+        # TX816 performance parameters
         tx816_params = [
             (k, k, p['min'], p['max'], p.get('description', k), p['parameter_number'])
             for k, p in self._tx816perf_param_info.items()
@@ -506,6 +509,16 @@ class VoiceEditorPanel(SingletonDialog):
         self.status_bar.setFixedWidth(300)
         self.update_svg_overlay(resize_only=True)
 
+    def update_all_spacer_widths(self, width=None):
+        if width is None:
+            width = self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50
+        for spacer in getattr(self, 'operator_spacer_items', []):
+            spacer.setFixedWidth(width)
+        if hasattr(self, 'global_spacer_item'):
+            self.global_spacer_item.setFixedWidth(width)
+        if hasattr(self, 'perf_spacer_item'):
+            self.perf_spacer_item.setFixedWidth(width)
+
     def update_svg_overlay(self, resize_only=False):
         alg_idx = self.alg_combo.currentIndex() + 1  # 1-based
         if not resize_only:
@@ -533,10 +546,7 @@ class VoiceEditorPanel(SingletonDialog):
         self.svg_overlay.setVisible(True)
         self.svg_overlay.raise_()
         self.svg_overlay.move(2, 7)
-        for spacer in getattr(self, 'operator_spacer_items', []):
-            spacer.setMinimumWidth(self.svg_overlay.width())
-        if hasattr(self, 'global_spacer_item'):
-            self.global_spacer_item.setMinimumWidth(self.svg_overlay.width())
+        self.update_all_spacer_widths(self.svg_overlay.width())
 
     def update_operator_bg_colors(self):
         alg_idx = self.alg_combo.currentIndex()
