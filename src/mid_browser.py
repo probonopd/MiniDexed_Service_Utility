@@ -1,21 +1,19 @@
-print("=== mid_browser.py loaded ===")
 import sys
 import os
-import json
 import hashlib
 import requests
 import mido
-import difflib
 import logging
+logging.basicConfig(level=logging.DEBUG)
 from PySide6.QtCore import QThread, Signal, Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QListWidget, QHBoxLayout, QPushButton, QLabel, QStatusBar, QListWidgetItem, QLineEdit,
-    QDialogButtonBox, QComboBox, QSpinBox, QFormLayout, QCheckBox, QApplication
+    QCheckBox, QApplication
 )
 from PySide6.QtGui import QIcon
 from dialogs import Dialogs
-from mido import Message
-from voice_browser import get_cache_dir, VOICE_LIST_CACHE_NAME, VoiceDownloadWorker
+
+from track_channel_dialog import TrackChannelDialog
 
 MIDBROWSER_API_URL = "https://gifx.co/chip/browse?path="
 MIDBROWSER_CACHE_NAME = "midbrowser_cache.json"
@@ -93,8 +91,7 @@ class MidBrowser(QDialog):
             print(msg)
 
     def load_directory(self, path):
-        import logging
-        logging.debug(f"load_directory called with path={path}")
+        logging.info(f"load_directory called with path={path}")
         self.list_widget.clear()
         self.entries = []
         self.breadcrumb_label.setText(f"Path: {path}")
@@ -126,19 +123,17 @@ class MidBrowser(QDialog):
             self.load_search_results(text)
 
     def load_search_results(self, query):
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
         self.set_status(f"Searching for '{query}' ...")
         self.list_widget.clear()
         self.entries = []
         self.breadcrumb_label.setText(f"Search: {query}")
         try:
             url = f"https://gifx.co/chip/search?query={requests.utils.quote(query)}&limit=100"
-            logging.debug(f"Search URL: {url}")
+            logging.info(f"Search URL: {url}")
             resp = requests.get(url)
             resp.raise_for_status()
             entries = resp.json()
-            logging.debug(f"Raw search response: {entries}")
+            logging.info(f"Raw search response: {entries}")
             if isinstance(entries, dict):
                 if 'items' in entries:
                     items = entries['items']
@@ -154,12 +149,12 @@ class MidBrowser(QDialog):
                 logging.error(f"Entries is not a list: {entries}")
                 raise Exception('Unexpected search result format')
             entries = [e for e in entries if e.get('type') == 'directory' or e['path'].lower().endswith('.mid') or e['path'].lower().endswith('.midi')]
-            logging.debug(f"Filtered entries: {entries}")
+            logging.info(f"Filtered entries: {entries}")
             entries.sort(key=lambda e: (e.get('type') != 'directory', not (e['path'].lower().endswith('.mid') or e['path'].lower().endswith('.midi')), e['path'].lower()))
             self.entries = entries
             for entry in entries:
                 name = os.path.basename(entry['path'])
-                logging.debug(f"Adding entry to list: {entry}")
+                logging.info(f"Adding entry to list: {entry}")
                 if entry.get('type') == 'directory':
                     item = QListWidgetItem(QIcon.fromTheme('folder'), name)
                 elif name.lower().endswith('.mid') or name.lower().endswith('.midi'):
@@ -226,171 +221,6 @@ class MidBrowser(QDialog):
         self.set_status(f"Downloaded {file_name} to {local_path}")
         try:
             midi = mido.MidiFile(local_path)
-            class TrackChannelDialog(QDialog):
-                _instance = None
-                def __new__(cls, *args, **kwargs):
-                    if cls._instance is not None and cls._instance.isVisible():
-                        cls._instance.raise_()
-                        cls._instance.activateWindow()
-                        return cls._instance
-                    instance = super().__new__(cls)
-                    cls._instance = instance
-                    return instance
-                def closeEvent(self, event):
-                    type(self)._instance = None
-                    super().closeEvent(event)
-                def __init__(self, midi, parent=None):
-                    if hasattr(self, '_initialized') and self._initialized:
-                        return
-                    self._initialized = True
-                    super().__init__(parent)
-                    self.setWindowTitle("Assign Tracks to MIDI Channels")
-                    self.setModal(False)
-                    layout = QVBoxLayout(self)
-                    form = QFormLayout()
-                    self.channel_boxes = []
-                    self.suggestion_labels = []
-                    # Load voices from patch_list.json (cached by VoiceBrowser)
-                    voices = []
-                    try:
-                        from voice_browser import get_cache_dir, VOICE_LIST_CACHE_NAME
-                        cache_path = os.path.join(get_cache_dir(), VOICE_LIST_CACHE_NAME)
-                        if os.path.exists(cache_path):
-                            with open(cache_path, 'r', encoding='utf-8') as f:
-                                voices = json.load(f)
-                    except Exception as e:
-                        voices = []
-                    def suggest_voice(track_name):
-                        if not track_name:
-                            return None
-                        tn = track_name.lower().strip()
-                        # Exact match
-                        for v in voices:
-                            if v.get('name','').lower().strip() == tn:
-                                return v['name']
-                        # Fuzzy: best match by similarity
-                        voice_names = [v.get('name','') for v in voices]
-                        matches = difflib.get_close_matches(track_name, voice_names, n=1, cutoff=0.6)
-                        if matches:
-                            return matches[0]
-                        # Fuzzy: contains
-                        for v in voices:
-                            if tn and tn in v.get('name','').lower():
-                                return v['name']
-                        return None
-                    # Filter tracks: only include those with at least one note_on
-                    filtered_tracks = []
-                    filtered_track_indices = []
-                    for i, track in enumerate(midi.tracks):
-                        has_note_on = any(getattr(msg, 'type', None) == 'note_on' and getattr(msg, 'velocity', 0) > 0 for msg in track)
-                        if has_note_on:
-                            filtered_tracks.append((i, track))
-                            filtered_track_indices.append(i)
-                    for idx, (i, track) in enumerate(filtered_tracks):
-                        label = f"Track {i}: {track.name if hasattr(track, 'name') and track.name else ''}".strip()
-                        combo = QComboBox()
-                        combo.addItems([str(ch+1) for ch in range(16)] + ["None"])
-                        combo.setCurrentIndex(idx if idx < 16 else 15)
-                        self.channel_boxes.append(combo)
-                        # Suggestion label
-                        suggestion = suggest_voice(getattr(track, 'name', ''))
-                        suggestion_lbl = QLabel(f"Suggested: {suggestion}" if suggestion else "")
-                        self.suggestion_labels.append(suggestion_lbl)
-                        row_layout = QHBoxLayout()
-                        row_layout.addWidget(combo)
-                        row_layout.addWidget(suggestion_lbl)
-                        form.addRow(label, row_layout)
-                    layout.addLayout(form)
-                    btn_layout = QHBoxLayout()
-                    self.auto_btn = QPushButton("Send Voices")
-                    self.auto_btn.clicked.connect(self.auto_assign)
-                    btn_layout.addWidget(self.auto_btn)
-                    self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-                    btn_layout.addWidget(self.buttons)
-                    layout.addLayout(btn_layout)
-                    self.buttons.accepted.connect(self.accept)
-                    self.buttons.rejected.connect(self.reject)
-                    self.setLayout(layout)
-                    self.voices = voices
-                    self.midi = midi
-                    self.filtered_track_indices = filtered_track_indices
-                    self.suggestions = [suggest_voice(getattr(midi.tracks[i], 'name', '')) for i in filtered_track_indices]
-                    # After creating self.suggestions and self.channel_boxes, assign same channel to same voice
-                    voice_to_channel = {}
-                    used_channels = set()
-                    for sugg in self.suggestions:
-                        if not sugg:
-                            continue
-                        if sugg not in voice_to_channel:
-                            for ch in range(16):
-                                if ch not in used_channels:
-                                    voice_to_channel[sugg] = ch
-                                    used_channels.add(ch)
-                                    break
-                    for idx, sugg in enumerate(self.suggestions):
-                        if sugg and sugg in voice_to_channel:
-                            self.channel_boxes[idx].setCurrentIndex(voice_to_channel[sugg])
-                def get_assignments(self):
-                    return [box.currentIndex()+1 for box in self.channel_boxes]
-                def auto_assign(self):
-                    # Use global midi_handler from QApplication
-                    app = QApplication.instance()
-                    midi_handler = getattr(app, "midi_handler", None)
-                    # Assign the same MIDI channel to all tracks with the same suggested voice
-                    voice_to_channel = {}
-                    used_channels = set()
-                    for sugg in self.suggestions:
-                        if not sugg:
-                            continue
-                        if sugg not in voice_to_channel:
-                            for ch in range(16):
-                                if ch not in used_channels:
-                                    voice_to_channel[sugg] = ch
-                                    used_channels.add(ch)
-                                    break
-                    for idx, sugg in enumerate(self.suggestions):
-                        if sugg and sugg in voice_to_channel:
-                            self.channel_boxes[idx].setCurrentIndex(voice_to_channel[sugg])
-                    # Send channel assignment SysEx
-                    for idx, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
-                        if not sugg:
-                            continue
-                        channel = box.currentIndex() + 1
-                        if channel <= 0 or channel > 16:
-                            continue
-                        sysex = [0xF0, 0x7D, 0x21, channel, 0x00, 0x02, 0x00, channel-1, 0xF7]
-                        msg = mido.Message('sysex', data=sysex[1:-1])
-
-                        logging.info(f"Setting TG{channel-1} to MIDI channel {channel}")
-                        QApplication.instance().midi_handler.send_sysex(msg.bytes())
-                    # Send voice SysEx for each channel/voice assignment
-                    for idx, (sugg, box) in enumerate(zip(self.suggestions, self.channel_boxes)):
-                        if not sugg:
-                            continue
-                        channel = box.currentIndex() + 1
-                        if channel <= 0 or channel > 16:
-                            continue
-                        voice_obj = next((v for v in self.voices if v.get('name') == sugg and v.get('syx')), None)
-                        if not voice_obj:
-                            continue
-                        syx_data = voice_obj['syx']
-                        if isinstance(syx_data, str):
-                            syx_data = [int(x, 16) for x in syx_data.split() if x.strip()]
-                        elif isinstance(syx_data, bytes):
-                            syx_data = list(syx_data)
-                        if len(syx_data) > 3:
-                            syx_data[2] = 0x10 | ((channel-1) & 0x0F)
-                        if syx_data[0] != 0xF0:
-                            syx_data = [0xF0] + syx_data
-                        if syx_data[-1] != 0xF7:
-                            syx_data = syx_data + [0xF7]
-                        msg = mido.Message('sysex', data=syx_data[1:-1])
-                        logging.info(f"Sending FF FF format SysEx to MIDI channel {channel}")
-                        print(f"[DEBUG] About to send SysEx to channel {channel}, syx_data: {syx_data}")
-                        app = QApplication.instance()
-                        midi_handler = getattr(app, "midi_handler", None)
-                        midi_handler.send_sysex(msg.bytes())
-
             dlg = TrackChannelDialog(midi, self)
             if not dlg.exec():
                 return

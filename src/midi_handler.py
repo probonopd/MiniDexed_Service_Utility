@@ -49,13 +49,17 @@ class MIDIHandler:
 
     def send_sysex(self, data):
         print("[MIDI LOG] send_sysex called")
+        # Remove 0xF0 and 0xF7 if present
+        if data and data[0] == 0xF0:
+            data = data[1:]
+        if data and data[-1] == 0xF7:
+            data = data[:-1]
+        # Check for out-of-range bytes
+        if any((b < 0 or b > 127) for b in data):
+            print(f"[MIDI LOG] Skipping SysEx: bytes out of range 0..127: {' '.join(f'{b:02X}' for b in data)}")
+            return
         if self.outport and self._midi_send_worker:
             print(f"[MIDI LOG] Sending SysEx: {' '.join(f'{b:02X}' for b in data)}")
-            # Remove 0xF0 and 0xF7 if present
-            if data and data[0] == 0xF0:
-                data = data[1:]
-            if data and data[-1] == 0xF7:
-                data = data[:-1]
             msg = Message('sysex', data=data)
             self._midi_send_worker.send(msg)
 

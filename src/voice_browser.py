@@ -136,8 +136,6 @@ class VoiceBrowser(SingletonDialog):
         self.edit_panel_button.setToolTip("Send and edit this voice (Panel UI)")
         self.edit_panel_button.clicked.connect(self.edit_selected_voice_panel)
         controls_layout.addWidget(self.edit_panel_button)
-        self.send_button = QPushButton("Send", self)
-        controls_layout.addWidget(self.send_button)
         layout.addLayout(controls_layout)
         self.status_bar = QStatusBar(self)
         self.status_bar.setStyleSheet("QStatusBar { margin: 0; padding: 0; border: none; }")
@@ -145,7 +143,6 @@ class VoiceBrowser(SingletonDialog):
         self.voices = []
         self.filtered_voices = []
         self.search_box.returnPressed.connect(self.filter_voices)
-        self.send_button.clicked.connect(self.send_voice)
         self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
         self.list_widget.itemClicked.connect(self.send_voice_on_click)
         self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
@@ -158,7 +155,6 @@ class VoiceBrowser(SingletonDialog):
         self.send_queue = []
         self.edit_button.setEnabled(False)
         self.edit_panel_button.setEnabled(False)
-        self.send_button.setEnabled(False)
         self.list_widget.itemSelectionChanged.connect(self._update_action_buttons)
         self._active_workers = []  # Keep references to active workers
 
@@ -218,26 +214,38 @@ class VoiceBrowser(SingletonDialog):
         if idx < 0 or idx >= len(self.filtered_voices):
             self.set_status("No voice selected.", error=True)
             return
-        # Always create a new worker for each request
         voice = self.filtered_voices[idx]
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        self.download_worker = VoiceDownloadWorker(url, voice["name"])
         def after_download(syx_data, voice_name, error):
-            if error:
+            if error or not syx_data:
+                self.set_status(f"Failed to get SysEx data for '{voice.get('name','')}'.", error=True)
+                if worker in self._active_workers:
+                    self._active_workers.remove(worker)
                 return
             midi_handler = getattr(self.main_window, 'midi_handler', None)
             if midi_handler:
+                import mido
+                channel_idx = self.channel_combo.currentIndex()
+                if len(syx_data) > 3:
+                    syx_data[2] = 0x10 | (channel_idx & 0x0F)
+                if syx_data[0] != 0xF0:
+                    syx_data = [0xF0] + syx_data
+                if syx_data[-1] != 0xF7:
+                    syx_data = syx_data + [0xF7]
+                msg = mido.Message('sysex', data=syx_data[1:-1])
                 midi_handler.send_sysex(msg.bytes())
-                self.set_status(f"Sent '{voice_name}' to MIDI Out.")
+                self.set_status(f"Sent '{voice.get('name','')}' to MIDI Out on channel {channel_idx+1}.")
             from voice_editor import VoiceEditor
             editor = VoiceEditor(parent=self, midi_outport=midi_handler, voice_bytes=syx_data)
             editor.setModal(False)
             editor.show()
             editor.raise_()
             editor.activateWindow()
-            return
-        self.download_worker.finished.connect(after_download)
-        self.download_worker.start()
+            if worker in self._active_workers:
+                self._active_workers.remove(worker)
+        worker = VoiceBrowser.get_syx_data_for_voice_async(voice, after_download)
+        if not hasattr(self, '_active_workers'):
+            self._active_workers = []
+        self._active_workers.append(worker)
 
     def edit_selected_voice_panel(self):
         idx = self.list_widget.currentRow()
@@ -245,11 +253,11 @@ class VoiceBrowser(SingletonDialog):
             self.set_status("No voice selected.", error=True)
             return
         voice = self.filtered_voices[idx]
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        self.download_worker = VoiceDownloadWorker(url, voice["name"])
         def after_download(syx_data, voice_name, error):
-            if error:
+            if error or not syx_data:
                 self.set_status(f"Failed to download voice: {error}", error=True)
+                if worker in self._active_workers:
+                    self._active_workers.remove(worker)
                 return
             midi_outport = getattr(self.main_window, 'midi_handler', None)
             from voice_editor_panel import VoiceEditorPanel
@@ -270,127 +278,74 @@ class VoiceBrowser(SingletonDialog):
             if hasattr(editor, 'channel_combo') and hasattr(self, 'channel_combo'):
                 idx_ch = self.channel_combo.currentIndex()
                 editor.channel_combo.setCurrentIndex(idx_ch)
-        self.download_worker.finished.connect(after_download)
-        self.download_worker.start()
+            if worker in self._active_workers:
+                self._active_workers.remove(worker)
+        worker = VoiceBrowser.get_syx_data_for_voice_async(voice, after_download)
+        if not hasattr(self, '_active_workers'):
+            self._active_workers = []
+        self._active_workers.append(worker)
 
     def send_voice_on_click(self, item):
         idx = self.list_widget.currentRow()
         if idx < 0 or idx >= len(self.filtered_voices):
             self.set_status("No voice selected.", error=True)
             return
-        # Always send to the channel selected in the channel_combo (UI is 1-indexed, MIDI is 0-indexed)
         channel_idx = self.channel_combo.currentIndex()  # 0-based
         if channel_idx >= 16:  # 'Omni' selected
             self.set_status("Cannot send to 'Omni' channel. Please select a specific MIDI channel.", error=True)
             return
         voice = self.filtered_voices[idx]
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        self.download_worker = VoiceDownloadWorker(url, voice["name"])
         def after_download(syx_data, voice_name, error):
-            if error:
-                self.set_status(f"Failed to download voice: {error}", error=True)
+            if error or not syx_data:
+                self.set_status(f"Failed to get SysEx data for '{voice.get('name','')}'.", error=True)
+                if worker in self._active_workers:
+                    self._active_workers.remove(worker)
                 return
-            midi_outport = getattr(self.main_window, 'midi_handler', None)
-            if midi_outport and hasattr(midi_outport, 'outport'):
-                midi_outport = midi_outport.outport
-            if midi_outport:
-                import mido
-                # Patch the channel byte in the SysEx (3rd byte, index 2)
-                if isinstance(syx_data, list):
-                    syx_data = bytes(syx_data)
-                if syx_data[0] == 0xF0:
-                    sysex = list(syx_data)
-                else:
-                    sysex = [0xF0] + list(syx_data)
-                if sysex[-1] != 0xF7:
-                    sysex.append(0xF7)
-                if len(sysex) > 3:
-                    sysex[2] = 0x10 | (channel_idx & 0x0F)  # 0x10 is DX7 base, channel is 0-indexed
-                msg = mido.Message('sysex', data=sysex[1:-1])
-                mw = self.main_window
-                mw.midi_handler.send_sysex(msg.bytes())
-                self.set_status(f"Sent '{voice_name}' to MIDI Out on channel {channel_idx+1}.")
-        self.download_worker.finished.connect(after_download)
-        self.download_worker.start()
-
-    def open_voice_in_editor_on_double_click(self, item):
-        idx = self.list_widget.currentRow()
-        if idx < 0 or idx >= len(self.filtered_voices):
-            self.set_status("No voice selected.", error=True)
-            return
-        self.download_and_open_voice_in_editor(idx)
+            import mido
+            if len(syx_data) > 3:
+                syx_data[2] = 0x10 | (channel_idx & 0x0F)
+            if syx_data[0] != 0xF0:
+                syx_data = [0xF0] + syx_data
+            if syx_data[-1] != 0xF7:
+                syx_data = syx_data + [0xF7]
+            data_bytes = syx_data[1:-1]
+            if any(b < 0 or b > 127 for b in data_bytes):
+                self.set_status(f"Skipping SysEx for '{voice.get('name','')}' on channel {channel_idx+1}: bytes out of range 0..127: {data_bytes}", error=True)
+                if worker in self._active_workers:
+                    self._active_workers.remove(worker)
+                return
+            msg = mido.Message('sysex', data=data_bytes)
+            mw = self.main_window
+            mw.midi_handler.send_sysex(msg.bytes())
+            self.set_status(f"Sent '{voice.get('name','')}' to MIDI Out on channel {channel_idx+1}.")
+            if worker in self._active_workers:
+                self._active_workers.remove(worker)
+        worker = VoiceBrowser.get_syx_data_for_voice_async(voice, after_download)
+        if not hasattr(self, '_active_workers'):
+            self._active_workers = []
+        self._active_workers.append(worker)
 
     def download_and_send_voice(self, idx):
         voice = self.filtered_voices[idx]
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        self.download_worker = VoiceDownloadWorker(url, voice["name"])
-        def after_download(syx_data, voice_name, error):
-            if error:
-                self.set_status(f"Failed to download voice: {error}", error=True)
-                return
-            midi_outport = getattr(self.main_window, 'midi_handler', None)
-            if midi_outport and hasattr(midi_outport, 'outport'):
-                midi_outport = midi_outport.outport
-            if midi_outport:
-                import mido
-                msg = mido.Message('sysex', data=syx_data[1:-1] if syx_data[0] == 0xF0 and syx_data[-1] == 0xF7 else syx_data)
-                mw = self.main_window
-                mw.midi_handler.send_sysex(msg.bytes())
-                self.set_status(f"Sent '{voice_name}' to MIDI Out.")
-        self.download_worker.finished.connect(after_download)
-        self.download_worker.start()
-
-    def download_and_open_voice_in_editor(self, idx):
-        voice = self.filtered_voices[idx]
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        worker = VoiceDownloadWorker(url, voice["name"])
-        self._active_workers.append(worker)  # Keep a reference
-        def after_download(syx_data, voice_name, error):
-            if error:
-                self.set_status(f"Failed to download voice: {error}", error=True)
-                self._active_workers.remove(worker)
-                return
-            midi_outport = getattr(self.main_window, 'midi_handler', None)
-            from voice_editor import VoiceEditor
-            # --- Ensure valid 161-byte SysEx for the editor ---
-            if isinstance(syx_data, list):
-                syx_data = bytes(syx_data)
-            # Add header/footer if needed
-            if len(syx_data) == 159:
-                syx_data = b'\xF0' + syx_data + b'\xF7'
-            elif len(syx_data) == 161 and syx_data[0] != 0xF0:
-                syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
-            elif len(syx_data) == 155:
-                syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
-            # ---
-            # editor = VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=syx_data)
-            editor = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
-            editor.setModal(False)
-            editor.show()
-            editor.raise_()
-            editor.activateWindow()
-            if hasattr(editor, 'channel_combo') and hasattr(self, 'channel_combo'):
-                idx_ch = self.channel_combo.currentIndex()
-                editor.channel_combo.setCurrentIndex(idx_ch)
-            self._active_workers.remove(worker)
-        worker.finished.connect(after_download)
-        worker.start()
-
-    def download_voice(self, idx):
-        if self.sending:
-            # Queue the request if one is running
-            self.send_queue.append(idx)
+        syx_data = VoiceBrowser.get_syx_data_for_voice(voice)
+        if not syx_data:
+            self.set_status(f"Failed to get SysEx data for '{voice.get('name','')}'.", error=True)
             return
-        self.sending = True
-        self.send_button.setEnabled(False)
-        voice = self.filtered_voices[idx]
-        channel_text = self.channel_combo.currentText()
-        url = f"https://patches.fm/patches/single-voice/dx7/{voice['signature'][:2]}/{voice['signature']}.syx"
-        self.set_status("Downloading voice...")
-        # Always create a new worker for each request
-        self.download_worker = VoiceDownloadWorker(url, voice["name"])
-        self.download_worker.finished.connect(lambda syx_data, voice_name, error: self._on_voice_downloaded_wrapper(syx_data, voice, channel_text, error))
-        self.download_worker.start()
+        channel_idx = self.channel_combo.currentIndex()  # 0-based
+        import mido
+        if len(syx_data) > 3:
+            syx_data[2] = 0x10 | (channel_idx & 0x0F)
+        if syx_data[0] != 0xF0:
+            syx_data = [0xF0] + syx_data
+        if syx_data[-1] != 0xF7:
+            syx_data = syx_data + [0xF7]
+        msg = mido.Message('sysex', data=syx_data[1:-1])
+        mw = self.main_window
+        mw.midi_handler.send_sysex(msg.bytes())
+        self.set_status(f"Sent '{voice.get('name','')}' to MIDI Out on channel {channel_idx+1}.")
+
+    def open_voice_in_editor_on_double_click(self, item):
+        self.edit_selected_voice_panel()
 
     def _on_voice_downloaded_wrapper(self, syx_data, voice, channel_text, error):
         self.sending = False
@@ -400,15 +355,7 @@ class VoiceBrowser(SingletonDialog):
             next_idx = self.send_queue.pop(0)
             self.download_voice(next_idx)
 
-    def send_voice(self):
-        idx = self.list_widget.currentRow()
-        if idx < 0 or idx >= len(self.filtered_voices):
-            self.set_status("No voice selected.", error=True)
-            return
-        self.download_voice(idx)
-
     def on_voice_downloaded(self, syx_data, voice, channel_text, error):
-        self.send_button.setEnabled(True)
         if error:
             from dialogs import Dialogs
             Dialogs.show_error(self, "Voice Browser Error", f"Failed to download syx: {error}")
@@ -499,6 +446,25 @@ class VoiceBrowser(SingletonDialog):
             bank = bank.removesuffix('.syx').removesuffix('.SXY').removesuffix('.SYX').removesuffix('.sxy')
         self.bank_label.setText(f"Source: Bank {bank} by {author}")
 
+    @staticmethod
+    def get_syx_data_for_voice_async(voice_obj, callback):
+        """
+        Asynchronously retrieves SysEx data for a given voice object using a worker.
+        Calls callback(syx_data, voice_name, error) when done.
+        """
+        sig = voice_obj.get('signature')
+        name = voice_obj.get('name', '(unknown)')
+        if not sig:
+            import logging
+            logging.warning(f"No signature for voice '{name}', cannot fetch syx.")
+            callback(None, name, Exception("No signature for voice"))
+            return None
+        url = f"https://patches.fm/patches/single-voice/dx7/{sig[:2]}/{sig}.syx"
+        worker = VoiceDownloadWorker(url, name)
+        worker.finished.connect(callback)
+        worker.start()
+        return worker
+
     def showEvent(self, event):
         VoiceBrowser._instance = self
         super().showEvent(event)
@@ -530,7 +496,6 @@ class VoiceBrowser(SingletonDialog):
         has_selection = self.list_widget.currentRow() >= 0
         self.edit_button.setEnabled(has_selection)
         self.edit_panel_button.setEnabled(has_selection)
-        self.send_button.setEnabled(has_selection)
 
     def get_main_window(self):
         parent = self.parent()
