@@ -143,7 +143,7 @@ class VoiceBrowser(SingletonDialog):
         self.voices = []
         self.filtered_voices = []
         self.search_box.returnPressed.connect(self.filter_voices)
-        self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
+        self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
         self.list_widget.itemClicked.connect(self.send_voice_on_click)
         self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
         self.search_box.setMinimumWidth(0)
@@ -270,8 +270,7 @@ class VoiceBrowser(SingletonDialog):
                 syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
             elif len(syx_data) == 155:
                 syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
-            # Use the singleton method to show the editor panel
-            editor = VoiceEditorPanel.show_singleton(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
+            editor = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
             editor.setModal(False)
             editor.show()
             editor.raise_()
@@ -309,13 +308,7 @@ class VoiceBrowser(SingletonDialog):
                 syx_data = [0xF0] + syx_data
             if syx_data[-1] != 0xF7:
                 syx_data = syx_data + [0xF7]
-            data_bytes = syx_data[1:-1]
-            if any(b < 0 or b > 127 for b in data_bytes):
-                self.set_status(f"Skipping SysEx for '{voice.get('name','')}' on channel {channel_idx+1}: bytes out of range 0..127: {data_bytes}", error=True)
-                if worker in self._active_workers:
-                    self._active_workers.remove(worker)
-                return
-            msg = mido.Message('sysex', data=data_bytes)
+            msg = mido.Message('sysex', data=syx_data[1:-1])
             mw = self.main_window
             mw.midi_handler.send_sysex(msg.bytes())
             self.set_status(f"Sent '{voice.get('name','')}' to MIDI Out on channel {channel_idx+1}.")
@@ -482,22 +475,12 @@ class VoiceBrowser(SingletonDialog):
     def closeEvent(self, event):
         # Ensure any running worker threads are finished before closing
         try:
-            # Stop and wait for download_worker and json_worker if present
             if hasattr(self, 'download_worker') and self.download_worker is not None:
                 self.download_worker.quit()
                 self.download_worker.wait()
             if hasattr(self, 'json_worker') and self.json_worker is not None:
                 self.json_worker.quit()
                 self.json_worker.wait()
-            # Stop and wait for any workers in _active_workers
-            if hasattr(self, '_active_workers'):
-                for worker in list(self._active_workers):
-                    try:
-                        worker.quit()
-                        worker.wait()
-                    except Exception:
-                        pass
-                self._active_workers.clear()
         except Exception:
             pass
         VoiceBrowser._instance = None

@@ -252,7 +252,41 @@ class MidBrowser(QDialog):
             gm_voice_needed = set()
             # Helper to build and send the MIDI file after all downloads
             def proceed_to_send_midi():
-                logging.debug("proceed_to_send_midi() called. Building and sending MIDI file.")
+                # Show GM replacements dialog if needed
+                if replace_gm and gm_voice_results:
+                    from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QDialogButtonBox, QTableWidget, QTableWidgetItem
+                    class GMReplacementDialog(QDialog):
+                        def __init__(self, parent, gm_map, gm_voice_results):
+                            super().__init__(parent)
+                            self.setWindowTitle("GM Program Replacements")
+                            layout = QVBoxLayout(self)
+                            label = QLabel("The following General MIDI program changes will be replaced with DX7 voices:")
+                            layout.addWidget(label)
+                            table = QTableWidget(self)
+                            table.setColumnCount(3)
+                            table.setHorizontalHeaderLabels(["GM Program #", "GM Name", "DX7 Voice"])
+                            # Only show rows for which a replacement is actually used
+                            used_gm_nums = [int(k) for k in gm_map if gm_map[k]['dx7_voices'] and gm_map[k]['dx7_voices'][0] in gm_voice_results]
+                            table.setRowCount(len(used_gm_nums))
+                            for row, gm_num in enumerate(sorted(used_gm_nums)):
+                                gm_num_str = str(gm_num)
+                                gm_entry = gm_map[gm_num_str]
+                                dx7_name = gm_entry['dx7_voices'][0] if gm_entry['dx7_voices'] else "(none)"
+                                table.setItem(row, 0, QTableWidgetItem(gm_num_str))
+                                table.setItem(row, 1, QTableWidgetItem(gm_entry.get('name', '')))
+                                table.setItem(row, 2, QTableWidgetItem(dx7_name))
+                            table.resizeColumnsToContents()
+                            layout.addWidget(table)
+                            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+                            buttons.accepted.connect(self.accept)
+                            buttons.rejected.connect(self.reject)
+                            layout.addWidget(buttons)
+                    dlg = GMReplacementDialog(self, gm_map, gm_voice_results)
+                    if not dlg.exec():
+                        self.set_status("User cancelled after viewing GM replacements.")
+                        return
+                # Create new MIDI file with the same tracks and messages
+                # but with the assigned channels and optionally DX7 voices instead of GM program changes
                 for i, track in enumerate(midi.tracks):
                     new_track = mido.MidiTrack()
                     if i in assign_map:

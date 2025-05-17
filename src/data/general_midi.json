@@ -1,5 +1,5 @@
 {
-  "0": {"name": "Acoustic Grand Piano", "dx7_voices": ["PIANO 1", "PIANO 2", "PIANO 3", "PIANO 4", "PIANO 5", "PIANO 5THS", "TOY PIANO", "E.GRAND 1", "E.GRAND 2"]},
+  "0": {"name": "Acoustic Grand Piano", "dx7_voices": ["PianoBrite", "PIANO 1", "PIANO 2", "PIANO 3", "PIANO 4", "PIANO 5", "PIANO 5THS", "TOY PIANO", "E.GRAND 1", "E.GRAND 2"]},
   "1": {"name": "Bright Acoustic Piano", "dx7_voices": ["BRIGHT BOW"]},
   "2": {"name": "Electric Grand Piano", "dx7_voices": ["E.GRAND 1", "E.GRAND 2"]},
   "3": {"name": "Honky-tonk Piano", "dx7_voices": ["HONKY TONK"]},
