@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QObject, QEvent
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtGui import QResizeEvent, QPalette, QColor, QFontDatabase, QFont, QPainter
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
@@ -80,7 +80,7 @@ class VoiceEditorPanel(SingletonDialog):
         self.decoder.decode()
         self.params = self.decoder.params
         self.op_count = 6
-        self.tg_bg_widgets = []
+        self.op_bg_widgets = []
         self.status_bar = QLabel("")
         self.status_bar.setFixedHeight(48)
         self.status_bar.setFixedWidth(220)
@@ -139,51 +139,34 @@ class VoiceEditorPanel(SingletonDialog):
             self.update_status_bar(f"{d}: {label_val}", lcd_value=val)
             if k:
                 self._show_param_info(k)
-            # Highlight in envelope widget if rate or level
-            if k and k.startswith('R') and k[1:].isdigit():
-                idx = int(k[1:]) - 1
-                self.env_widget.set_highlight('rate', idx)
-            elif k and k.startswith('L') and k[1:].isdigit():
-                idx = int(k[1:]) - 1
-                self.env_widget.set_highlight('level', idx)
-            # Highlight in keyboard scaling widget
-            if k == 'BP':
-                self.ks_widget.set_highlight('break')
-            elif k == 'LD':
-                self.ks_widget.set_highlight('left_depth')
-            elif k == 'RD':
-                self.ks_widget.set_highlight('right_depth')
-            elif k == 'LC':
-                self.ks_widget.set_highlight('left_curve')
-            elif k == 'RC':
-                self.ks_widget.set_highlight('right_curve')
         def leaveEvent(event, s=slider, d=description, k=param_key):
             self.update_status_bar("")
             self.param_info_panel.setText("")
-            # Remove highlight
-            self.env_widget.clear_highlight()
-            self.ks_widget.clear_highlight()
         slider.enterEvent = enterEvent
         slider.leaveEvent = leaveEvent
         slider.valueChanged.connect(lambda v, s=slider, d=description, k=param_key: self.update_status_bar(f"{d}: {self.get_value_label(k, v) if k else v}", lcd_value=v))
         if label:
             col = QVBoxLayout()
             col.setSpacing(0)
-            col.setContentsMargins(0, 0, 0, 0)  # Remove left/right margin in layout
+            col.setContentsMargins(0, 0, 0, 0)
+            value_lbl = QLabel(str(value))
+            value_lbl.setStyleSheet("font-size: 8pt; background: transparent;")
+            value_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            col.addWidget(value_lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
+            def update_value_lbl(val):
+                label_val = self.get_value_label(param_key, val) if param_key else str(val)
+                value_lbl.setText(str(label_val))
+            slider.valueChanged.connect(update_value_lbl)
             col.addWidget(slider, alignment=Qt.AlignmentFlag.AlignHCenter)
             lbl = QLabel(label)
-            lbl.setStyleSheet("font-size: 8pt; background: transparent;")
+            # Dynamically set font size based on label length
+            font_size = 8 if len(label) <= 2 else 6
+            lbl.setStyleSheet(f"font-size: {font_size}pt; background: transparent;")
             col.addWidget(lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
             w = QWidget()
             w.setLayout(col)
             w.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-            w.setContentsMargins(0, 5, 0, 5)  # Remove left/right margin in widget
-            def w_enterEvent(event, s=slider):
-                s.enterEvent(event)
-            def w_leaveEvent(event, s=slider):
-                s.leaveEvent(event)
-            w.enterEvent = w_enterEvent
-            w.leaveEvent = w_leaveEvent
+            w.setMouseTracking(True)
             return w
         return slider
 
@@ -271,19 +254,7 @@ class VoiceEditorPanel(SingletonDialog):
         topbar_layout.addWidget(self.status_bar, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         topbar_layout.addStretch(3)
-        
-        # EnvelopeWidget
-        self.env_widget = EnvelopeWidget()
-        self.env_widget.setFixedWidth(140)
-        self.env_widget.setFixedHeight(80)
-        topbar_layout.addWidget(self.env_widget, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # KeyboardScalingWidget
-        self.ks_widget = KeyboardScalingWidget()
-        self.ks_widget.setFixedWidth(100)
-        self.ks_widget.setFixedHeight(90)
-        topbar_layout.addWidget(self.ks_widget, alignment=Qt.AlignmentFlag.AlignVCenter)
-        
         topbar_layout.addStretch(1)
         ch_col = QVBoxLayout()
         ch_col.setSpacing(0)
@@ -313,12 +284,15 @@ class VoiceEditorPanel(SingletonDialog):
         # Operator rows
         self._hovered_op_idx = None  # Track which operator is hovered
         self.operator_spacer_items = []
-        for row, tg in enumerate(reversed(range(self.op_count)), start=1):
+        self.op_env_widgets = []  # Store per-operator EnvelopeWidget
+        self.op_ks_widgets = []   # Store per-operator KeyboardScalingWidget
+        for row, tg in enumerate(range(self.op_count), start=1):
             is_carrier = tg in self.get_carrier_ops(self.get_param('ALS', 0))
-            tg_bg = QWidget()
-            tg_bg.setStyleSheet(self.gradient_carrier if is_carrier else self.gradient_noncarrier)
-            self.tg_bg_widgets.insert(0, tg_bg)
-            operator_row_layout = QHBoxLayout(tg_bg)
+            op_bg = QWidget()
+            op_bg.setStyleSheet(self.gradient_carrier if is_carrier else self.gradient_noncarrier)
+            op_bg.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # Ensure hover events
+            self.op_bg_widgets.append(op_bg)
+            operator_row_layout = QHBoxLayout(op_bg)
             operator_row_layout.setContentsMargins(0, 0, 0, 0)
             operator_row_layout.setSpacing(0)
             spacer_item = QWidget()
@@ -351,43 +325,161 @@ class VoiceEditorPanel(SingletonDialog):
                     full_name, '#8ecae6', short_label, param_key=key
                 ))
             operator_row_layout.addWidget(self._make_vline())
-            # EG Level (L1-L4)
-            for i in range(4):
-                key = f'L{i+1}'
-                short_label = self._vced_param_info.get(key, {}).get('short', key)
-                operator_row_layout.addWidget(self._make_slider(
-                    self.get_op_param(tg, key), 0, 99,
-                    lambda v, o=tg, idx=i: self.set_op_param(o, f'L{idx+1}', v),
-                    f'Envelope Generator Level {i+1}', '#ffb703', short_label, param_key=key
-                ))
-            # EG Rate (R1-R4)
-            for i in range(4):
-                key = f'R{i+1}'
-                short_label = self._vced_param_info.get(key, {}).get('short', key)
-                operator_row_layout.addWidget(self._make_slider(
-                    self.get_op_param(tg, key), 0, 99,
-                    lambda v, o=tg, idx=i: self.set_op_param(o, f'R{idx+1}', v),
-                    f'Envelope Generator Rate {i+1}', '#8ecae6', short_label, param_key=key
-                ))
-            operator_row_layout.addWidget(self._make_vline())
-            # Keyboard Scaling
-            for key, full_name, _short_lbl, max_val in OP_KS_DEFS:
-                short_label = self._vced_param_info.get(key, {}).get('short', key)
-                operator_row_layout.addWidget(self._make_slider(
-                    self.get_op_param(tg, key), 0, max_val,
-                    lambda v, o=tg, k=key: self.set_op_param(o, k, v),
-                    full_name, '#8ecae6', short_label, param_key=key
-                ))
-            op_grid.addWidget(tg_bg, row, 0, 1, op_col_count)
+            # --- Remove EG Level, EG Rate, and Keyboard Scaling sliders ---
+            # Add per-operator EnvelopeWidget
+            env_widget = EnvelopeWidget()
+            rates = [self.get_op_param(tg, f'R{i+1}', 50) for i in range(4)]
+            levels = [self.get_op_param(tg, f'L{i+1}', 99 if i == 0 else 0) for i in range(4)]
+            env_widget.set_envelope(rates, levels)
+            self.op_env_widgets.append(env_widget)
+            operator_row_layout.addWidget(env_widget)
+            # Connect envelopeChanged to MIDI update
+            def make_env_handler(op_idx):
+                def handler(rates, levels):
+                    for i in range(4):
+                        self.set_op_param(op_idx, f'R{i+1}', int(rates[i]))
+                        self.set_op_param(op_idx, f'L{i+1}', int(levels[i]))
+                    # Show value for hovered label if any, else last changed
+                    widget = self.op_env_widgets[op_idx]
+                    hovered = getattr(widget, '_hovered_label', None)
+                    if hovered:
+                        if hovered.startswith('R') and hovered[1:].isdigit():
+                            idx = int(hovered[1:]) - 1
+                            val = int(rates[idx])
+                            desc = f"Envelope Rate {idx+1}"
+                        elif hovered.startswith('L') and hovered[1:].isdigit():
+                            idx = int(hovered[1:]) - 1
+                            val = int(levels[idx])
+                            desc = f"Envelope Level {idx+1}"
+                        else:
+                            val = ''
+                            desc = hovered
+                        self.update_status_bar(f"{desc}: {val}", lcd_value=val)
+                    else:
+                        # Fallback: show last dragged
+                        if hasattr(widget, '_drag_idx') and widget._drag_idx is not None:
+                            idx = widget._drag_idx
+                            if idx == 5:
+                                lidx = 3
+                                val = int(levels[lidx])
+                                desc = f"Envelope Level {lidx+1}"
+                            elif idx in [1,2,3]:
+                                ridx = idx-1
+                                val = int(rates[ridx])
+                                desc = f"Envelope Rate {ridx+1}"
+                            else:
+                                val = ''
+                                desc = ''
+                            self.update_status_bar(f"{desc}: {val}", lcd_value=val)
+                return handler
+            env_widget.envelopeChanged.connect(make_env_handler(op_idx=tg))
+            # Connect labelHovered to show param info
+            def make_env_label_hovered(op_idx):
+                def handler(param_key):
+                    if param_key:
+                        # Show param info as before
+                        self._show_param_info(param_key)
+                        # Also update status bar and LCD
+                        val = None
+                        label = param_key
+                        if param_key.startswith('R') and len(param_key) == 2 and param_key[1].isdigit():
+                            idx = int(param_key[1]) - 1
+                            val = self.get_op_param(op_idx, param_key, 50)
+                            desc = f"Envelope Rate {idx+1}"
+                        elif param_key.startswith('L') and len(param_key) == 2 and param_key[1].isdigit():
+                            idx = int(param_key[1]) - 1
+                            val = self.get_op_param(op_idx, param_key, 99 if idx == 0 else 0)
+                            desc = f"Envelope Level {idx+1}"
+                        else:
+                            val = self.get_op_param(op_idx, param_key)
+                            desc = param_key
+                        self.update_status_bar(f"{desc}: {val}", lcd_value=val)
+                    else:
+                        self.param_info_panel.setText("")
+                        self.update_status_bar("")
+                return handler
+            env_widget.labelHovered.connect(make_env_label_hovered(op_idx=tg))
+            # Add per-operator KeyboardScalingWidget
+            ks_widget = KeyboardScalingWidget()
+            bp = self.get_op_param(tg, 'BP', 50)
+            ld = self.get_op_param(tg, 'LD', 50)
+            rd = self.get_op_param(tg, 'RD', 50)
+            lc = self.get_op_param(tg, 'LC', 0)
+            rc = self.get_op_param(tg, 'RC', 0)
+            ks_widget.set_params(bp, ld, rd, lc, rc)
+            self.op_ks_widgets.append(ks_widget)
+            operator_row_layout.addWidget(ks_widget)
+            # Connect paramsChanged to MIDI update
+            def make_ks_handler(op_idx):
+                def handler(bp, ld, rd, lc, rc):
+                    self.set_op_param(op_idx, 'BP', int(bp))
+                    self.set_op_param(op_idx, 'LD', int(ld))
+                    self.set_op_param(op_idx, 'RD', int(rd))
+                    self.set_op_param(op_idx, 'LC', int(lc))
+                    self.set_op_param(op_idx, 'RC', int(rc))
+                    widget = self.op_ks_widgets[op_idx]
+                    hovered = getattr(widget, '_hovered_label', None)
+                    if hovered == 'BP':
+                        self.update_status_bar(f"Break Point: {bp}", lcd_value=bp)
+                    elif hovered == 'LD':
+                        self.update_status_bar(f"Left Depth: {ld}", lcd_value=ld)
+                    elif hovered == 'RD':
+                        self.update_status_bar(f"Right Depth: {rd}", lcd_value=rd)
+                    elif hovered == 'LC':
+                        val = self.get_value_label('LC', lc)
+                        self.update_status_bar(f"Left Curve: {val}", lcd_value=lc)
+                    elif hovered == 'RC':
+                        val = self.get_value_label('RC', rc)
+                        self.update_status_bar(f"Right Curve: {val}", lcd_value=rc)
+                    else:
+                        # Show all for clarity if not hovering
+                        self.update_status_bar(
+                            f"Break Point: {bp}  Left Depth: {ld}  Right Depth: {rd}  Left Curve: {self.get_value_label('LC', lc)}  Right Curve: {self.get_value_label('RC', rc)}",
+                            lcd_value=bp
+                        )
+                return handler
+            ks_widget.paramsChanged.connect(make_ks_handler(op_idx=tg))
+            # Connect labelHovered to show param info and update status bar/LCD
+            def make_ks_label_hovered(op_idx):
+                def handler(param_key):
+                    if param_key:
+                        self._show_param_info(param_key)
+                        # Also update status bar and LCD
+                        val = None
+                        desc = param_key
+                        if param_key == 'BP':
+                            val = self.get_op_param(op_idx, 'BP', 50)
+                            desc = "Break Point"
+                        elif param_key == 'LD':
+                            val = self.get_op_param(op_idx, 'LD', 50)
+                            desc = "Left Depth"
+                        elif param_key == 'RD':
+                            val = self.get_op_param(op_idx, 'RD', 50)
+                            desc = "Right Depth"
+                        elif param_key == 'LC':
+                            val = self.get_op_param(op_idx, 'LC', 0)
+                            desc = "Left Curve"
+                            val = self.get_value_label('LC', val)
+                        elif param_key == 'RC':
+                            val = self.get_op_param(op_idx, 'RC', 0)
+                            desc = "Right Curve"
+                            val = self.get_value_label('RC', val)
+                        else:
+                            val = self.get_op_param(op_idx, param_key)
+                        self.update_status_bar(f"{desc}: {val}", lcd_value=val if isinstance(val, int) else "")
+                    else:
+                        self.param_info_panel.setText("")
+                        self.update_status_bar("")
+                return handler
+            ks_widget.labelHovered.connect(make_ks_label_hovered(op_idx=tg))
+            op_grid.addWidget(op_bg, row, 0, 1, op_col_count)
 
             # --- Add event handlers for envelope preview on hover ---
             def make_enter_event(op_idx, is_carrier):
                 def enterEvent(event, self=self, op_idx=op_idx, is_carrier=is_carrier):
                     op_type = "Carrier" if is_carrier else "Modulator"
                     print(f"[HOVER] Operator {op_idx+1} ({op_type}) row hovered")
-                    # Only show the name in the status bar
                     self.update_status_bar(f"Operator {op_idx+1} ({op_type})")
-                    # Show detailed info in the side panel
                     self.param_info_panel.show_param_info({
                         f'OP{op_idx+1}': {
                             'name': f'Operator {op_idx+1} ({op_type})',
@@ -395,24 +487,29 @@ class VoiceEditorPanel(SingletonDialog):
                         }
                     }, f'OP{op_idx+1}', op_idx, None)
                     self._hovered_op_idx = op_idx
-                    self._update_env_widget_for_operator(op_idx)
-                    self._update_ks_widget_for_operator(op_idx)
+                    # Highlight the widgets for this operator
+                    for i, ew in enumerate(self.op_env_widgets):
+                        ew.setStyleSheet('border: 2px solid #ffb703;' if i == op_idx else '')
+                    for i, kw in enumerate(self.op_ks_widgets):
+                        kw.setStyleSheet('border: 2px solid #8ecae6;' if i == op_idx else '')
                 return enterEvent
             def make_leave_event():
                 def leaveEvent(event, self=self):
                     self._hovered_op_idx = None
-                    self._reset_env_widget()
-                    self._reset_ks_widget()
+                    for ew in self.op_env_widgets:
+                        ew.setStyleSheet('')
+                    for kw in self.op_ks_widgets:
+                        kw.setStyleSheet('')
                     self.update_status_bar("")
                 return leaveEvent
-            tg_bg.enterEvent = make_enter_event(tg, is_carrier)
-            tg_bg.leaveEvent = make_leave_event()
-
+            op_bg.enterEvent = make_enter_event(tg, is_carrier)
+            op_bg.leaveEvent = make_leave_event()
         # Add global row at the bottom
         global_row = self.op_count + 1
         global_bg = QWidget()
         global_bg.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23242a, stop:1 #18191c); border-radius: 2px;")
         global_bg.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        global_bg.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # Ensure hover events
         global_layout = QHBoxLayout(global_bg)
         global_layout.setContentsMargins(0, 0, 0, 0)
         global_layout.setSpacing(0)
@@ -458,6 +555,7 @@ class VoiceEditorPanel(SingletonDialog):
         perf_bg = QWidget()
         perf_bg.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #23242a, stop:1 #18191c); border-radius: 2px;")
         perf_bg.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        perf_bg.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # Ensure hover events
         perf_layout = QHBoxLayout(perf_bg)
         perf_layout.setContentsMargins(0, 0, 0, 0)
         perf_layout.setSpacing(0)
@@ -487,6 +585,7 @@ class VoiceEditorPanel(SingletonDialog):
         op_grid.addWidget(perf_bg, perf_row, 0, 1, op_col_count)
         op_table_widget = QWidget()
         op_table_widget.setLayout(op_grid)
+        op_table_widget.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # Ensure hover events
         op_table_widget.lower()
         self.svg_overlay = QSvgWidget(op_table_widget)
         self.svg_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -497,6 +596,7 @@ class VoiceEditorPanel(SingletonDialog):
         # At the end, create a QWidget for the main editor area
         main_editor_widget = QWidget()
         main_editor_widget.setLayout(main_vbox)
+        main_editor_widget.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # Ensure hover events
         # --- Contextual Side Panel ---
         self.param_info_panel = ParamInfoPanel()
         # --- Splitter to allow resizing ---
@@ -509,12 +609,7 @@ class VoiceEditorPanel(SingletonDialog):
         self.setLayout(layout)
         self.update_svg_overlay()
         # --- Load VCED.json for parameter info ---
-        self._vced_param_info = None
-        try:
-            with open(os.path.join(os.path.dirname(__file__), 'data', 'VCED.json'), 'r', encoding='utf-8') as f:
-                self._vced_param_info = {p['key']: p for p in json.load(f)}
-        except Exception as e:
-            self._vced_param_info = {}
+
 
     def _show_param_info(self, param_key):
         hovered_op_idx = getattr(self, '_hovered_op_idx', None)
@@ -572,11 +667,11 @@ class VoiceEditorPanel(SingletonDialog):
     def update_operator_bg_colors(self):
         alg_idx = self.alg_combo.currentIndex()
         carrier_ops = self.get_carrier_ops(alg_idx)
-        for op_idx, tg_bg in enumerate(self.tg_bg_widgets):
+        for op_idx, op_bg in enumerate(self.op_bg_widgets):
             if op_idx in carrier_ops:
-                tg_bg.setStyleSheet(self.gradient_carrier)
+                op_bg.setStyleSheet(self.gradient_carrier)
             else:
-                tg_bg.setStyleSheet(self.gradient_noncarrier)
+                op_bg.setStyleSheet(self.gradient_noncarrier)
 
     def on_algorithm_changed(self, idx):
         print(f"[DEBUG] on_algorithm_changed called with idx={idx}")
@@ -621,11 +716,11 @@ class VoiceEditorPanel(SingletonDialog):
         param_num = self._get_operator_param_num(op, key)
         if param_num is not None:
             self.send_sysex(key, value, param_num, op_idx=op)
-        # Update envelope widget if this is the hovered operator and key is R1-R4 or L1-L4
-        if self._hovered_op_idx == op and (key in [f'R{i+1}' for i in range(4)] or key in [f'L{i+1}' for i in range(4)]):
+        # Update envelope widget if key is R1-R4 or L1-L4
+        if key in [f'R{i+1}' for i in range(4)] or key in [f'L{i+1}' for i in range(4)]:
             self._update_env_widget_for_operator(op)
-        # Update keyboard scaling widget if hovered and key is BP, LD, RD, LC, RC
-        if self._hovered_op_idx == op and key in ['BP', 'LD', 'RD', 'LC', 'RC']:
+        # Update keyboard scaling widget if key is BP, LD, RD, LC, RC
+        if key in ['BP', 'LD', 'RD', 'LC', 'RC']:
             self._update_ks_widget_for_operator(op)
 
     def _update_ks_widget_for_operator(self, op_idx):
@@ -634,10 +729,10 @@ class VoiceEditorPanel(SingletonDialog):
         rd = self.get_op_param(op_idx, 'RD', 50)
         lc = self.get_op_param(op_idx, 'LC', 0)
         rc = self.get_op_param(op_idx, 'RC', 0)
-        self.ks_widget.set_params(bp, ld, rd, lc, rc)
+        self.op_ks_widgets[op_idx].set_params(bp, ld, rd, lc, rc)
 
-    def _reset_ks_widget(self):
-        self.ks_widget.set_params(50, 50, 50, 0, 0)
+    def _reset_ks_widget(self, op_idx):
+        self.op_ks_widgets[op_idx].set_params(50, 50, 50, 0, 0)
 
     def get_op_param(self, op, key, default=0):
         if 'operators' in self.params and isinstance(self.params['operators'], list):
@@ -742,11 +837,10 @@ class VoiceEditorPanel(SingletonDialog):
     def _update_env_widget_for_operator(self, op_idx):
         rates = [self.get_op_param(op_idx, f'R{i+1}', 50) for i in range(4)]
         levels = [self.get_op_param(op_idx, f'L{i+1}', 99 if i == 0 else 0) for i in range(4)]
-        self.env_widget.set_envelope(rates, levels)
+        self.op_env_widgets[op_idx].set_envelope(rates, levels)
 
-    def _reset_env_widget(self):
-        # Optionally, reset to a default or global envelope, or just clear
-        self.env_widget.set_envelope([50, 50, 50, 50], [99, 70, 40, 0])
+    def _reset_env_widget(self, op_idx):
+        self.op_env_widgets[op_idx].set_envelope([50, 50, 50, 50], [99, 70, 40, 0])
 
     # --- Load parameter definitions ---
         self._param_formats = {}

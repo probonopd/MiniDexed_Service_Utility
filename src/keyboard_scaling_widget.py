@@ -1,12 +1,26 @@
 from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QPainter, QPen, QColor, QFont, QPainterPath
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, Signal
 import sys
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+# Curve label mapping for display
+curve_labels = {
+    0: "+LIN",
+    1: "-EXP",
+    2: "+EXP",
+    3: "-LIN"
+}
 
 class KeyboardScalingWidget(QWidget):
+    paramsChanged = Signal(int, int, int, int, int)  # break_point, left_depth, right_depth, left_curve, right_curve
+    labelHovered = Signal(str)  # Emits param_key when hovering over a label
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(220, 160)
+        self.setMinimumSize(80, 64)
+        self.setMaximumSize(80, 64)
         self.break_point = 50  # 0-99
         self.left_depth = 50   # 0-99
         self.right_depth = 50  # 0-99
@@ -18,14 +32,26 @@ class KeyboardScalingWidget(QWidget):
         self.text_color = QColor('#e0e0e0')
         self.highlight = None  # 'break', 'left_depth', 'right_depth', 'left_curve', 'right_curve'
         self.highlight_color = QColor('#ffffff')
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self._hovered_label = None
+        self.setMouseTracking(True)
 
     def set_params(self, break_point, left_depth, right_depth, left_curve, right_curve):
+        changed = (
+            self.break_point != break_point or
+            self.left_depth != left_depth or
+            self.right_depth != right_depth or
+            self.left_curve != left_curve or
+            self.right_curve != right_curve
+        )
         self.break_point = break_point
         self.left_depth = left_depth
         self.right_depth = right_depth
         self.left_curve = left_curve
         self.right_curve = right_curve
         self.update()
+        if changed:
+            self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
 
     def set_highlight(self, part):
         self.highlight = part  # 'break', 'left_depth', 'right_depth', 'left_curve', 'right_curve'
@@ -38,9 +64,8 @@ class KeyboardScalingWidget(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.fillRect(self.rect(), self.bg_color)
         w, h = self.width(), self.height()
-        margin = 24
+        margin = 18
         # Draw grid
         painter.setPen(QPen(self.line_color, 1))
         painter.drawRect(margin, margin, w-2*margin, h-2*margin)
@@ -83,23 +108,54 @@ class KeyboardScalingWidget(QWidget):
         painter.setPen(pen)
         painter.drawLine(int(bp_x), margin, int(bp_x), h-margin)
 
-        # Draw hover labels for highlighted part
+        # Draw values equally spaced above and below the frame
+        # Above: left_depth, break_point, right_depth
+        x_left = margin
+        x_center = margin + (w - 2 * margin) / 2
+        x_right = w - margin
         painter.setPen(QPen(self.text_color))
         font = QFont()
         font.setPointSize(9)
+        # Draw left_depth label
+        left_label = str(self.left_depth)
+        if len(left_label) >= 3:
+            font.setPointSize(7)
+        else:
+            font.setPointSize(9)
         painter.setFont(font)
-        label_offset = 28
-        
-        curve_labels = {0: '+LIN', 1: '-EXP', 2: '+EXP', 3: '-LIN'}
+        painter.drawText(QRectF(x_left-18, margin-18, 36, 16), Qt.AlignmentFlag.AlignCenter, left_label)
+        # Draw break_point label
+        font.setPointSize(9 if len(str(self.break_point)) < 3 else 7)
+        painter.setFont(font)
+        painter.drawText(QRectF(x_center-18, margin-18, 36, 16), Qt.AlignmentFlag.AlignCenter, str(self.break_point))
+        # Draw right_depth label at the top right
+        right_label = str(self.right_depth)
+        font.setPointSize(9 if len(right_label) < 3 else 7)
+        painter.setFont(font)
+        painter.drawText(QRectF(x_right-18, margin-18, 36, 16), Qt.AlignmentFlag.AlignCenter, right_label)
+
+        # Draw left_curve and right_curve labels only if not highlighted
+        if self.highlight not in ('left_curve', 'right_curve'):
+            # Always show curve labels below the rectangle
+            label_left = curve_labels.get(self.left_curve, '')
+            x_left_curve = x_left
+            y_curve = margin + (self.height() - 2 * margin) + 2
+            painter.drawText(QRectF(x_left_curve-20, y_curve, 40, 18), Qt.AlignmentFlag.AlignCenter, label_left)
+
+            label_right = curve_labels.get(self.right_curve, '')
+            x_right_curve = x_right
+            painter.drawText(QRectF(x_right_curve-20, y_curve, 40, 18), Qt.AlignmentFlag.AlignCenter, label_right)
+
+        # Draw highlighted curve labels above the rectangle
         if self.highlight == 'left_curve':
             label = curve_labels.get(self.left_curve, '')
             x = margin + (bp_x - margin) * 0.25
-            y = 5
+            y = margin + (self.height() - 2 * margin) + 2  # Move label below rectangle
             painter.drawText(QRectF(x-20, y, 40, 18), Qt.AlignmentFlag.AlignCenter, label)
         elif self.highlight == 'right_curve':
             label = curve_labels.get(self.right_curve, '')
             x = bp_x + (w - margin - bp_x) * 0.25
-            y = 5
+            y = margin + (self.height() - 2 * margin) + 2  # Move label below rectangle
             painter.drawText(QRectF(x-20, y, 40, 18), Qt.AlignmentFlag.AlignCenter, label)
         elif self.highlight == 'break':
             label = "BREAK"
@@ -120,6 +176,108 @@ class KeyboardScalingWidget(QWidget):
             x = (w / 2) - (text_width / 2)
             y = 5
             painter.drawText(QRectF(x, y, text_width, 18), Qt.AlignmentFlag.AlignCenter, label)
+
+    def wheelEvent(self, event):
+        pos = event.position() if hasattr(event, 'position') else event.posF()
+        x, y = pos.x(), pos.y()
+        w, h = self.width(), self.height()
+        margin = 18
+        # Above: left_depth, break_point, right_depth
+        x_left = margin
+        x_center = margin + (w - 2 * margin) / 2
+        x_right = w - margin
+        top_rects = [
+            QRectF(x_left-18, margin-18, 36, 16),
+            QRectF(x_center-18, margin-18, 36, 16),
+            QRectF(x_right-18, margin-18, 36, 16)
+        ]
+        # Below: left_curve, right_curve (no break point)
+        y_bottom = margin + (self.height() - 2 * margin) + 2
+        bottom_rects = [
+            QRectF(x_left-18, y_bottom, 36, 16),
+            QRectF(x_right-18, y_bottom, 36, 16)
+        ]
+        delta = 1 if event.angleDelta().y() > 0 else -1
+        # Check if mouse is over a top label (depths/break)
+        if top_rects[0].contains(x, y):
+            self.left_depth = max(0, min(99, self.left_depth + delta))
+            changed = True
+            self.update()
+            if changed:
+                self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+            return
+        if top_rects[1].contains(x, y):
+            self.break_point = max(0, min(99, self.break_point + delta))
+            changed = True
+            self.update()
+            if changed:
+                self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+            return
+        if top_rects[2].contains(x, y):
+            self.right_depth = max(0, min(99, self.right_depth + delta))
+            changed = True
+            self.update()
+            if changed:
+                self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+            return
+        # Check if mouse is over a bottom label (curves)
+        if bottom_rects[0].contains(x, y):
+            self.left_curve = (self.left_curve + delta) % 4
+            changed = True
+            self.update()
+            if changed:
+                self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+            return
+        if bottom_rects[1].contains(x, y):
+            self.right_curve = (self.right_curve + delta) % 4
+            changed = True
+            self.update()
+            if changed:
+                self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+            return
+        # Otherwise, pass event to base class
+        super().wheelEvent(event)
+
+    def mouseMoveEvent(self, event):
+        x, y = event.position().x(), event.position().y()
+        w, h = self.width(), self.height()
+        margin = 18
+        x_left = margin
+        x_center = margin + (w - 2 * margin) / 2
+        x_right = w - margin
+        y_bottom = margin + (self.height() - 2 * margin) + 2
+        top_rects = [
+            QRectF(x_left-18, margin-18, 36, 16),   # LD
+            QRectF(x_center-18, margin-18, 36, 16), # BP
+            QRectF(x_right-18, margin-18, 36, 16)   # RD
+        ]
+        bottom_rects = [
+            QRectF(x_left-18, y_bottom, 36, 16),    # LC
+            QRectF(x_right-18, y_bottom, 36, 16)    # RC
+        ]
+        hovered = None
+        if top_rects[0].contains(x, y):
+            hovered = 'LD'
+        elif top_rects[1].contains(x, y):
+            hovered = 'BP'
+        elif top_rects[2].contains(x, y):
+            hovered = 'RD'
+        elif bottom_rects[0].contains(x, y):
+            hovered = 'LC'
+        elif bottom_rects[1].contains(x, y):
+            hovered = 'RC'
+        if hovered != self._hovered_label:
+            self._hovered_label = hovered
+            if hovered:
+                self.labelHovered.emit(hovered)
+            else:
+                self.labelHovered.emit("")
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered_label = None
+        self.labelHovered.emit("")
+        super().leaveEvent(event)
 
     def _dx7_curve(self, rel, depth, curve, h, margin, left=True):
         # rel: 0..1, depth: 0..99, curve: 0=+LIN, 1=-EXP, 2=+EXP, 3=-LIN

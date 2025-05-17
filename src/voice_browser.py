@@ -143,8 +143,6 @@ class VoiceBrowser(SingletonDialog):
         self.voices = []
         self.filtered_voices = []
         self.search_box.returnPressed.connect(self.filter_voices)
-        self.list_widget.itemDoubleClicked.connect(lambda _: self.send_voice())
-        self.list_widget.itemClicked.connect(self.send_voice_on_click)
         self.list_widget.itemDoubleClicked.connect(self.open_voice_in_editor_on_double_click)
         self.search_box.setMinimumWidth(0)
         self.list_widget.setMinimumWidth(0)
@@ -270,14 +268,12 @@ class VoiceBrowser(SingletonDialog):
                 syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
             elif len(syx_data) == 155:
                 syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
-            editor = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
-            editor.setModal(False)
+            editor = VoiceEditorPanel.get_instance(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
+            idx_ch = self.channel_combo.currentIndex()
+            editor.channel_combo.setCurrentIndex(idx_ch)
             editor.show()
             editor.raise_()
             editor.activateWindow()
-            if hasattr(editor, 'channel_combo') and hasattr(self, 'channel_combo'):
-                idx_ch = self.channel_combo.currentIndex()
-                editor.channel_combo.setCurrentIndex(idx_ch)
             if worker in self._active_workers:
                 self._active_workers.remove(worker)
         worker = VoiceBrowser.get_syx_data_for_voice_async(voice, after_download)
