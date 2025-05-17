@@ -17,6 +17,7 @@ class EnvelopeWidget(QWidget):
         self.text_color = QColor('#e0e0e0')
         self.highlight_color = QColor('#ffffff')
         self._drag_idx = None  # Which point is being dragged
+        self._drag_label = None
         self._drag_offset = (0, 0)
         self._last_mouse_pos = None
         self.highlight_type = None  # 'rate' or 'level'
@@ -128,6 +129,9 @@ class EnvelopeWidget(QWidget):
         points, x_points, margin, w, h = self._get_points()
         mx, my = event.position().x(), event.position().y()
         # Only allow dragging L1, L2, L3, L4 (end) (indices 1,2,3,5)
+        self._drag_idx = None
+        self._drag_label = None
+        # Check for point drag first
         for idx in [1,2,3,5]:
             px, py = points[idx]
             if (mx - px)**2 + (my - py)**2 < 64:  # within 8px
@@ -135,7 +139,27 @@ class EnvelopeWidget(QWidget):
                 self._last_mouse_pos = (mx, my)
                 break
         else:
-            self._drag_idx = None
+            # Check for label drag
+            num_levels = 4
+            num_rates = 4
+            level_rects = []
+            for i in range(num_levels):
+                lx = margin + i * (w / (num_levels - 1))
+                level_rects.append(QRectF(lx-14, margin-18, 28, 16))
+            rate_rects = []
+            for i in range(num_rates):
+                rx = margin + i * (w / (num_rates - 1))
+                rate_rects.append(QRectF(rx-14, margin+h+2, 28, 16))
+            for i, rect in enumerate(level_rects):
+                if rect.contains(mx, my):
+                    self._drag_label = ('L', i)
+                    self._last_mouse_pos = (mx, my)
+                    break
+            for i, rect in enumerate(rate_rects):
+                if rect.contains(mx, my):
+                    self._drag_label = ('R', i)
+                    self._last_mouse_pos = (mx, my)
+                    break
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
@@ -147,38 +171,51 @@ class EnvelopeWidget(QWidget):
             if idx in [1,2,3,5]:
                 if idx == 5:
                     lidx = 3
-                    # Only vertical for L4
                     y = max(margin, min(y, margin + h))
                     level = int(99 * (1 - (y - margin) / h))
                     level = max(0, min(99, level))
                     self.levels[lidx] = level
                 else:
                     lidx = idx - 1
-                    # Vertical drag: level
                     y = max(margin, min(y, margin + h))
                     level = int(99 * (1 - (y - margin) / h))
                     level = max(0, min(99, level))
                     self.levels[lidx] = level
-                    # Horizontal drag: rate
-                    # Clamp x to widget area
                     x = max(margin, min(x, margin + w))
-                    # Compute new rate based on x position
-                    # The x_points for L1, L2, L3 are at indices 1,2,3
                     prev_x = x_points[idx-1]
                     next_x = x_points[idx+1] if idx+1 < len(x_points) else x_points[idx]
-                    # Prevent division by zero
                     if next_x != prev_x:
                         rel = (x - prev_x) / (next_x - prev_x)
                         rel = max(0.0, min(1.0, rel))
-                        # Map rel to rate (1-99, higher rate = shorter time = closer to prev_x)
                         rate = int(99 - rel * 98)
                         rate = max(1, min(99, rate))
                         self.rates[lidx] = rate
                 self.update()
-                # Change envelopeChanged to emit send=False during drag
                 self.envelopeChanged.emit(self.rates, self.levels, False)
                 self._last_mouse_pos = (x, y)
                 return
+        # --- Label drag logic ---
+        if self._drag_label is not None and self._last_mouse_pos is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            label_type, idx = self._drag_label
+            dx = x - self._last_mouse_pos[0]
+            dy = y - self._last_mouse_pos[1]
+            # Use the larger of dx or dy (in absolute value) for both types
+            drag = dx if abs(dx) > abs(dy) else -dy
+            if label_type == 'L':
+                orig = self.levels[idx]
+                delta = int(drag / 2)  # scale drag speed
+                new_val = max(0, min(99, orig + delta))
+                self.levels[idx] = new_val
+            elif label_type == 'R':
+                orig = self.rates[idx]
+                delta = int(drag / 2)  # scale drag speed
+                new_val = max(1, min(99, orig + delta))
+                self.rates[idx] = new_val
+            self.update()
+            self.envelopeChanged.emit(self.rates, self.levels, False)
+            # Update last mouse pos so drag is incremental
+            self._last_mouse_pos = (x, y)
+            return
         num_levels = 4
         num_rates = 4
         # Calculate label rects for levels (top) and rates (bottom)
@@ -214,10 +251,10 @@ class EnvelopeWidget(QWidget):
         super().leaveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        # Only emit envelopeChanged with send=True on release
-        if self._drag_idx is not None:
+        if self._drag_idx is not None or self._drag_label is not None:
             self.envelopeChanged.emit(self.rates, self.levels, True)
         self._drag_idx = None
+        self._drag_label = None
         self._last_mouse_pos = None
         super().mouseReleaseEvent(event)
 

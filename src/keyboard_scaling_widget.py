@@ -238,7 +238,95 @@ class KeyboardScalingWidget(QWidget):
         # Otherwise, pass event to base class
         super().wheelEvent(event)
 
+    def mousePressEvent(self, event):
+        w, h = self.width(), self.height()
+        margin = 18
+        x_left = margin
+        x_center = margin + (w - 2 * margin) / 2
+        x_right = w - margin
+        y_top = margin-18
+        y_bottom = margin + (self.height() - 2 * margin) + 2
+        y_curve = y_bottom  # match paintEvent
+        bp_x = margin + (w-2*margin) * (self.break_point/99)
+        self._drag_part = None
+        self._drag_label = None
+        mx, my = event.position().x(), event.position().y()
+        # Prioritize curve label hit test (wider area) before smaller rects
+        if QRectF(x_left-20, y_curve, 40, 18).contains(mx, my):
+            print('[DEBUG] Drag start: LC curve label')
+            self._drag_label = 'LC'
+        elif QRectF(x_right-20, y_curve, 40, 18).contains(mx, my):
+            print('[DEBUG] Drag start: RC curve label')
+            self._drag_label = 'RC'
+        # Then check for top/bottom label rects
+        elif QRectF(x_center-18, y_top, 36, 16).contains(mx, my):
+            print('[DEBUG] Drag start: BP')
+            self._drag_part = 'BP'
+        elif QRectF(x_left-18, y_top, 36, 16).contains(mx, my):
+            print('[DEBUG] Drag start: LD')
+            self._drag_part = 'LD'
+        elif QRectF(x_right-18, y_top, 36, 16).contains(mx, my):
+            print('[DEBUG] Drag start: RD')
+            self._drag_part = 'RD'
+        elif QRectF(x_left-18, y_bottom, 36, 16).contains(mx, my):
+            print('[DEBUG] Drag start: LC (small rect)')
+            self._drag_label = 'LC'
+        elif QRectF(x_right-18, y_bottom, 36, 16).contains(mx, my):
+            print('[DEBUG] Drag start: RC (small rect)')
+            self._drag_label = 'RC'
+        self._last_mouse_pos = (mx, my)
+        super().mousePressEvent(event)
+
     def mouseMoveEvent(self, event):
+        x, y = event.position().x(), event.position().y()
+        w, h = self.width(), self.height()
+        margin = 18
+        # --- Drag logic for handles ---
+        if hasattr(self, '_drag_part') and self._drag_part and event.buttons() & Qt.MouseButton.LeftButton:
+            if self._drag_part == 'BP':
+                bp = int(99 * (x - margin) / (w - 2*margin))
+                bp = max(0, min(99, bp))
+                self.break_point = bp
+            elif self._drag_part == 'LD':
+                ld = int(99 * (1 - (y - margin) / (h - 2*margin)))
+                ld = max(0, min(99, ld))
+                self.left_depth = ld
+            elif self._drag_part == 'RD':
+                rd = int(99 * (1 - (y - margin) / (h - 2*margin)))
+                rd = max(0, min(99, rd))
+                self.right_depth = rd
+            self.update()
+            return
+        # --- Drag logic for labels ---
+        if hasattr(self, '_drag_label') and self._drag_label and event.buttons() & Qt.MouseButton.LeftButton:
+            x, y = event.position().x(), event.position().y()
+            last_x, last_y = self._last_mouse_pos
+            dx = x - last_x
+            dy = y - last_y
+            # Use the larger of dx or dy (in absolute value) for both LC and RC
+            drag = dx if abs(dx) > abs(dy) else -dy
+            if self._drag_label == 'LC':
+                orig = self.left_curve
+                delta = int(drag / 8)  # more sensitive drag
+                if delta != 0:
+                    new_val = (orig + delta) % 4
+                    if new_val != self.left_curve:
+                        print(f'[DEBUG] Drag LC: {orig} -> {new_val}')
+                        self.left_curve = new_val
+                        self.update()
+                    # Reset last_mouse_pos so drag is incremental
+                    self._last_mouse_pos = (x, y)
+            elif self._drag_label == 'RC':
+                orig = self.right_curve
+                delta = int(drag / 8)
+                if delta != 0:
+                    new_val = (orig + delta) % 4
+                    if new_val != self.right_curve:
+                        print(f'[DEBUG] Drag RC: {orig} -> {new_val}')
+                        self.right_curve = new_val
+                        self.update()
+                    self._last_mouse_pos = (x, y)
+            return
         x, y = event.position().x(), event.position().y()
         w, h = self.width(), self.height()
         margin = 18
@@ -273,6 +361,14 @@ class KeyboardScalingWidget(QWidget):
             else:
                 self.labelHovered.emit("")
         super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if (hasattr(self, '_drag_part') and self._drag_part) or (hasattr(self, '_drag_label') and self._drag_label):
+            self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+            self._drag_part = None
+            self._drag_label = None
+        self._last_mouse_pos = None
+        super().mouseReleaseEvent(event)
 
     def leaveEvent(self, event):
         self._hovered_label = None
