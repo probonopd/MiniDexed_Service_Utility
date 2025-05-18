@@ -154,6 +154,7 @@ class VoiceBrowser(SingletonDialog):
         self.edit_button.setEnabled(False)
         self.edit_panel_button.setEnabled(False)
         self.list_widget.itemSelectionChanged.connect(self._update_action_buttons)
+        self.list_widget.itemClicked.connect(self.on_voice_clicked)
         self._active_workers = []  # Keep references to active workers
 
     def set_status(self, msg, error=False):
@@ -258,7 +259,6 @@ class VoiceBrowser(SingletonDialog):
                     self._active_workers.remove(worker)
                 return
             midi_outport = getattr(self.main_window, 'midi_handler', None)
-            from voice_editor_panel import VoiceEditorPanel
             # Ensure valid 161-byte SysEx for the editor
             if isinstance(syx_data, list):
                 syx_data = bytes(syx_data)
@@ -317,24 +317,33 @@ class VoiceBrowser(SingletonDialog):
 
     def download_and_send_voice(self, idx):
         voice = self.filtered_voices[idx]
-        syx_data = VoiceBrowser.get_syx_data_for_voice(voice)
-        if not syx_data:
-            self.set_status(f"Failed to get SysEx data for '{voice.get('name','')}'.", error=True)
-            return
         channel_idx = self.channel_combo.currentIndex()  # 0-based
-        import mido
-        if len(syx_data) > 3:
-            syx_data[2] = 0x10 | (channel_idx & 0x0F)
-        if syx_data[0] != 0xF0:
-            syx_data = [0xF0] + syx_data
-        if syx_data[-1] != 0xF7:
-            syx_data = syx_data + [0xF7]
-        msg = mido.Message('sysex', data=syx_data[1:-1])
-        mw = self.main_window
-        mw.midi_handler.send_sysex(msg.bytes())
-        self.set_status(f"Sent '{voice.get('name','')}' to MIDI Out on channel {channel_idx+1}.")
+        def after_download(syx_data, voice_name, error):
+            if error or not syx_data:
+                self.set_status(f"Failed to get SysEx data for '{voice.get('name','')}'.", error=True)
+                if worker in self._active_workers:
+                    self._active_workers.remove(worker)
+                return
+            import mido
+            if len(syx_data) > 3:
+                syx_data[2] = 0x10 | (channel_idx & 0x0F)
+            if syx_data[0] != 0xF0:
+                syx_data = [0xF0] + syx_data
+            if syx_data[-1] != 0xF7:
+                syx_data = syx_data + [0xF7]
+            msg = mido.Message('sysex', data=syx_data[1:-1])
+            mw = self.main_window
+            mw.midi_handler.send_sysex(msg.bytes())
+            self.set_status(f"Sent '{voice.get('name','')}' to MIDI Out on channel {channel_idx+1}.")
+            if worker in self._active_workers:
+                self._active_workers.remove(worker)
+        worker = VoiceBrowser.get_syx_data_for_voice_async(voice, after_download)
+        if not hasattr(self, '_active_workers'):
+            self._active_workers = []
+        self._active_workers.append(worker)
 
     def open_voice_in_editor_on_double_click(self, item):
+        # Only open the editor, do not send again (single-click already sends)
         self.edit_selected_voice_panel()
 
     def _on_voice_downloaded_wrapper(self, syx_data, voice, channel_text, error):
@@ -415,6 +424,7 @@ class VoiceBrowser(SingletonDialog):
             self.bank_label.setText("")
             return
         voice = self.filtered_voices[idx]
+        self.download_and_send_voice(idx)
         sig = voice.get('signature')
         if not sig:
             self.bank_label.setText("")
