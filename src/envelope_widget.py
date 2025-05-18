@@ -170,26 +170,17 @@ class EnvelopeWidget(QWidget):
             idx = self._drag_idx
             if idx in [1,2,3,5]:
                 if idx == 5:
-                    lidx = 3
+                    lidx = 3  # L4
                     y = max(margin, min(y, margin + h))
                     level = int(99 * (1 - (y - margin) / h))
                     level = max(0, min(99, level))
                     self.levels[lidx] = level
                 else:
-                    lidx = idx - 1
+                    lidx = idx - 1  # L1 (1), L2 (2), L3 (3)
                     y = max(margin, min(y, margin + h))
                     level = int(99 * (1 - (y - margin) / h))
                     level = max(0, min(99, level))
                     self.levels[lidx] = level
-                    x = max(margin, min(x, margin + w))
-                    prev_x = x_points[idx-1]
-                    next_x = x_points[idx+1] if idx+1 < len(x_points) else x_points[idx]
-                    if next_x != prev_x:
-                        rel = (x - prev_x) / (next_x - prev_x)
-                        rel = max(0.0, min(1.0, rel))
-                        rate = int(99 - rel * 98)
-                        rate = max(1, min(99, rate))
-                        self.rates[lidx] = rate
                 self.update()
                 self.envelopeChanged.emit(self.rates, self.levels, False)
                 self._last_mouse_pos = (x, y)
@@ -199,21 +190,19 @@ class EnvelopeWidget(QWidget):
             label_type, idx = self._drag_label
             dx = x - self._last_mouse_pos[0]
             dy = y - self._last_mouse_pos[1]
-            # Use the larger of dx or dy (in absolute value) for both types
             drag = dx if abs(dx) > abs(dy) else -dy
             if label_type == 'L':
                 orig = self.levels[idx]
-                delta = int(drag / 2)  # scale drag speed
+                delta = int(drag / 2)
                 new_val = max(0, min(99, orig + delta))
                 self.levels[idx] = new_val
             elif label_type == 'R':
                 orig = self.rates[idx]
-                delta = int(drag / 2)  # scale drag speed
+                delta = int(drag / 2)
                 new_val = max(1, min(99, orig + delta))
                 self.rates[idx] = new_val
             self.update()
             self.envelopeChanged.emit(self.rates, self.levels, False)
-            # Update last mouse pos so drag is incremental
             self._last_mouse_pos = (x, y)
             return
         num_levels = 4
