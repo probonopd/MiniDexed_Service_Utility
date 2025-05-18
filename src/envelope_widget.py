@@ -27,10 +27,14 @@ class EnvelopeWidget(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
     def set_envelope(self, rates, levels):
-        if len(rates) == 4 and len(levels) == 4:
-            self.rates = list(rates)
-            self.levels = list(levels)
-            self.update()
+        self.blockSignals(True)
+        try:
+            if len(rates) == 4 and len(levels) == 4:
+                self.rates = list(rates)
+                self.levels = list(levels)
+                self.update()
+        finally:
+            self.blockSignals(False)
 
     def set_highlight(self, highlight_type, index):
         self.highlight_type = highlight_type  # 'rate' or 'level'

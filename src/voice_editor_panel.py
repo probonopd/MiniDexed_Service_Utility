@@ -214,6 +214,8 @@ class VoiceEditorPanel(QWidget):
         return str(value)
 
     def _make_slider(self, value, min_val, max_val, slot, description, color, label=None, param_key=None):
+        if value is None:
+            value = min_val
         slider = QSlider(Qt.Orientation.Vertical)
         slider.setMinimum(min_val)
         slider.setMaximum(max_val)
@@ -449,47 +451,14 @@ class VoiceEditorPanel(QWidget):
             env_widget.set_envelope(rates, levels)
             self.op_env_widgets.append(env_widget)
             operator_row_layout.addWidget(env_widget)
-            # Connect envelopeChanged to MIDI update
+            # Connect envelopeChanged to MIDI update (robust closure for operator index)
             def make_env_handler(op_idx):
-                def handler(rates, levels, send=True):
+                def handler(rates, levels, send):
                     for i in range(4):
-                        if send:
-                            self.set_op_param(op_idx, f'R{i+1}', int(rates[i]))
-                            self.set_op_param(op_idx, f'L{i+1}', int(levels[i]))
-                    # Show value for hovered label if any, else last changed
-                    widget = self.op_env_widgets[op_idx]
-                    hovered = getattr(widget, '_hovered_label', None)
-                    if hovered:
-                        if hovered.startswith('R') and hovered[1:].isdigit():
-                            idx = int(hovered[1:]) - 1
-                            val = int(rates[idx])
-                            desc = f"Envelope Rate {idx+1}"
-                        elif hovered.startswith('L') and hovered[1:].isdigit():
-                            idx = int(hovered[1:]) - 1
-                            val = int(levels[idx])
-                            desc = f"Envelope Level {idx+1}"
-                        else:
-                            val = ''
-                            desc = hovered
-                        self.update_status_bar(f"{desc}: {val}", lcd_value=val)
-                    else:
-                        # Fallback: show last dragged
-                        if hasattr(widget, '_drag_idx') and widget._drag_idx is not None:
-                            idx = widget._drag_idx
-                            if idx == 5:
-                                lidx = 3
-                                val = int(levels[lidx])
-                                desc = f"Envelope Level {lidx+1}"
-                            elif idx in [1,2,3]:
-                                ridx = idx-1
-                                val = int(rates[ridx])
-                                desc = f"Envelope Rate {ridx+1}"
-                            else:
-                                val = ''
-                                desc = ''
-                            self.update_status_bar(f"{desc}: {val}", lcd_value=val)
+                        self.set_op_param(op_idx, f'R{i+1}', int(rates[i]))
+                        self.set_op_param(op_idx, f'L{i+1}', int(levels[i]))
                 return handler
-            env_widget.envelopeChanged.connect(make_env_handler(op_idx=tg))
+            env_widget.envelopeChanged.connect(make_env_handler(tg))
             # Connect labelHovered to show param info
             def make_env_label_hovered(op_idx):
                 def handler(param_key):
@@ -515,7 +484,7 @@ class VoiceEditorPanel(QWidget):
                         self.param_info_panel.setText("")
                         self.update_status_bar("")
                 return handler
-            env_widget.labelHovered.connect(make_env_label_hovered(op_idx=tg))
+            env_widget.labelHovered.connect(make_env_label_hovered(tg))
             # Add per-operator KeyboardScalingWidget
             ks_widget = KeyboardScalingWidget()
             bp = self.get_op_param(tg, 'BP', 50)
@@ -526,7 +495,7 @@ class VoiceEditorPanel(QWidget):
             ks_widget.set_params(bp, ld, rd, lc, rc)
             self.op_ks_widgets.append(ks_widget)
             operator_row_layout.addWidget(ks_widget)
-            # Connect paramsChanged to MIDI update
+            # Connect paramsChanged to MIDI update (robust closure for operator index)
             def make_ks_handler(op_idx):
                 def handler(bp, ld, rd, lc, rc):
                     self.set_op_param(op_idx, 'BP', int(bp))
@@ -534,29 +503,9 @@ class VoiceEditorPanel(QWidget):
                     self.set_op_param(op_idx, 'RD', int(rd))
                     self.set_op_param(op_idx, 'LC', int(lc))
                     self.set_op_param(op_idx, 'RC', int(rc))
-                    widget = self.op_ks_widgets[op_idx]
-                    hovered = getattr(widget, '_hovered_label', None)
-                    if hovered == 'BP':
-                        self.update_status_bar(f"Break Point: {bp}", lcd_value=bp)
-                    elif hovered == 'LD':
-                        self.update_status_bar(f"Left Depth: {ld}", lcd_value=ld)
-                    elif hovered == 'RD':
-                        self.update_status_bar(f"Right Depth: {rd}", lcd_value=rd)
-                    elif hovered == 'LC':
-                        val = self.get_value_label('LC', lc)
-                        self.update_status_bar(f"Left Curve: {val}", lcd_value=lc)
-                    elif hovered == 'RC':
-                        val = self.get_value_label('RC', rc)
-                        self.update_status_bar(f"Right Curve: {val}", lcd_value=rc)
-                    else:
-                        # Show all for clarity if not hovering
-                        self.update_status_bar(
-                            f"Break Point: {bp}  Left Depth: {ld}  Right Depth: {rd}  Left Curve: {self.get_value_label('LC', lc)}  Right Curve: {self.get_value_label('RC', rc)}",
-                            lcd_value=bp
-                        )
                 return handler
-            ks_widget.paramsChanged.connect(make_ks_handler(op_idx=tg))
-            # Connect labelHovered to show param info and update status bar/LCD
+            ks_widget.paramsChanged.connect(make_ks_handler(tg))
+            # Connect labelHovered to show param info
             def make_ks_label_hovered(op_idx):
                 def handler(param_key):
                     if param_key:
@@ -588,7 +537,7 @@ class VoiceEditorPanel(QWidget):
                         self.param_info_panel.setText("")
                         self.update_status_bar("")
                 return handler
-            ks_widget.labelHovered.connect(make_ks_label_hovered(op_idx=tg))
+            ks_widget.labelHovered.connect(make_ks_label_hovered(tg))
             op_grid.addWidget(op_bg, row, 0, 1, op_col_count)
 
             # --- Add event handlers for envelope preview on hover ---
@@ -819,6 +768,11 @@ class VoiceEditorPanel(QWidget):
     def get_param(self, key, default=None):
         return self.params.get(key, default)
 
+    def get_op_param(self, op, key, default=None):
+        if 'operators' in self.params and isinstance(self.params['operators'], list) and len(self.params['operators']) > op:
+            return self.params['operators'][op].get(key, default)
+        return default
+
     def set_param(self, key, value):
         self.params[key] = value
         param_num = self._get_param_num(key)
@@ -840,35 +794,6 @@ class VoiceEditorPanel(QWidget):
         # Update keyboard scaling widget if key is BP, LD, RD, LC, RC
         if key in ['BP', 'LD', 'RD', 'LC', 'RC']:
             self._update_ks_widget_for_operator(op)
-
-    def _update_ks_widget_for_operator(self, op_idx):
-        bp = self.get_op_param(op_idx, 'BP', 50)
-        ld = self.get_op_param(op_idx, 'LD', 50)
-        rd = self.get_op_param(op_idx, 'RD', 50)
-        lc = self.get_op_param(op_idx, 'LC', 0)
-        rc = self.get_op_param(op_idx, 'RC', 0)
-        self.op_ks_widgets[op_idx].set_params(bp, ld, rd, lc, rc)
-
-    def _reset_ks_widget(self, op_idx):
-        self.op_ks_widgets[op_idx].set_params(50, 50, 50, 0, 0)
-
-    def get_op_param(self, op, key, default=0):
-        if 'operators' in self.params and isinstance(self.params['operators'], list):
-            if 0 <= op < len(self.params['operators']):
-                return self.params['operators'][op].get(key, default)
-        return default
-
-    def _get_rtpc_number(self, key, op_idx=None):
-        # Look up the RTPC number for a parameter (and operator index if operator param)
-        param_info = self._vced_param_info.get(key)
-        if not param_info:
-            return None
-        rtpc = param_info.get('rtpc_number')
-        if isinstance(rtpc, list) and op_idx is not None:
-            return rtpc[op_idx]
-        elif isinstance(rtpc, int):
-            return rtpc
-        return None
 
     def send_sysex(self, key, value, param_num, op_idx=None):
         print(f"[DEBUG] send_sysex called with key={key}, value={value}, param_num={param_num}, op_idx={op_idx}")
@@ -899,75 +824,28 @@ class VoiceEditorPanel(QWidget):
         else:
             print(f"[VOICE EDITOR PANEL] No valid param_num for {key} (op_idx={op_idx})")
 
-    def _get_param_num(self, key):
-        param_map = {
-            'PR1': 121, 'PR2': 122, 'PR3': 123, 'PR4': 124,
-            'PL1': 125, 'PL2': 126, 'PL3': 127, 'PL4': 128,
-            'FBL': 129, 'OPI': 130, 'ALS': 134, 'LFS': 137, 'LFD': 138, 'LPMD': 139, 'LAMD': 140,
-            'LFKS': 141, 'LFW': 142, 'LPMS': 143, 'TRNP': 144,
-            # TX816/TX216 performance params
-            'SRC': 1, 'PMO': 2, 'PBR': 3, 'PBS': 4, 'PRT': 5, 'PGL': 6, 'PMD': 7,
-            'MWS': 9, 'MWA': 10, 'FCS': 11, 'FCA': 12, 'ATS': 13, 'ATA': 14, 'BCS': 15, 'BCA': 16,
-            'ATT': 26, 'MTU': 64,
-        }
-        if key.startswith('VNAM'):
-            try:
-                idx = int(key[4:])
-                return 145 + idx - 1
-            except Exception:
-                return None
-        return param_map.get(key)
-
-    def _get_operator_param_offsets_from_json(self):
-        # Dynamically build OPERATOR_PARAM_OFFSETS from VCED.json
-        if not hasattr(self, '_vced_param_info') or not self._vced_param_info:
-            import os, json
-            try:
-                with open(os.path.join(os.path.dirname(__file__), 'data', 'VCED.json'), 'r', encoding='utf-8') as f:
-                    vced_json = json.load(f)
-                    self._vced_param_info = {p['key']: p for p in vced_json.get('parameters', [])}
-            except Exception:
-                self._vced_param_info = {}
-        # Only include operator params (parameter_number 0-20)
-        return {k: v['parameter_number'] for k, v in self._vced_param_info.items() if 0 <= v.get('parameter_number', -1) <= 20}
-
-    def _get_operator_param_num(self, op, key):
-        OPERATOR_PARAM_OFFSETS = self._get_operator_param_offsets_from_json()
-        if key in OPERATOR_PARAM_OFFSETS:
-            op_idx = int(op)
-            param_base = (5 - op_idx) * 21
-            return param_base + OPERATOR_PARAM_OFFSETS[key]
-        return None
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.update_svg_overlay()
-
-    def handle_op_enabled(self):
-        enabled_states = []
-        bitfield = 0
-        for i in range(self.op_count):
-            enabled = self.get_op_param(i, 'E', 1)
-            enabled_states.append(f"Op {i+1}: {'Enabled' if enabled else 'Disabled'}")
-            if enabled:
-                bitfield |= (1 << (5 - i))  # OP1 is bit 5, OP6 is bit 0
-        # Send DX7 operator enable/disable SysEx
-        sysex = [0xF0, 0x43, 0x10, 0x01, 0x1B, bitfield, 0xF7]
-        print(f"[DX7 OP ENABLE] Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)}")
-        if self.midi_outport:
-            import mido
-            msg = mido.Message('sysex', data=sysex[1:-1])
-            self.midi_outport.send_sysex(sysex)
-        else:
-            print("[DX7 OP ENABLE] midi_outport is not set, cannot send SysEx.")
-
     def _update_env_widget_for_operator(self, op_idx):
+        widget_idx = self.op_count - 1 - op_idx
         rates = [self.get_op_param(op_idx, f'R{i+1}', 50) for i in range(4)]
         levels = [self.get_op_param(op_idx, f'L{i+1}', 99 if i == 0 else 0) for i in range(4)]
-        self.op_env_widgets[op_idx].set_envelope(rates, levels)
+        self.op_env_widgets[widget_idx].set_envelope(rates, levels)
 
     def _reset_env_widget(self, op_idx):
-        self.op_env_widgets[op_idx].set_envelope([50, 50, 50, 50], [99, 70, 40, 0])
+        widget_idx = self.op_count - 1 - op_idx
+        self.op_env_widgets[widget_idx].set_envelope([50, 50, 50, 50], [99, 70, 40, 0])
+
+    def _update_ks_widget_for_operator(self, op_idx):
+        widget_idx = self.op_count - 1 - op_idx
+        bp = self.get_op_param(op_idx, 'BP', 50)
+        ld = self.get_op_param(op_idx, 'LD', 50)
+        rd = self.get_op_param(op_idx, 'RD', 50)
+        lc = self.get_op_param(op_idx, 'LC', 0)
+        rc = self.get_op_param(op_idx, 'RC', 0)
+        self.op_ks_widgets[widget_idx].set_params(bp, ld, rd, lc, rc)
+
+    def _reset_ks_widget(self, op_idx):
+        widget_idx = self.op_count - 1 - op_idx
+        self.op_ks_widgets[widget_idx].set_params(50, 50, 50, 0, 0)
 
     def init_patch_bytes(self):
         # Returns 161 bytes for an INIT patch (all params default, name 'INIT PATCH')
@@ -1009,19 +887,19 @@ class VoiceEditorPanel(QWidget):
     def get_lcd_widget(self):
         return self.lcd_number
 
-    # --- Load parameter definitions ---
-        self._param_formats = {}
-        vced_path = os.path.join(os.path.dirname(__file__), 'data', 'VCED.json')
-        try:
-            with open(vced_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, dict) and 'format' in data and 'parameters' in data:
-                    fmt = data['format']
-                    self._param_formats[fmt] = {p['key']: p for p in data['parameters']}
-        except Exception as e:
-            self._param_formats = {}
-        # Default to VCED for now
-        self._vced_param_info = self._param_formats.get('VCED', {})
+    def _get_operator_param_num(self, op_idx, key):
+        """
+        Returns the parameter number for a given operator and key, or None if not found.
+        """
+        if hasattr(self, '_vced_param_info') and self._vced_param_info:
+            param_info = self._vced_param_info.get(key)
+            if param_info and 'parameter_number' in param_info:
+                param_num = param_info['parameter_number']
+                if isinstance(param_num, list) and len(param_num) > op_idx:
+                    return param_num[op_idx]
+                elif isinstance(param_num, int):
+                    return param_num
+        return None
 
 class VoiceEditorPanelDialog(QDialog):
     _instance = None

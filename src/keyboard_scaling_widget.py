@@ -36,22 +36,17 @@ class KeyboardScalingWidget(QWidget):
         self._hovered_label = None
         self.setMouseTracking(True)
 
-    def set_params(self, break_point, left_depth, right_depth, left_curve, right_curve):
-        changed = (
-            self.break_point != break_point or
-            self.left_depth != left_depth or
-            self.right_depth != right_depth or
-            self.left_curve != left_curve or
-            self.right_curve != right_curve
-        )
-        self.break_point = break_point
-        self.left_depth = left_depth
-        self.right_depth = right_depth
-        self.left_curve = left_curve
-        self.right_curve = right_curve
-        self.update()
-        if changed:
-            self.paramsChanged.emit(self.break_point, self.left_depth, self.right_depth, self.left_curve, self.right_curve)
+    def set_params(self, bp, ld, rd, lc, rc):
+        self.blockSignals(True)
+        try:
+            self.break_point = bp
+            self.left_depth = ld
+            self.right_depth = rd
+            self.left_curve = lc
+            self.right_curve = rc
+            self.update()
+        finally:
+            self.blockSignals(False)
 
     def set_highlight(self, part):
         self.highlight = part  # 'break', 'left_depth', 'right_depth', 'left_curve', 'right_curve'
