@@ -389,16 +389,33 @@ class VoiceEditorPanel(QWidget):
             spacer_item.setFixedWidth(self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50)
             self.operator_spacer_items.append(spacer_item)
             operator_row_layout.addWidget(spacer_item)
-            # Add E (Enable) slider
-            e_short = self._vced_param_info.get('E', {}).get('short', 'E')
+            # Add OPE (Operator Enable) slider
+            ope_short = self._vced_param_info.get('OPE', {}).get('short', 'OPE')
             operator_row_layout.addWidget(self._make_slider(
                 self.get_op_param(tg, 'E', 1), 0, 1,
                 lambda v, o=tg: (self.set_op_param(o, 'E', v), self.handle_op_enabled()),
-                'Operator Enable', '#8ecae6', e_short, param_key='E'
+                'Operator Enable', '#8ecae6', ope_short, param_key='OPE'
             ))
+            # Add TL (Total Level) slider
+            tl_short = self._vced_param_info.get('TL', {}).get('short', 'TL')
+            operator_row_layout.addWidget(self._make_slider(
+                self.get_op_param(tg, 'TL'), 0, 99,
+                lambda v, o=tg: self.set_op_param(o, 'TL', v),
+                'Total Level', '#8ecae6', tl_short, param_key='TL'
+            ))
+            # Insert separator between TL and PM
             operator_row_layout.addWidget(self._make_vline())
-            # Frequency
+            # Add PM (Frequency Mode) slider
+            pm_short = self._vced_param_info.get('PM', {}).get('short', 'PM')
+            operator_row_layout.addWidget(self._make_slider(
+                self.get_op_param(tg, 'PM'), 0, 1,
+                lambda v, o=tg: self.set_op_param(o, 'PM', v),
+                'Frequency Mode', '#8ecae6', pm_short, param_key='PM'
+            ))
+            # Add the rest of the frequency sliders (PC, PF, PD)
             for key, full_name, _short_lbl, max_val in OP_FREQ_DEFS:
+                if key in ('PM',):
+                    continue
                 short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
                     self.get_op_param(tg, key), 0, max_val,
@@ -406,14 +423,23 @@ class VoiceEditorPanel(QWidget):
                     full_name, '#8ecae6', short_label, param_key=key
                 ))
             operator_row_layout.addWidget(self._make_vline())
-            # Level
+            # Add the rest of the level sliders (AMS, TS)
             for key, full_name, _short_lbl, max_val in OP_LEVEL_DEFS:
+                if key in ('TL',):
+                    continue
                 short_label = self._vced_param_info.get(key, {}).get('short', key)
                 operator_row_layout.addWidget(self._make_slider(
                     self.get_op_param(tg, key), 0, max_val,
                     lambda v, o=tg, k=key: self.set_op_param(o, k, v),
                     full_name, '#8ecae6', short_label, param_key=key
                 ))
+            # Add RS (Rate Scaling) slider before AMS
+            rs_short = self._vced_param_info.get('RS', {}).get('short', 'RS')
+            operator_row_layout.addWidget(self._make_slider(
+                self.get_op_param(tg, 'RS'), 0, 7,
+                lambda v, o=tg: self.set_op_param(o, 'RS', v),
+                'Rate Scaling', '#8ecae6', rs_short, param_key='RS'
+            ))
             operator_row_layout.addWidget(self._make_vline())
             # --- Remove EG Level, EG Rate, and Keyboard Scaling sliders ---
             # Add per-operator EnvelopeWidget
@@ -892,16 +918,25 @@ class VoiceEditorPanel(QWidget):
                 return None
         return param_map.get(key)
 
+    def _get_operator_param_offsets_from_json(self):
+        # Dynamically build OPERATOR_PARAM_OFFSETS from VCED.json
+        if not hasattr(self, '_vced_param_info') or not self._vced_param_info:
+            import os, json
+            try:
+                with open(os.path.join(os.path.dirname(__file__), 'data', 'VCED.json'), 'r', encoding='utf-8') as f:
+                    vced_json = json.load(f)
+                    self._vced_param_info = {p['key']: p for p in vced_json.get('parameters', [])}
+            except Exception:
+                self._vced_param_info = {}
+        # Only include operator params (parameter_number 0-20)
+        return {k: v['parameter_number'] for k, v in self._vced_param_info.items() if 0 <= v.get('parameter_number', -1) <= 20}
+
     def _get_operator_param_num(self, op, key):
-        op_param_order = [
-            'R1', 'R2', 'R3', 'R4', 'L1', 'L2', 'L3', 'L4',
-            'BP', 'LD', 'RD', 'LC', 'RC', 'RS', 'TL', 'AMS', 'TS', 'PM', 'PC', 'PF', 'PD'
-        ]
-        if key in op_param_order:
+        OPERATOR_PARAM_OFFSETS = self._get_operator_param_offsets_from_json()
+        if key in OPERATOR_PARAM_OFFSETS:
             op_idx = int(op)
             param_base = (5 - op_idx) * 21
-            param_offset = op_param_order.index(key)
-            return param_base + param_offset
+            return param_base + OPERATOR_PARAM_OFFSETS[key]
         return None
 
     def showEvent(self, event):
@@ -936,11 +971,39 @@ class VoiceEditorPanel(QWidget):
 
     def init_patch_bytes(self):
         # Returns 161 bytes for an INIT patch (all params default, name 'INIT PATCH')
-        data = [0xF0, 0x43, 0x00, 0x09, 0x20] + [0]*155 + [0xF7]
-        # Set name to 'INIT PATCH'
+        # See DX7 parameter order and default values from the provided table
+        data = [0xF0, 0x43, 0x00, 0x09, 0x20]
+        # Operator parameters (6 operators, each 21 bytes)
+        op_defaults = [
+            # R1, R2, R3, R4, L1, L2, L3, L4, LD, RD, LC, RC, RS, TL, AMS, TS, PM, PC, PF, PD, BP
+            99, 99, 99, 99, 99, 99, 99, 0, 99, 99, 0, 0, 0, 99, 0, 0, 0, 1, 0, 7, 39
+        ]
+        # The DX7 stores operator data in reverse order: OP6, OP5, ..., OP1
+        for _ in range(6):
+            data.extend(op_defaults)
+        # PEG (Pitch EG) rates and levels
+        data.extend([99, 99, 99, 99])  # PR1-PR4
+        data.extend([99, 99, 99, 99])  # PL1-PL4
+        # Algorithm selector
+        data.append(0)  # ALS
+        # Feedback level
+        data.append(0)  # FBL
+        # Oscillator phase init
+        data.append(0)  # OPI
+        # LFO
+        data.extend([35, 0, 0, 0, 0, 0, 0, 0, 0, 24])  # LFS, LFD, LPMD, LAMD, LFKS, LFW, LPMS, TRNP
+        # Voice name (10 chars, ASCII)
         name = b'INIT PATCH'
-        for i, c in enumerate(name):
-            data[150 + i] = c
+        for i in range(10):
+            data.append(name[i] if i < len(name) else 32)
+        # Operator enable (OPSEL): all enabled (0b111111 = 63)
+        data.append(63)
+        # Operator select (OPSEL): 0
+        data.append(0)
+        # Pad to 155 bytes if needed
+        while len(data) < 160:
+            data.append(0)
+        data.append(0xF7)
         return bytes(data)
 
     def get_lcd_widget(self):

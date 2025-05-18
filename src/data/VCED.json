@@ -593,6 +593,24 @@
       "massey_chapter": 15,
       "massey_subchapter": "Changing pitch",
       "massey_chapter_name": "Advanced Programming Techniques"
+    },
+    {
+      "key": "OPE",
+      "short": "OPE",
+      "long": "Operator Enable",
+      "min": 0,
+      "max": 1,
+      "values": {
+        "0": "Off",
+        "1": "On"
+      },
+      "description": "Operator Enable (OPE). Turns the operator on or off. 0 = Off, 1 = On.",
+      "long_description": "Operator Enable determines whether the operator is active or inactive in the sound generation process. When set to 'On', the operator contributes to the sound; when set to 'Off', it does not produce any sound. This parameter is essential for controlling which operators are used in a voice and for designing complex sounds with multiple operators.",
+      "sound_impact": "This parameter turns the operator on or off. When 'On', the operator contributes to the sound; when 'Off', it does not produce any sound. This is crucial for controlling which operators are active in a voice and for designing complex sounds.",
+      "parameter_number": 145,
+      "massey_chapter": 5,
+      "massey_subchapter": "The Carrier",
+      "massey_chapter_name": "The Carrier"
     }
   ],
   "TX816Perf": [
