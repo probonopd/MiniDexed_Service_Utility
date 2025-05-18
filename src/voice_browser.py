@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction
 from voice_editor import VoiceEditor
-from voice_editor_panel import VoiceEditorPanel
+from voice_editor_panel import VoiceEditorPanelDialog
 from singleton_dialog import SingletonDialog
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"
@@ -259,7 +259,6 @@ class VoiceBrowser(SingletonDialog):
                     self._active_workers.remove(worker)
                 return
             midi_outport = getattr(self.main_window, 'midi_handler', None)
-            # Ensure valid 161-byte SysEx for the editor
             if isinstance(syx_data, list):
                 syx_data = bytes(syx_data)
             if len(syx_data) == 159:
@@ -268,12 +267,12 @@ class VoiceBrowser(SingletonDialog):
                 syx_data = b'\xF0' + syx_data[1:-1] + b'\xF7'
             elif len(syx_data) == 155:
                 syx_data = b'\xF0\x43\x00\x09\x20' + syx_data + b'\xF7'
-            editor = VoiceEditorPanel.get_instance(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
             idx_ch = self.channel_combo.currentIndex()
-            editor.channel_combo.setCurrentIndex(idx_ch)
-            editor.show()
-            editor.raise_()
-            editor.activateWindow()
+            VoiceEditorPanelDialog.show_panel(midi_outport=midi_outport, voice_bytes=syx_data, parent=self)
+            # Set the channel in the editor if needed
+            editor = VoiceEditorPanel.get_instance()
+            if hasattr(editor, 'channel_combo'):
+                editor.channel_combo.setCurrentIndex(idx_ch)
             if worker in self._active_workers:
                 self._active_workers.remove(worker)
         worker = VoiceBrowser.get_syx_data_for_voice_async(voice, after_download)
@@ -343,7 +342,6 @@ class VoiceBrowser(SingletonDialog):
         self._active_workers.append(worker)
 
     def open_voice_in_editor_on_double_click(self, item):
-        # Only open the editor, do not send again (single-click already sends)
         self.edit_selected_voice_panel()
 
     def _on_voice_downloaded_wrapper(self, syx_data, voice, channel_text, error):

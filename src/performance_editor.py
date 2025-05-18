@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtCore import QTimer
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from voice_editor import VoiceEditor
+from voice_editor_panel import VoiceEditorPanelDialog
 from singleton_dialog import SingletonDialog
 from performance_fields import TG_FIELDS, GLOBAL_FIELDS, PERFORMANCE_FIELDS, PERFORMANCE_FIELD_RANGES, TG_LABELS
 from voice_management import select_voice_dialog, open_voice_editor, on_voice_dump
@@ -82,7 +83,7 @@ class PerformanceEditor(SingletonDialog):
                         edit_btn.setObjectName(f"edit_btn_{col}")
                         edit_btn.setFixedWidth(22)
                         edit_btn.setToolTip("Edit this voice")
-                        edit_btn.clicked.connect(lambda checked, r=row, c=col: open_voice_editor(self.table, self.main_window, r, c, getattr(self, '_voice_dump_data', {})))
+                        edit_btn.clicked.connect(lambda checked, r=row, c=col: self.open_voice_editor(r, c))
                         h_layout.addWidget(btn)
                         h_layout.addWidget(edit_btn)
                         # No stretch, so buttons are flush
@@ -572,12 +573,12 @@ class PerformanceEditor(SingletonDialog):
         voice_bytes = None
         if hasattr(self, '_voice_dump_data') and col in self._voice_dump_data:
             voice_bytes = bytes(self._voice_dump_data[col])
-        # Open the Voice Editor
+        # Open the Voice Editor Panel in a window
         midi_outport = getattr(self.main_window, 'midi_handler', None)
         if midi_outport and hasattr(midi_outport, 'outport'):
             midi_outport = midi_outport.outport
-        VoiceEditor.show_singleton(parent=self, midi_outport=midi_outport, voice_bytes=voice_bytes)
-        # Set the channel in the editor
-        editor = VoiceEditor.get_instance()
+        # Use singleton dialog for the panel
+        VoiceEditorPanelDialog.show_panel(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=self)
+        editor = VoiceEditorPanel.get_instance()
         if hasattr(editor, 'channel_combo'):
             editor.channel_combo.setCurrentIndex(channel - 1)

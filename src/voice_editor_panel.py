@@ -121,6 +121,34 @@ class DraggableValueLabel(QLabel):
         super().wheelEvent(event)
 
 class VoiceEditorPanel(QWidget):
+    _instance = None
+
+    @classmethod
+    def get_instance(cls, midi_outport=None, voice_bytes=None, parent=None):
+        if cls._instance is None or not hasattr(cls._instance, 'isVisible') or not cls._instance.isVisible():
+            cls._instance = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=parent)
+            # Optionally connect a close event to clear _instance
+            cls._instance.destroyed.connect(lambda: setattr(cls, '_instance', None))
+        else:
+            # Update midi_outport and voice_bytes if provided
+            if midi_outport is not None:
+                cls._instance.midi_outport = midi_outport
+            if voice_bytes is not None:
+                cls._instance.voice_bytes = voice_bytes
+                cls._instance.decoder = SingleVoiceDumpDecoder(voice_bytes)
+                cls._instance.decoder.decode()
+                cls._instance.params = cls._instance.decoder.params
+        return cls._instance
+
+    @classmethod
+    def show_singleton(cls, parent=None, midi_outport=None, voice_bytes=None):
+        dlg = cls.get_instance(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=parent)
+        dlg.setWindowModality(Qt.NonModal)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        return dlg
+
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
         super().__init__(parent)
         self.setStyleSheet("background-color: #332b28; color: #e0e0e0;")
@@ -135,15 +163,25 @@ class VoiceEditorPanel(QWidget):
         self.status_bar.setFixedHeight(36)
         self.status_bar.setFixedWidth(220)
         self.status_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.status_bar.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.status_bar.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         self.status_bar.setWordWrap(False)
-        self.status_bar.setStyleSheet("background: transparent; color: #e0e0e0; padding: 4px;")
-        self.setContentsMargins(0, 0, 0, 0)
-        # Gradient styles for backgrounds
+        self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #17777a, stop:1 #223c36); border-radius: 2px;"
+        self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
         self.gradient_global = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
-        self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2a9d8f, stop:1 #264653); border-radius: 2px;"
-        self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #6c757d, stop:1 #495057); border-radius: 2px;"
-        # --- VoiceEditorPanel initialization code... ---
+        self.setStyleSheet("background-color: #332b28; color: #e0e0e0;")
+        
+        self.status_bar.setStyleSheet("background: transparent; color: #e0e0e0; padding: 4px;")
+        self.gradient_status = (
+            "font-size: 8pt; "
+            "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fffde8, stop:0.5 #fffad7, stop:1 #f3eeb2); "
+            "color: #000000; padding: 0px; border-top: 1px solid #d4cc99; border-radius: 2px; "
+            "text-align: center; "  # horizontal centering
+            "vertical-align: middle; "  # vertical centering (for single-line)
+            "line-height: 0.8; "  # reduce space between lines to 80%
+        )
+        self.status_bar.setStyleSheet(self.gradient_status)
+        self.status_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.status_bar.mousePressEvent = self._on_status_bar_click
         self.init_ui()
 
     def update_status_bar(self, text, lcd_value=None):
@@ -209,7 +247,7 @@ class VoiceEditorPanel(QWidget):
             col.addWidget(slider, alignment=Qt.AlignmentFlag.AlignHCenter)
             lbl = QLabel(label)
             # Dynamically set font size based on label length
-            font_size = 8 if len(label) <= 2 else 7
+            font_size = 8 # if len(label) <= 2 else 7
             lbl.setStyleSheet(f"font-size: {font_size}pt; background: transparent;")
             col.addWidget(lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
             w = QWidget()
@@ -921,3 +959,47 @@ class VoiceEditorPanel(QWidget):
             self._param_formats = {}
         # Default to VCED for now
         self._vced_param_info = self._param_formats.get('VCED', {})
+
+class VoiceEditorPanelDialog(QDialog):
+    _instance = None
+
+    @classmethod
+    def show_panel(cls, midi_outport=None, voice_bytes=None, parent=None):
+        if cls._instance is not None and cls._instance.isVisible():
+            # Update panel contents if needed
+            panel = VoiceEditorPanel.get_instance(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=cls._instance)
+            if midi_outport is not None:
+                panel.midi_outport = midi_outport
+            if voice_bytes is not None:
+                panel.voice_bytes = voice_bytes
+                panel.decoder = SingleVoiceDumpDecoder(voice_bytes)
+                panel.decoder.decode()
+                panel.params = panel.decoder.params
+            cls._instance.raise_()
+            cls._instance.activateWindow()
+            cls._instance.show()
+            return cls._instance
+        dlg = VoiceEditorPanelDialog(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=parent)
+        cls._instance = dlg
+        dlg.setModal(False)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        return dlg
+
+    def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Voice Editor Panel")
+        self.setMinimumSize(800, 600)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.panel = VoiceEditorPanel.get_instance(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=self)
+        self.panel.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.panel)
+        self.setLayout(layout)
+        self.resize(800, 600)
+
+    def closeEvent(self, event):
+        VoiceEditorPanelDialog._instance = None
+        super().closeEvent(event)
