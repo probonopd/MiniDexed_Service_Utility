@@ -120,14 +120,9 @@ class DraggableValueLabel(QLabel):
                 self.valueChanged.emit(self._value)
         super().wheelEvent(event)
 
-class VoiceEditorPanel(SingletonDialog):
+class VoiceEditorPanel(QWidget):
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Voice Editor")
-        self.resize(800, 400)
-        self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #17777a, stop:1 #223c36); border-radius: 2px;"
-        self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
-        self.gradient_global = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
         self.setStyleSheet("background-color: #332b28; color: #e0e0e0;")
         self.midi_outport = midi_outport
         self.voice_bytes = voice_bytes or self.init_patch_bytes()
@@ -137,16 +132,18 @@ class VoiceEditorPanel(SingletonDialog):
         self.op_count = 6
         self.op_bg_widgets = []
         self.status_bar = QLabel("")
-        self.status_bar.setFixedHeight(48)
+        self.status_bar.setFixedHeight(36)
         self.status_bar.setFixedWidth(220)
         self.status_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.status_bar.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.status_bar.setWordWrap(False)
         self.status_bar.setStyleSheet("background: transparent; color: #e0e0e0; padding: 4px;")
-        self.gradient_status = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fffde8, stop:0.5 #fffad7, stop:1 #f3eeb2); color: #000000; padding: 4px; border-top: 1px solid #d4cc99; border-radius: 2px;"
-        self.status_bar.setStyleSheet(self.gradient_status)
-        self.status_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.status_bar.mousePressEvent = self._on_status_bar_click
+        self.setContentsMargins(0, 0, 0, 0)
+        # Gradient styles for backgrounds
+        self.gradient_global = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42372e, stop:1 #332b28); border-radius: 2px;"
+        self.gradient_carrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2a9d8f, stop:1 #264653); border-radius: 2px;"
+        self.gradient_noncarrier = "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #6c757d, stop:1 #495057); border-radius: 2px;"
+        # --- VoiceEditorPanel initialization code... ---
         self.init_ui()
 
     def update_status_bar(self, text, lcd_value=None):
@@ -245,7 +242,9 @@ class VoiceEditorPanel(SingletonDialog):
         except Exception as e:
             self._vced_param_info = {}
             self._tx816perf_param_info = {}
-        layout = QHBoxLayout(self)  # Use horizontal layout for main area
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         # --- Main editor area (was layout = QVBoxLayout(self)) ---
         main_vbox = QVBoxLayout()
         # --- Top bar layout ---
@@ -896,6 +895,18 @@ class VoiceEditorPanel(SingletonDialog):
 
     def _reset_env_widget(self, op_idx):
         self.op_env_widgets[op_idx].set_envelope([50, 50, 50, 50], [99, 70, 40, 0])
+
+    def init_patch_bytes(self):
+        # Returns 161 bytes for an INIT patch (all params default, name 'INIT PATCH')
+        data = [0xF0, 0x43, 0x00, 0x09, 0x20] + [0]*155 + [0xF7]
+        # Set name to 'INIT PATCH'
+        name = b'INIT PATCH'
+        for i, c in enumerate(name):
+            data[150 + i] = c
+        return bytes(data)
+
+    def get_lcd_widget(self):
+        return self.lcd_number
 
     # --- Load parameter definitions ---
         self._param_formats = {}
