@@ -120,6 +120,19 @@ def setup_menus(main_window):
     main_window.autoscroll_action.setChecked(True)
     options_menu.addAction(main_window.autoscroll_action)
     main_window.autoscroll_action.toggled.connect(lambda enabled: setattr(main_window, 'autoscroll_enabled', enabled))
+
+    # Route MIDI In to MIDI Out
+    main_window.route_midi_action = QAction("Route MIDI In to MIDI Out", main_window)
+    main_window.route_midi_action.setCheckable(True)
+    checked = main_window.settings.value("route_midi_in_to_out", False, type=bool)
+    main_window.route_midi_action.setChecked(checked)
+    options_menu.addAction(main_window.route_midi_action)
+    def on_route_midi_toggled(checked):
+        main_window.settings.setValue("route_midi_in_to_out", checked)
+        main_window.route_midi_in_to_out_enabled = checked
+    main_window.route_midi_action.toggled.connect(on_route_midi_toggled)
+    main_window.route_midi_in_to_out_enabled = checked
+
     # Preferences
     preferences_action = QAction("Preferences...", main_window)
     options_menu.addAction(preferences_action)

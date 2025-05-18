@@ -140,7 +140,33 @@ class MainWindow(QMainWindow):
         self.receive_worker = MIDIReceiveWorker(self.midi_handler)
         self.receive_worker.sysex_received.connect(self.ui.display_sysex)
         self.receive_worker.log.connect(self.ui.append_log)
+        # Forward MIDI In to Out if enabled
+        self.receive_worker.sysex_received.connect(self._maybe_forward_sysex)
+        self.receive_worker.note_on_received.connect(self._maybe_forward_note_on)
+        self.receive_worker.note_off_received.connect(self._maybe_forward_note_off)
+        self.receive_worker.control_change_received.connect(self._maybe_forward_control_change)
+        self.receive_worker.other_message_received.connect(self._maybe_forward_other)
         self.receive_worker.start()
+
+    def _maybe_forward_sysex(self, data):
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
+            self.midi_handler.send_sysex(data)
+
+    def _maybe_forward_note_on(self, msg):
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
+            self.midi_handler.outport.send(msg)
+
+    def _maybe_forward_note_off(self, msg):
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
+            self.midi_handler.outport.send(msg)
+
+    def _maybe_forward_control_change(self, msg):
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
+            self.midi_handler.outport.send(msg)
+
+    def _maybe_forward_other(self, msg):
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
+            self.midi_handler.outport.send(msg)
 
     def show_status(self, msg):
         self.statusBar().showMessage(msg)

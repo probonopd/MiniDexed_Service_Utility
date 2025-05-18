@@ -33,6 +33,8 @@ class MIDIReceiveWorker(QThread):
                 if not self.running:
                     logging.debug('MIDIReceiveWorker.run: self.running is False, breaking loop')
                     break
+                # Log every received MIDI message
+                self.log.emit(f"Received MIDI: {msg}")
                 if msg.type == 'sysex':
                     self.sysex_received.emit(list(msg.data))
                 elif msg.type == 'note_on':
