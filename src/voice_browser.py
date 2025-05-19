@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction
 from voice_editor import VoiceEditor
-from voice_editor_panel import VoiceEditorPanelDialog
+from voice_editor_panel import VoiceEditorPanelDialog, VoiceEditorPanel
 from singleton_dialog import SingletonDialog
 
 VOICE_LIST_URL = "https://patches.fm/patches/dx7/patch_list.json"

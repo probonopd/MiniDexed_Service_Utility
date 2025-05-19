@@ -163,9 +163,20 @@ class VoiceEditor(SingletonDialog):
     def send_sysex(self, key=None, value=None, param_num=None):
         # Send a DX7 Parameter Change SysEx message for the edited parameter
         # For operator params, send Operator Select first (0x15), then the param change
+        ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
+        # Determine if this is an operator parameter
+        op_idx = None
+        if key and key.startswith("OP") and "_" in key:
+            try:
+                op_idx = int(key[2]) - 1
+            except Exception:
+                op_idx = None
+        if op_idx is not None:
+            # Send Operator Select SysEx first
+            sel_sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), 0x00, 0x15, op_idx, 0xF7]
+            if self.midi_outport:
+                self.midi_outport.send_sysex(sel_sysex)
         if param_num is not None and value is not None:
-            ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
-            # Determine parameter group and parameter number for correct mapping
             if 0 <= param_num <= 155:
                 group = 0x00
                 if param_num <= 127:

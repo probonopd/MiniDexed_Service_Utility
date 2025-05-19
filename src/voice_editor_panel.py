@@ -1,16 +1,13 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QLineEdit, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter
-from PySide6.QtCore import Qt, QObject, QEvent, Signal, QPoint
+from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtGui import QResizeEvent, QPalette, QColor, QFontDatabase, QFont, QPainter, QMouseEvent
+from PySide6.QtGui import QResizeEvent, QPalette, QColor, QMouseEvent
 from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from envelope_widget import EnvelopeWidget
 from keyboard_scaling_widget import KeyboardScalingWidget
 from param_info_panel import ParamInfoPanel
 import os
-import mido
 import json
-from PySide6.QtWidgets import QApplication
-from singleton_dialog import SingletonDialog
 
 # --- Static definitions and tables ---
 
@@ -142,14 +139,26 @@ class VoiceEditorPanel(QWidget):
 
     @classmethod
     def show_singleton(cls, parent=None, midi_outport=None, voice_bytes=None):
-        dlg = cls.get_instance(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=parent)
-        dlg.setWindowModality(Qt.NonModal)
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
-        return dlg
+        # Always create a new instance to ensure UI is fully initialized
+        if cls._instance is not None:
+            try:
+                cls._instance.setParent(None)
+                cls._instance.deleteLater()
+            except Exception:
+                pass
+            cls._instance = None
+        cls._instance = VoiceEditorPanel(midi_outport=midi_outport, voice_bytes=voice_bytes, parent=parent)
+        cls._instance.setWindowModality(Qt.NonModal)
+        cls._instance.show()
+        cls._instance.raise_()
+        cls._instance.activateWindow()
+        return cls._instance
 
     def __init__(self, midi_outport=None, voice_bytes=None, parent=None):
+        # Ensure parent is a QWidget, not a QWindow
+        from PySide6.QtWidgets import QWidget
+        if parent is not None and not isinstance(parent, QWidget):
+            parent = None
         super().__init__(parent)
         self.setStyleSheet("background-color: #332b28; color: #e0e0e0;")
         self.midi_outport = midi_outport
@@ -691,6 +700,10 @@ class VoiceEditorPanel(QWidget):
         super().resizeEvent(event)
         self.update_svg_overlay(resize_only=True)
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.update_svg_overlay()
+
     def update_all_spacer_widths(self, width=None):
         if width is None:
             width = self.svg_overlay.width() if hasattr(self, 'svg_overlay') else 50
@@ -705,26 +718,32 @@ class VoiceEditorPanel(QWidget):
         alg_idx = self.alg_combo.currentIndex() + 1  # 1-based
         if not resize_only:
             svg_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "images", f"algorithm-{alg_idx:02d}.svg"))
+            print(f"[SVG DEBUG] Loading SVG: {svg_path}")
+            print(f"[SVG DEBUG] Exists: {os.path.exists(svg_path)}")
             self.svg_overlay.load(svg_path)
-        parent_height = self.svg_overlay.parent().height()
-        # Subtract the height of the last row (performance row) to avoid covering it
-        perf_row_widget = None
-        op_grid = self.svg_overlay.parent().layout() if self.svg_overlay.parent() else None
-        if op_grid is not None:
-            # The last row is the performance row
-            perf_row_idx = op_grid.rowCount() - 1
-            for col in range(op_grid.columnCount()):
-                item = op_grid.itemAtPosition(perf_row_idx, col)
-                if item is not None and item.widget() is not None:
-                    perf_row_widget = item.widget()
-                    break
-        perf_row_height = perf_row_widget.height() if perf_row_widget is not None else 0
-        # Reduce the available height for the SVG overlay
-        operator_height = (parent_height - perf_row_height) * 0.93
-        scale_factor = operator_height / self.svg_overlay.sizeHint().height() if self.svg_overlay.sizeHint().height() > 0 else 1.0
-        svg_width = int(self.svg_overlay.sizeHint().width() * scale_factor)
-        svg_height = int(self.svg_overlay.sizeHint().height() * scale_factor)
-        self.svg_overlay.resize(svg_width, svg_height)
+            print(f"[SVG DEBUG] SVG overlay sizeHint: {self.svg_overlay.sizeHint()}, parent height: {self.svg_overlay.parent().height() if self.svg_overlay.parent() else 'None'}")
+        parent = self.svg_overlay.parent()
+        if parent is not None:
+            parent_height = parent.height()
+            # Subtract the height of the last row (performance row) to avoid covering it
+            perf_row_widget = None
+            op_grid = parent.layout() if parent else None
+            if op_grid is not None:
+                perf_row_idx = op_grid.rowCount() - 1
+                for col in range(op_grid.columnCount()):
+                    item = op_grid.itemAtPosition(perf_row_idx, col)
+                    if item is not None and item.widget() is not None:
+                        perf_row_widget = item.widget()
+                        break
+            perf_row_height = perf_row_widget.height() if perf_row_widget is not None else 0
+            # Reduce the available height for the SVG overlay
+            operator_height = (parent_height - perf_row_height) * 0.93
+            scale_factor = operator_height / self.svg_overlay.sizeHint().height() if self.svg_overlay.sizeHint().height() > 0 else 1.0
+            svg_width = int(self.svg_overlay.sizeHint().width() * scale_factor)
+            svg_height = int(self.svg_overlay.sizeHint().height() * scale_factor)
+            self.svg_overlay.resize(svg_width, svg_height)
+        else:
+            self.svg_overlay.resize(self.svg_overlay.sizeHint())
         self.svg_overlay.setVisible(True)
         self.svg_overlay.raise_()
         self.svg_overlay.move(2, 7)
@@ -798,6 +817,11 @@ class VoiceEditorPanel(QWidget):
     def send_sysex(self, key, value, param_num, op_idx=None):
         print(f"[DEBUG] send_sysex called with key={key}, value={value}, param_num={param_num}, op_idx={op_idx}")
         ch = self.channel_combo.currentIndex()  # 0-indexed for MIDI
+        # If this is an operator parameter, send an Operator Select message first
+        if op_idx is not None:
+            sel_msg = [0xF0, 0x43, 0x10 | (ch & 0x0F), 0x00, 0x15, op_idx, 0xF7]
+            if self.midi_outport:
+                self.midi_outport.send_sysex(sel_msg)
         if param_num is not None and value is not None:
             if 0 <= param_num <= 155:
                 group = 0x00
@@ -940,6 +964,10 @@ class VoiceEditorPanelDialog(QDialog):
         layout.addWidget(self.panel)
         self.setLayout(layout)
         self.resize(800, 600)
+        self.panel.update_svg_overlay()
+        self.update()
+        self.adjustSize()
+        QApplication.processEvents()
 
     def closeEvent(self, event):
         VoiceEditorPanelDialog._instance = None
