@@ -91,7 +91,7 @@ def setup_menus(main_window):
             action.setCheckable(True)
             if port == selected_out:
                 action.setChecked(True)
-            action.triggered.connect(lambda checked, p=port: main_window.ui.set_out_port_from_menu(p))
+            action.triggered.connect(lambda checked, p=port: main_window.set_out_port_from_menu(p))
             midi_out_menu.addAction(action)
         # Add UDP MIDI if available
         if is_udp_port_open(50007, '127.0.0.1'):
@@ -100,7 +100,7 @@ def setup_menus(main_window):
             action.setCheckable(True)
             if selected_out == udp_label:
                 action.setChecked(True)
-            action.triggered.connect(lambda checked, p=udp_label: main_window.ui.set_out_port_from_menu(p))
+            action.triggered.connect(lambda checked, p=udp_label: main_window.set_out_port_from_menu(p))
             midi_out_menu.addAction(action)
     midi_out_menu.aboutToShow.connect(populate_out_menu)
 
@@ -118,7 +118,7 @@ def setup_menus(main_window):
             action.setCheckable(True)
             if port == selected_in:
                 action.setChecked(True)
-            action.triggered.connect(lambda checked, p=port: main_window.ui.set_in_port_from_menu(p))
+            action.triggered.connect(lambda checked, p=port: main_window.set_in_port_from_menu(p))
             midi_in_menu.addAction(action)
         # Add UDP MIDI if available
         if is_udp_port_open(50007, '127.0.0.1'):
@@ -127,7 +127,7 @@ def setup_menus(main_window):
             action.setCheckable(True)
             if selected_in == udp_label:
                 action.setChecked(True)
-            action.triggered.connect(lambda checked, p=udp_label: main_window.ui.set_in_port_from_menu(p))
+            action.triggered.connect(lambda checked, p=udp_label: main_window.set_in_port_from_menu(p))
             midi_in_menu.addAction(action)
     midi_in_menu.aboutToShow.connect(populate_in_menu)
 

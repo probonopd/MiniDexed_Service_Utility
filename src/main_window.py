@@ -23,7 +23,21 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("MiniDexed Service Utility")
         self.resize(800, 500)
         self.settings = QSettings("MIDISend", "MIDISendApp")
-        self.midi_handler = getattr(QApplication.instance(), "midi_handler", None)
+        
+        # MIDIHandler is now a QObject and needs to be instantiated properly.
+        # It should not be on QApplication.instance() if it's specific to MainWindow logic.
+        # If it truly needs to be globally accessible, a different singleton pattern might be needed.
+        # For now, let's assume it's owned by MainWindow.
+        self.midi_handler = MIDIHandler() 
+        # Connect MIDIHandler signals to MainWindow slots or other handlers
+        # self.midi_handler.log_message.connect(self.show_status) # Or a more specific log handler
+        # self.midi_handler.sysex_received.connect(self._maybe_forward_any)
+        # self.midi_handler.note_on_received.connect(self._maybe_forward_any)
+        # self.midi_handler.note_off_received.connect(self._maybe_forward_any)
+        # self.midi_handler.control_change_received.connect(self._maybe_forward_any)
+        # Instead, use the generic forward callback:
+        self.midi_handler.set_forward_callback(self._maybe_forward_any)
+
         self.ui = UiMainWindow(self)
         self.file_ops = FileOps(self)
         self.midi_ops = MidiOps(self)
@@ -47,16 +61,25 @@ class MainWindow(QMainWindow):
         self.firewall_worker.start()
         self.setup_midi_io_ui()
         # Ensure MIDI In-to-Out forwarding is set up immediately
-        self.start_receiving()
+        # self.start_receiving() # This is now implicitly handled by midi_handler.set_input_port
 
     def setup_midi_io_ui(self):
         # Setup MIDI input/output combo boxes
-        self.midi_in_combo = QComboBox()
-        self.midi_out_combo = QComboBox()
-        # ...existing code to populate with real MIDI ports...
-        self.midi_in_combo.addItem('UDP MIDI (127.0.0.1:50007)')
-        self.midi_out_combo.addItem('UDP MIDI (127.0.0.1:50007)')
-        # ...existing code to add to layout...
+        # These are now part of UiMainWindow, assuming they are named self.ui.midi_in_combo etc.
+        # If they are created here, ensure they are added to a layout.
+        # Example if they are direct members of MainWindow:
+        # self.midi_in_combo = QComboBox()
+        # self.midi_out_combo = QComboBox()
+        # self.ui.some_layout.addWidget(self.midi_in_combo) # Example add to layout
+        # self.ui.some_layout.addWidget(self.midi_out_combo) # Example add to layout
+        
+        # Connect UI combo box signals if they are managed here
+        # Assuming they are part of self.ui and named appropriately in ui_main_window.py
+        if hasattr(self.ui, 'midi_in_combo') and hasattr(self.ui, 'midi_out_combo'):
+            self.ui.midi_in_combo.currentIndexChanged.connect(self.on_midi_in_changed_ui)
+            self.ui.midi_out_combo.currentIndexChanged.connect(self.on_midi_out_changed_ui)
+        else:
+            print("[UI WARNING] MIDI combo boxes not found on self.ui. Connections skipped.")
 
     def handle_firewall_check_result(self, has_rule, current_profile, rule_profiles, enabled_profiles, disabled_profiles, has_block):
         profile_display = current_profile.capitalize() if current_profile else "Unknown"
@@ -107,15 +130,54 @@ class MainWindow(QMainWindow):
     def restore_last_ports(self):
         last_in = self.settings.value("last_in_port", "")
         last_out = self.settings.value("last_out_port", "")
-        self.ui.refresh_ports()
+        
+        self.ui.refresh_ports() # This populates combo boxes with names from MIDIHandler
+
+        # Set the MIDI handler's ports first. This will start listeners.
         if last_out:
-            if last_out == 'UDP MIDI (127.0.0.1:50007)':
-                self.midi_handler.use_udp_midi(True, as_input=False)
-            self.ui.set_out_port_from_menu(last_out)
+            self.show_status(f"[UI] Restoring last MIDI Out: '{last_out}'")
+            self.midi_handler.open_output(last_out)
+        else: # Ensure a default or no port state is explicitly set if nothing was saved
+            self.midi_handler.open_output(None)
+
         if last_in:
-            if last_in == 'UDP MIDI (127.0.0.1:50007)':
-                self.midi_handler.use_udp_midi(True, as_input=True)
-            self.ui.set_in_port_from_menu(last_in)
+            self.show_status(f"[UI] Restoring last MIDI In: '{last_in}'")
+            try:
+                self.midi_handler.open_input(last_in)
+            except Exception as e:
+                self.show_status(f"[ERROR] Could not open MIDI In '{last_in}': {e}")
+                self.midi_handler.open_input(None)
+        else: # Ensure a default or no port state is explicitly set
+            self.midi_handler.open_input(None)
+
+        # Now, update the UI to reflect the state of MIDIHandler
+        # This should happen *after* MIDIHandler has tried to open the ports,
+        # so current_input_port_name and current_output_port_name are accurate.
+        current_ui_in_port = self.midi_handler.current_input_port_name
+        current_ui_out_port = self.midi_handler.current_output_port_name
+
+        if hasattr(self.ui, 'midi_in_combo'):
+            if current_ui_in_port and current_ui_in_port in [self.ui.midi_in_combo.itemText(i) for i in range(self.ui.midi_in_combo.count())]:
+                self.ui.midi_in_combo.setCurrentText(current_ui_in_port)
+            elif not current_ui_in_port and self.ui.midi_in_combo.count() > 0:
+                 # self.ui.midi_in_combo.setCurrentIndex(-1) # Or select a placeholder if one exists
+                 pass # Or select a "None" or placeholder if available
+            self.show_status(f"[UI] Restored MIDI In UI to: '{current_ui_in_port or "None"}'")
+
+        if hasattr(self.ui, 'midi_out_combo'):
+            if current_ui_out_port and current_ui_out_port in [self.ui.midi_out_combo.itemText(i) for i in range(self.ui.midi_out_combo.count())]:
+                self.ui.midi_out_combo.setCurrentText(current_ui_out_port)
+            elif not current_ui_out_port and self.ui.midi_out_combo.count() > 0:
+                # self.ui.midi_out_combo.setCurrentIndex(-1)
+                pass # Or select a "None" or placeholder
+            self.show_status(f"[UI] Restored MIDI Out UI to: '{current_ui_out_port or "None"}'")
+
+        # Forwarding should be enabled by default if ports are set
+        # The `route_midi_in_to_out_enabled` attribute should be checked by forwarding methods
+        self.route_midi_in_to_out_enabled = True # Enable by default
+        if hasattr(self.ui, 'route_midi_action') and self.ui.route_midi_action:
+            self.ui.route_midi_action.setChecked(True)
+        self.show_status("[UI] MIDI In-to-Out forwarding enabled by default.")
 
     def closeEvent(self, event):
         import logging
@@ -151,132 +213,38 @@ class MainWindow(QMainWindow):
         event.accept()
         QApplication.quit()
 
-    def start_receiving(self):
-        if hasattr(self, 'receive_worker') and self.receive_worker and self.receive_worker.isRunning():
-            self.receive_worker.stop()  # MIDIReceiveWorker.stop() includes a wait() call.
-            # self.receive_worker = None # Optional: clear the reference after stopping
-
-        self.receive_worker = MIDIReceiveWorker(self.midi_handler)
-        self.receive_worker.log.connect(self.ui.append_log)
-        # Forward ALL MIDI In to Out using _maybe_forward_any
-        self.receive_worker.sysex_received.connect(self._maybe_forward_any)
-        self.receive_worker.note_on_received.connect(self._maybe_forward_any)
-        self.receive_worker.note_off_received.connect(self._maybe_forward_any)
-        self.receive_worker.control_change_received.connect(self._maybe_forward_any)
-        self.receive_worker.other_message_received.connect(self._maybe_forward_any)
-        self.receive_worker.start()
-
-    def _maybe_forward_sysex(self, data):
-        print(f"[MIDI FORWARD DEBUG] _maybe_forward_sysex called, data len={len(data)}")
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
-            if getattr(self.midi_handler, 'udp_enabled', False):
-                print(f"[MIDI FORWARD DEBUG] Forwarding SysEx to UDP MIDI")
-                self.midi_handler.send_sysex(data)
-            elif self.midi_handler.outport:
-                print(f"[MIDI FORWARD DEBUG] Forwarding SysEx to outport: {self.midi_handler.outport}")
-                self.midi_handler.send_sysex(data)
-            else:
-                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for SysEx")
-        else:
-            print(f"[MIDI FORWARD DEBUG] Not forwarding SysEx: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
-
-    def _maybe_forward_note_on(self, msg):
-        print(f"[MIDI FORWARD DEBUG] _maybe_forward_note_on called: {msg}")
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
-            if getattr(self.midi_handler, 'udp_enabled', False):
-                print(f"[MIDI FORWARD DEBUG] Forwarding Note On to UDP MIDI")
-                self.midi_handler.send_note_on(msg.channel, msg.note, msg.velocity)
-            elif self.midi_handler.outport:
-                print(f"[MIDI FORWARD DEBUG] Forwarding Note On to outport: {self.midi_handler.outport}")
-                self.midi_handler.outport.send(msg)
-            else:
-                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Note On")
-        else:
-            print(f"[MIDI FORWARD DEBUG] Not forwarding Note On: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
-
-    def _maybe_forward_note_off(self, msg):
-        print(f"[MIDI FORWARD DEBUG] _maybe_forward_note_off called: {msg}")
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
-            if getattr(self.midi_handler, 'udp_enabled', False):
-                print(f"[MIDI FORWARD DEBUG] Forwarding Note Off to UDP MIDI")
-                self.midi_handler.send_note_off(msg.channel, msg.note, msg.velocity)
-            elif self.midi_handler.outport:
-                print(f"[MIDI FORWARD DEBUG] Forwarding Note Off to outport: {self.midi_handler.outport}")
-                self.midi_handler.outport.send(msg)
-            else:
-                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Note Off")
-        else:
-            print(f"[MIDI FORWARD DEBUG] Not forwarding Note Off: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
-
-    def _maybe_forward_control_change(self, msg):
-        print(f"[MIDI FORWARD DEBUG] _maybe_forward_control_change called: {msg}")
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
-            if getattr(self.midi_handler, 'udp_enabled', False):
-                print(f"[MIDI FORWARD DEBUG] Forwarding Control Change to UDP MIDI")
-                self.midi_handler.send_cc(msg.channel, msg.control, msg.value)
-            elif self.midi_handler.outport:
-                print(f"[MIDI FORWARD DEBUG] Forwarding Control Change to outport: {self.midi_handler.outport}")
-                self.midi_handler.outport.send(msg)
-            else:
-                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Control Change")
-        else:
-            print(f"[MIDI FORWARD DEBUG] Not forwarding Control Change: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
-
-    def _maybe_forward_other(self, msg):
-        print(f"[MIDI FORWARD DEBUG] _maybe_forward_other called: {msg}")
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
-            if getattr(self.midi_handler, 'udp_enabled', False):
-                print(f"[MIDI FORWARD DEBUG] Forwarding Other MIDI to UDP MIDI")
-                # You may want to implement more message types here
-            elif self.midi_handler.outport:
-                print(f"[MIDI FORWARD DEBUG] Forwarding Other MIDI to outport: {self.midi_handler.outport}")
-                self.midi_handler.outport.send(msg)
-            else:
-                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Other MIDI")
-        else:
-            print(f"[MIDI FORWARD DEBUG] Not forwarding Other MIDI: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
-
     def _maybe_forward_any(self, msg):
-        print(f"[MIDI FORWARD DEBUG] _maybe_forward_any called: {msg}")
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
-            if getattr(self.midi_handler, 'udp_enabled', False) and self.midi_handler.udp_sock:
-                print(f"[MIDI FORWARD DEBUG] Forwarding ANY MIDI to UDP MIDI")
-                try:
-                    bytes_to_send = None
-                    if isinstance(msg, list):  # SysEx payload from sysex_received signal
-                        # Wrap with F0 and F7 for UDP transmission as a complete SysEx message
-                        bytes_to_send = bytes([0xF0] + msg + [0xF7])
-                    elif hasattr(msg, 'bytes') and callable(msg.bytes):  # mido.Message object
-                        # msg.bytes() returns a list of integers
-                        bytes_to_send = bytes(msg.bytes())
-                    else:
-                        print(f"[MIDI FORWARD DEBUG] Unknown message type for UDP forwarding: {type(msg)}")
-                        return
+        # Log every incoming message
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_any called with: {msg!r} (type: {type(msg)})")
+        # [MIDI FORWARD DEBUG] _maybe_forward_any called with: Message('note_on', channel=0, note=74, velocity=35, time=0) (type: <class 'mido.messages.messages.Message'>)
 
-                    if bytes_to_send is not None:
-                        self.midi_handler.udp_sock.sendto(bytes_to_send, (self.midi_handler.udp_host, self.midi_handler.udp_port))
-                except Exception as e:
-                    print(f"[MIDI FORWARD DEBUG] Error forwarding to UDP: {e}")
-            elif self.midi_handler.outport:
-                print(f"[MIDI FORWARD DEBUG] Forwarding ANY MIDI to outport: {self.midi_handler.outport}")
-                try:
-                    message_to_send = None
-                    if isinstance(msg, list):  # SysEx payload
-                        message_to_send = mido.Message('sysex', data=msg)
-                    elif isinstance(msg, mido.Message):  # Already a mido.Message object
-                        message_to_send = msg
-                    else:
-                        print(f"[MIDI FORWARD DEBUG] Unknown message type for outport forwarding: {type(msg)}")
-                        return
+        if not getattr(self, 'route_midi_in_to_out_enabled', False) or not self.midi_handler:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding: routing_disabled={not getattr(self, 'route_midi_in_to_out_enabled', False)} or no midi_handler")
+            return
 
-                    if message_to_send:
-                        self.midi_handler.outport.send(message_to_send)
-                except Exception as e:
-                    print(f"[MIDI FORWARD DEBUG] Error forwarding to outport: {e}")
-            else:
-                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for ANY MIDI")
+        can_send = self.midi_handler.udp_output_active or (self.midi_handler.outport and not getattr(self.midi_handler.outport, 'closed', True))
+        if not can_send:
+            print("[MIDI FORWARD DEBUG] No valid MIDI output configured in MIDIHandler.")
+            return
+
+        # Log where the message will be forwarded and print bytes
+        if self.midi_handler.udp_output_active:
+            midi_bytes = msg.bytes()
+            hex_str = ' '.join(f'{b:02X}' for b in midi_bytes)
+            print(f"[MIDI FORWARD DEBUG] Forwarding to UDP MIDI output: {hex_str}")
+        elif self.midi_handler.outport:
+            midi_bytes = msg.bytes()
+            hex_str = ' '.join(f'{b:02X}' for b in midi_bytes)
+            print(f"[MIDI FORWARD DEBUG] Forwarding to MIDI outport {self.midi_handler.current_output_port_name}: {hex_str}")
         else:
-            print(f"[MIDI FORWARD DEBUG] Not forwarding ANY MIDI: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
+            print("[MIDI FORWARD DEBUG] No output port to forward to.")
+
+        if isinstance(msg, list):
+            self.midi_handler.send_sysex(msg)
+        elif hasattr(msg, 'type') and hasattr(msg, 'bytes'):
+            self.midi_handler.send_mido_message(msg)
+        else:
+            print(f"[MIDI FORWARD DEBUG] Unknown message type for forwarding: {type(msg)}")
 
     def show_status(self, msg):
         self.statusBar().showMessage(msg)
@@ -527,34 +495,78 @@ class MainWindow(QMainWindow):
         dlg = AboutDialog(self)
         dlg.exec()
 
-    def on_midi_out_changed(self, idx):
-        # Handle MIDI output change
-        selected = self.midi_out_combo.currentText()
-        if 'UDP MIDI' in selected:
-            self.midi_handler.use_udp_midi(True)
+    # Slot for UI MIDI In ComboBox change
+    def on_midi_in_changed_ui(self, idx):
+        if hasattr(self.ui, 'midi_in_combo'):
+            port_name = self.ui.midi_in_combo.itemText(idx)
+            if not port_name: return
+            self.show_status(f"[UI] MIDI In ComboBox changed to: '{port_name}'")
+            try:
+                self.midi_handler.open_input(port_name)
+            except Exception as e:
+                self.show_status(f"[ERROR] Could not open MIDI In '{port_name}': {e}")
+                self.midi_handler.open_input(None)
+            self.settings.setValue("last_in_port", port_name)
         else:
-            self.midi_handler.use_udp_midi(False)
+            print("[UI ERROR] on_midi_in_changed_ui called but no midi_in_combo found.")
 
-    def set_in_port_from_menu(self, port):
-        import re
-        udp_label = 'UDP MIDI (127.0.0.1:50007)'
-        if port == udp_label:
-            QApplication.instance().midi_handler.use_udp_midi(True, as_input=True)
-            if hasattr(self.main_window, 'show_status'):
-                self.main_window.show_status(f"Selected MIDI In: {udp_label}")
-            self.main_window.start_receiving()
-            self.main_window.settings.setValue("last_in_port", port)
-            return
+    # Slot for UI MIDI Out ComboBox change (renamed from on_midi_out_changed)
+    def on_midi_out_changed_ui(self, idx):
+        if hasattr(self.ui, 'midi_out_combo'):
+            port_name = self.ui.midi_out_combo.itemText(idx)
+            if not port_name: return
+            self.show_status(f"[UI] MIDI Out ComboBox changed to: '{port_name}'")
+            self.midi_handler.open_output(port_name)
+            self.settings.setValue("last_out_port", port_name)
         else:
-            QApplication.instance().midi_handler.use_udp_midi(False)
+            print("[UI ERROR] on_midi_out_changed_ui called but no midi_out_combo found.")
+
+    # This method is called by menu actions in menus.py
+    def set_in_port_from_menu(self, port_name):
+        self.show_status(f"[UI] MIDI In set from menu to: '{port_name}'")
         try:
-            # Always open a new input port before starting the worker
-            QApplication.instance().midi_handler.open_input(port)
-            display_port = re.sub(r'\s*\d+$', '', str(port))
-            if hasattr(self.main_window, 'show_status'):
-                self.main_window.show_status(f"Selected MIDI In: {display_port}")
-            self.main_window.start_receiving()
-            self.main_window.settings.setValue("last_in_port", port)
+            self.midi_handler.open_input(port_name)
         except Exception as e:
-            from dialogs import Dialogs
-            Dialogs.show_error(self.main_window, "MIDI In Error", f"Could not open MIDI In port '{port}': {e}")
+            self.show_status(f"[ERROR] Could not open MIDI In '{port_name}': {e}")
+            self.midi_handler.open_input(None)
+        self.settings.setValue("last_in_port", port_name)
+        # Refresh combo box before setting value
+        if hasattr(self.ui, 'refresh_ports'):
+            self.ui.refresh_ports()
+        # Debug print all combo box items
+        if hasattr(self.ui, 'midi_in_combo'):
+            items = [self.ui.midi_in_combo.itemText(i) for i in range(self.ui.midi_in_combo.count())]
+            print(f"[DEBUG] MIDI In combo box items: {items}")
+            # Normalize comparison: strip and lower
+            norm_port = port_name.strip().lower()
+            norm_items = [item.strip().lower() for item in items]
+            if norm_port in norm_items:
+                idx = norm_items.index(norm_port)
+                self.ui.midi_in_combo.setCurrentIndex(idx)
+            else:
+                print(f"[UI WARNING] Selected MIDI In port '{port_name}' not found in combo box after menu selection.")
+        else:
+            print(f"[UI WARNING] midi_in_combo not found on UI.")
+
+    # This method is called by menu actions in menus.py (newly added for consistency)
+    def set_out_port_from_menu(self, port_name):
+        self.show_status(f"[UI] MIDI Out set from menu to: '{port_name}'")
+        self.midi_handler.open_output(port_name)
+        self.settings.setValue("last_out_port", port_name)
+        # Refresh combo box before setting value
+        if hasattr(self.ui, 'refresh_ports'):
+            self.ui.refresh_ports()
+        # Debug print all combo box items
+        if hasattr(self.ui, 'midi_out_combo'):
+            items = [self.ui.midi_out_combo.itemText(i) for i in range(self.ui.midi_out_combo.count())]
+            print(f"[DEBUG] MIDI Out combo box items: {items}")
+            # Normalize comparison: strip and lower
+            norm_port = port_name.strip().lower()
+            norm_items = [item.strip().lower() for item in items]
+            if norm_port in norm_items:
+                idx = norm_items.index(norm_port)
+                self.ui.midi_out_combo.setCurrentIndex(idx)
+            else:
+                print(f"[UI WARNING] Selected MIDI Out port '{port_name}' not found in combo box after menu selection.")
+        else:
+            print(f"[UI WARNING] midi_out_combo not found on UI.")
