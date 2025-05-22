@@ -84,6 +84,11 @@ def setup_menus(main_window):
         import re
         ports = sorted(main_window.midi_handler.list_output_ports(), key=str.casefold)
         selected_out = main_window.settings.value("last_out_port", "")
+        udp_label = 'UDP Socket (127.0.0.1:50007)'
+        # Only add UDP label if not already present in ports
+        if udp_label not in ports:
+            if is_udp_port_open(50007, '127.0.0.1'):
+                ports.append(udp_label)
         for port in ports:
             # Remove trailing numbers for display
             display_port = re.sub(r'\s*\d+$', '', str(port))
@@ -92,15 +97,6 @@ def setup_menus(main_window):
             if port == selected_out:
                 action.setChecked(True)
             action.triggered.connect(lambda checked, p=port: main_window.set_out_port_from_menu(p))
-            midi_out_menu.addAction(action)
-        # Add UDP MIDI if available
-        if is_udp_port_open(50007, '127.0.0.1'):
-            udp_label = 'UDP MIDI (127.0.0.1:50007)'
-            action = QAction(udp_label, main_window)
-            action.setCheckable(True)
-            if selected_out == udp_label:
-                action.setChecked(True)
-            action.triggered.connect(lambda checked, p=udp_label: main_window.set_out_port_from_menu(p))
             midi_out_menu.addAction(action)
     midi_out_menu.aboutToShow.connect(populate_out_menu)
 
@@ -111,6 +107,11 @@ def setup_menus(main_window):
         import re
         ports = sorted(main_window.midi_handler.list_input_ports(), key=str.casefold)
         selected_in = main_window.settings.value("last_in_port", "")
+        udp_label = 'UDP Socket (127.0.0.1:50007)'
+        # Only add UDP label if not already present in ports
+        if udp_label not in ports:
+            if is_udp_port_open(50007, '127.0.0.1'):
+                ports.append(udp_label)
         for port in ports:
             # Remove trailing numbers for display
             display_port = re.sub(r'\s*\d+$', '', str(port))
@@ -119,15 +120,6 @@ def setup_menus(main_window):
             if port == selected_in:
                 action.setChecked(True)
             action.triggered.connect(lambda checked, p=port: main_window.set_in_port_from_menu(p))
-            midi_in_menu.addAction(action)
-        # Add UDP MIDI if available
-        if is_udp_port_open(50007, '127.0.0.1'):
-            udp_label = 'UDP MIDI (127.0.0.1:50007)'
-            action = QAction(udp_label, main_window)
-            action.setCheckable(True)
-            if selected_in == udp_label:
-                action.setChecked(True)
-            action.triggered.connect(lambda checked, p=udp_label: main_window.set_in_port_from_menu(p))
             midi_in_menu.addAction(action)
     midi_in_menu.aboutToShow.connect(populate_in_menu)
 

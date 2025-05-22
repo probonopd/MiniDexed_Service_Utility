@@ -231,7 +231,7 @@ class MainWindow(QMainWindow):
         if self.midi_handler.udp_output_active:
             midi_bytes = msg.bytes()
             hex_str = ' '.join(f'{b:02X}' for b in midi_bytes)
-            print(f"[MIDI FORWARD DEBUG] Forwarding to UDP MIDI output: {hex_str}")
+            print(f"[MIDI FORWARD DEBUG] Forwarding to UDP Socket output: {hex_str}")
         elif self.midi_handler.outport:
             midi_bytes = msg.bytes()
             hex_str = ' '.join(f'{b:02X}' for b in midi_bytes)

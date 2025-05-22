@@ -5,7 +5,8 @@ import socket
 from PySide6.QtCore import Signal, QObject
 
 class MIDIHandler(QObject):
-    UDP_PORT_NAME = 'UDP MIDI (127.0.0.1:50007)'
+    UDP_PORT_NAME = 'UDP Socket (127.0.0.1:50007)'
+    UDP_MENU_LABEL = 'UDP Socket (127.0.0.1:50007)'
     UDP_HOST = '127.0.0.1'
     UDP_PORT = 50007
 
@@ -47,12 +48,12 @@ class MIDIHandler(QObject):
             self.udp_sock_in.close()
             self.udp_sock_in = None
             self.udp_input_active = False
-        if port_name == self.UDP_PORT_NAME:
+        if port_name in (self.UDP_PORT_NAME, self.UDP_MENU_LABEL):
             self.udp_sock_in = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.udp_sock_in.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.udp_sock_in.bind((self.UDP_HOST, self.UDP_PORT))
             self.udp_input_active = True
-            self._current_input_port_name = self.UDP_PORT_NAME
+            self._current_input_port_name = port_name
             # Start a thread to poll UDP input and call self.forward_any
             import threading
             def udp_poll():
@@ -85,6 +86,7 @@ class MIDIHandler(QObject):
 
     def open_output(self, port_name):
         print("[MIDI LOG] open_output called")
+        print(f"[DEBUG] open_output: port_name={port_name!r}")
         if self.outport:
             self.close_output_worker()
             self.outport.close()
@@ -93,13 +95,17 @@ class MIDIHandler(QObject):
             self.udp_sock_out.close()
             self.udp_sock_out = None
             self.udp_output_active = False
-        if port_name == self.UDP_PORT_NAME:
+        # Normalize UDP port names
+        udp_labels = (self.UDP_PORT_NAME, self.UDP_MENU_LABEL, 'UDP Socket (127.0.0.1:50007)', 'UDP MIDI (127.0.0.1:50007)')
+        if port_name in udp_labels:
+            print(f"[DEBUG] open_output: Detected UDP output selection.")
             self.udp_sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.udp_output_active = True
             self.outport = None
             self._midi_send_worker = None
-            self._current_output_port_name = self.UDP_PORT_NAME
+            self._current_output_port_name = port_name
         elif port_name and isinstance(port_name, str):
+            print(f"[DEBUG] open_output: Detected real MIDI output selection.")
             self.outport = mido.open_output(port_name)
             self.udp_output_active = False
             self._midi_send_worker = MidiMessageSendWorker(self.outport)
@@ -156,8 +162,9 @@ class MIDIHandler(QObject):
             except Exception as e:
                 print(f"[ERROR] UDP sendto failed: {e}")
         elif self.outport and self._midi_send_worker:
+            # Route all outport sends through send_mido_message for consistent debug
             msg = Message('sysex', data=data)
-            self._midi_send_worker.send(msg)
+            self.send_mido_message(msg)
 
     def register_input_callback(self, msg_type, callback):
         """Register a callback for a MIDI message type (e.g., 'sysex', 'note_on')."""
@@ -347,32 +354,37 @@ class MIDIHandler(QObject):
             except Exception as e:
                 print(f"[ERROR] UDP sendto failed: {e}")
         elif self.outport:
+            # Route all outport sends through send_mido_message for consistent debug
             msg = mido.Message('control_change', channel=channel, control=control, value=value)
-            if hasattr(self.outport, 'send'):
-                self.outport.send(msg)
+            self.send_mido_message(msg)
 
     def send_mido_message(self, msg):
-        print(f"[MIDI LOG] send_mido_message called: {msg}")
-        # Accepts mido.Message, list, or bytes
-        midi_bytes = bytes(msg)
-        print(f"[MIDI LOG] Sending... {' '.join(f'{b:02X}' for b in midi_bytes)}")
-        if self.udp_output_active and self.udp_sock_out:
-            try:
-                # Only pass bytes to sendto!
-                print(f"[DEBUG] UDP sendto: {list(midi_bytes)} to {(self.UDP_HOST, self.UDP_PORT)}")
-                sent = self.udp_sock_out.sendto(midi_bytes, (self.UDP_HOST, self.UDP_PORT))
-                print(f"[DEBUG] UDP sent {sent} bytes")
-            except Exception as e:
-                print(f"[ERROR] UDP sendto failed: {e}")
-        elif self.outport and hasattr(self.outport, 'send'):
-            if hasattr(msg, 'bytes'):
-                self.outport.send(msg)
-            else:
+        try:
+            print(f"[MIDI LOG] send_mido_message called: {msg}")
+            print(f"[DEBUG] send_mido_message: udp_output_active={self.udp_output_active}, udp_sock_out={self.udp_sock_out}, outport={self.outport}")
+            assert hasattr(msg, 'bytes'), f"send_mido_message: msg must be a mido.Message, got {type(msg)}"
+            midi_bytes = msg.bytes()
+            # Fix: If msg.bytes() returns a list, convert to bytes
+            if isinstance(midi_bytes, list):
+                print(f"[DEBUG] msg.bytes() returned a list, converting to bytes: {midi_bytes}")
+                midi_bytes = bytes(midi_bytes)
+            assert isinstance(midi_bytes, (bytes, bytearray)), f"msg.bytes() must return bytes, got {type(midi_bytes)}"
+            print(f"[MIDI LOG] Sending... {' '.join(f'{b:02X}' for b in midi_bytes)}")
+            print("[DEBUG] About to check UDP send block condition")
+            if self.udp_output_active and self.udp_sock_out:
+                print("[DEBUG] Entering UDP send block in send_mido_message")
                 try:
-                    mido_msg = mido.Message.from_bytes(list(midi_bytes))
-                    self.outport.send(mido_msg)
+                    print("[DEBUG] About to send UDP packet")
+                    print(f"[DEBUG] UDP sendto: {list(midi_bytes)} to {(self.UDP_HOST, self.UDP_PORT)}")
+                    sent = self.udp_sock_out.sendto(midi_bytes, (self.UDP_HOST, self.UDP_PORT))
+                    print(f"[DEBUG] UDP sent {sent} bytes")
                 except Exception as e:
-                    print(f"[MIDI LOG] Could not send to outport: {e}")
+                    print(f"[ERROR] UDP sendto failed: {e}")
+            elif self.outport and hasattr(self.outport, 'send'):
+                print(f"[DEBUG] outport.send: {msg}")
+                self.outport.send(msg)
+        except Exception as e:
+            print(f"[FATAL ERROR] send_mido_message exception: {e}")
 
     def send_midi_file(self, midi_file, on_finished=None, on_log=None):
         self.log_message.emit(f"[MIDI LOG] send_midi_file called: {midi_file}")
