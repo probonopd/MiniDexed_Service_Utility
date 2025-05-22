@@ -145,7 +145,19 @@ class UiMainWindow:
         pass
 
     def set_out_port_from_menu(self, port):
+        print(f"[UI DEBUG] set_out_port_from_menu called with port: {port}")
         import re
+        udp_label = 'UDP MIDI (127.0.0.1:50007)'
+        if port == udp_label:
+            print("[UI DEBUG] Enabling UDP MIDI out")
+            QApplication.instance().midi_handler.use_udp_midi(True, as_input=False)
+            if hasattr(self.main_window, 'show_status'):
+                self.main_window.show_status(f"Selected MIDI Out: {udp_label}")
+            self.main_window.settings.setValue("last_out_port", port)
+            return
+        else:
+            print("[UI DEBUG] Disabling UDP MIDI out")
+            QApplication.instance().midi_handler.use_udp_midi(False)
         try:
             QApplication.instance().midi_handler.open_output(port)
             # Remove trailing numbers from port name for display
@@ -159,9 +171,22 @@ class UiMainWindow:
 
     def set_in_port_from_menu(self, port):
         import re
+        udp_label = 'UDP MIDI (127.0.0.1:50007)'
+        # Always stop the old worker before changing port
+        if hasattr(self.main_window, 'receive_worker') and self.main_window.receive_worker:
+            self.main_window.receive_worker.stop()
+        if port == udp_label:
+            QApplication.instance().midi_handler.use_udp_midi(True, as_input=True)
+            if hasattr(self.main_window, 'show_status'):
+                self.main_window.show_status(f"Selected MIDI In: {udp_label}")
+            self.main_window.start_receiving()
+            self.main_window.settings.setValue("last_in_port", port)
+            return
+        else:
+            QApplication.instance().midi_handler.use_udp_midi(False)
         try:
+            # Only open the port AFTER stopping the worker!
             QApplication.instance().midi_handler.open_input(port)
-            # Remove trailing numbers from port name for display
             display_port = re.sub(r'\s*\d+$', '', str(port))
             if hasattr(self.main_window, 'show_status'):
                 self.main_window.show_status(f"Selected MIDI In: {display_port}")

@@ -1,5 +1,5 @@
 import os
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QFileDialog, QApplication
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QFileDialog, QApplication, QComboBox
 from PySide6.QtGui import QAction
 from ui_main_window import UiMainWindow
 from menus import setup_menus
@@ -15,6 +15,7 @@ from updater_worker import UpdaterWorker, DeviceDiscoveryWorker
 import sys
 import subprocess
 from windows_firewall_checker import WindowsFirewallChecker
+import mido # Added import
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -44,6 +45,18 @@ class MainWindow(QMainWindow):
         self.firewall_worker = FirewallCheckWorker()
         self.firewall_worker.result.connect(self.handle_firewall_check_result)
         self.firewall_worker.start()
+        self.setup_midi_io_ui()
+        # Ensure MIDI In-to-Out forwarding is set up immediately
+        self.start_receiving()
+
+    def setup_midi_io_ui(self):
+        # Setup MIDI input/output combo boxes
+        self.midi_in_combo = QComboBox()
+        self.midi_out_combo = QComboBox()
+        # ...existing code to populate with real MIDI ports...
+        self.midi_in_combo.addItem('UDP MIDI (127.0.0.1:50007)')
+        self.midi_out_combo.addItem('UDP MIDI (127.0.0.1:50007)')
+        # ...existing code to add to layout...
 
     def handle_firewall_check_result(self, has_rule, current_profile, rule_profiles, enabled_profiles, disabled_profiles, has_block):
         profile_display = current_profile.capitalize() if current_profile else "Unknown"
@@ -96,8 +109,12 @@ class MainWindow(QMainWindow):
         last_out = self.settings.value("last_out_port", "")
         self.ui.refresh_ports()
         if last_out:
+            if last_out == 'UDP MIDI (127.0.0.1:50007)':
+                self.midi_handler.use_udp_midi(True, as_input=False)
             self.ui.set_out_port_from_menu(last_out)
         if last_in:
+            if last_in == 'UDP MIDI (127.0.0.1:50007)':
+                self.midi_handler.use_udp_midi(True, as_input=True)
             self.ui.set_in_port_from_menu(last_in)
 
     def closeEvent(self, event):
@@ -135,38 +152,131 @@ class MainWindow(QMainWindow):
         QApplication.quit()
 
     def start_receiving(self):
-        if hasattr(self, 'receive_worker') and self.receive_worker:
-            self.receive_worker.stop()
+        if hasattr(self, 'receive_worker') and self.receive_worker and self.receive_worker.isRunning():
+            self.receive_worker.stop()  # MIDIReceiveWorker.stop() includes a wait() call.
+            # self.receive_worker = None # Optional: clear the reference after stopping
+
         self.receive_worker = MIDIReceiveWorker(self.midi_handler)
-        self.receive_worker.sysex_received.connect(self.ui.display_sysex)
         self.receive_worker.log.connect(self.ui.append_log)
-        # Forward MIDI In to Out if enabled
-        self.receive_worker.sysex_received.connect(self._maybe_forward_sysex)
-        self.receive_worker.note_on_received.connect(self._maybe_forward_note_on)
-        self.receive_worker.note_off_received.connect(self._maybe_forward_note_off)
-        self.receive_worker.control_change_received.connect(self._maybe_forward_control_change)
-        self.receive_worker.other_message_received.connect(self._maybe_forward_other)
+        # Forward ALL MIDI In to Out using _maybe_forward_any
+        self.receive_worker.sysex_received.connect(self._maybe_forward_any)
+        self.receive_worker.note_on_received.connect(self._maybe_forward_any)
+        self.receive_worker.note_off_received.connect(self._maybe_forward_any)
+        self.receive_worker.control_change_received.connect(self._maybe_forward_any)
+        self.receive_worker.other_message_received.connect(self._maybe_forward_any)
         self.receive_worker.start()
 
     def _maybe_forward_sysex(self, data):
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
-            self.midi_handler.send_sysex(data)
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_sysex called, data len={len(data)}")
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
+            if getattr(self.midi_handler, 'udp_enabled', False):
+                print(f"[MIDI FORWARD DEBUG] Forwarding SysEx to UDP MIDI")
+                self.midi_handler.send_sysex(data)
+            elif self.midi_handler.outport:
+                print(f"[MIDI FORWARD DEBUG] Forwarding SysEx to outport: {self.midi_handler.outport}")
+                self.midi_handler.send_sysex(data)
+            else:
+                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for SysEx")
+        else:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding SysEx: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
 
     def _maybe_forward_note_on(self, msg):
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
-            self.midi_handler.outport.send(msg)
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_note_on called: {msg}")
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
+            if getattr(self.midi_handler, 'udp_enabled', False):
+                print(f"[MIDI FORWARD DEBUG] Forwarding Note On to UDP MIDI")
+                self.midi_handler.send_note_on(msg.channel, msg.note, msg.velocity)
+            elif self.midi_handler.outport:
+                print(f"[MIDI FORWARD DEBUG] Forwarding Note On to outport: {self.midi_handler.outport}")
+                self.midi_handler.outport.send(msg)
+            else:
+                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Note On")
+        else:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding Note On: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
 
     def _maybe_forward_note_off(self, msg):
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
-            self.midi_handler.outport.send(msg)
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_note_off called: {msg}")
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
+            if getattr(self.midi_handler, 'udp_enabled', False):
+                print(f"[MIDI FORWARD DEBUG] Forwarding Note Off to UDP MIDI")
+                self.midi_handler.send_note_off(msg.channel, msg.note, msg.velocity)
+            elif self.midi_handler.outport:
+                print(f"[MIDI FORWARD DEBUG] Forwarding Note Off to outport: {self.midi_handler.outport}")
+                self.midi_handler.outport.send(msg)
+            else:
+                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Note Off")
+        else:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding Note Off: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
 
     def _maybe_forward_control_change(self, msg):
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
-            self.midi_handler.outport.send(msg)
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_control_change called: {msg}")
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
+            if getattr(self.midi_handler, 'udp_enabled', False):
+                print(f"[MIDI FORWARD DEBUG] Forwarding Control Change to UDP MIDI")
+                self.midi_handler.send_cc(msg.channel, msg.control, msg.value)
+            elif self.midi_handler.outport:
+                print(f"[MIDI FORWARD DEBUG] Forwarding Control Change to outport: {self.midi_handler.outport}")
+                self.midi_handler.outport.send(msg)
+            else:
+                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Control Change")
+        else:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding Control Change: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
 
     def _maybe_forward_other(self, msg):
-        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler and self.midi_handler.outport:
-            self.midi_handler.outport.send(msg)
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_other called: {msg}")
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
+            if getattr(self.midi_handler, 'udp_enabled', False):
+                print(f"[MIDI FORWARD DEBUG] Forwarding Other MIDI to UDP MIDI")
+                # You may want to implement more message types here
+            elif self.midi_handler.outport:
+                print(f"[MIDI FORWARD DEBUG] Forwarding Other MIDI to outport: {self.midi_handler.outport}")
+                self.midi_handler.outport.send(msg)
+            else:
+                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for Other MIDI")
+        else:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding Other MIDI: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
+
+    def _maybe_forward_any(self, msg):
+        print(f"[MIDI FORWARD DEBUG] _maybe_forward_any called: {msg}")
+        if getattr(self, 'route_midi_in_to_out_enabled', False) and self.midi_handler:
+            if getattr(self.midi_handler, 'udp_enabled', False) and self.midi_handler.udp_sock:
+                print(f"[MIDI FORWARD DEBUG] Forwarding ANY MIDI to UDP MIDI")
+                try:
+                    bytes_to_send = None
+                    if isinstance(msg, list):  # SysEx payload from sysex_received signal
+                        # Wrap with F0 and F7 for UDP transmission as a complete SysEx message
+                        bytes_to_send = bytes([0xF0] + msg + [0xF7])
+                    elif hasattr(msg, 'bytes') and callable(msg.bytes):  # mido.Message object
+                        # msg.bytes() returns a list of integers
+                        bytes_to_send = bytes(msg.bytes())
+                    else:
+                        print(f"[MIDI FORWARD DEBUG] Unknown message type for UDP forwarding: {type(msg)}")
+                        return
+
+                    if bytes_to_send is not None:
+                        self.midi_handler.udp_sock.sendto(bytes_to_send, (self.midi_handler.udp_host, self.midi_handler.udp_port))
+                except Exception as e:
+                    print(f"[MIDI FORWARD DEBUG] Error forwarding to UDP: {e}")
+            elif self.midi_handler.outport:
+                print(f"[MIDI FORWARD DEBUG] Forwarding ANY MIDI to outport: {self.midi_handler.outport}")
+                try:
+                    message_to_send = None
+                    if isinstance(msg, list):  # SysEx payload
+                        message_to_send = mido.Message('sysex', data=msg)
+                    elif isinstance(msg, mido.Message):  # Already a mido.Message object
+                        message_to_send = msg
+                    else:
+                        print(f"[MIDI FORWARD DEBUG] Unknown message type for outport forwarding: {type(msg)}")
+                        return
+
+                    if message_to_send:
+                        self.midi_handler.outport.send(message_to_send)
+                except Exception as e:
+                    print(f"[MIDI FORWARD DEBUG] Error forwarding to outport: {e}")
+            else:
+                print(f"[MIDI FORWARD DEBUG] No valid MIDI out for ANY MIDI")
+        else:
+            print(f"[MIDI FORWARD DEBUG] Not forwarding ANY MIDI: route_midi_in_to_out_enabled={getattr(self, 'route_midi_in_to_out_enabled', False)}, midi_handler={self.midi_handler}, outport={getattr(self.midi_handler, 'outport', None)}")
 
     def show_status(self, msg):
         self.statusBar().showMessage(msg)
@@ -416,3 +526,35 @@ class MainWindow(QMainWindow):
         from dialogs import AboutDialog
         dlg = AboutDialog(self)
         dlg.exec()
+
+    def on_midi_out_changed(self, idx):
+        # Handle MIDI output change
+        selected = self.midi_out_combo.currentText()
+        if 'UDP MIDI' in selected:
+            self.midi_handler.use_udp_midi(True)
+        else:
+            self.midi_handler.use_udp_midi(False)
+
+    def set_in_port_from_menu(self, port):
+        import re
+        udp_label = 'UDP MIDI (127.0.0.1:50007)'
+        if port == udp_label:
+            QApplication.instance().midi_handler.use_udp_midi(True, as_input=True)
+            if hasattr(self.main_window, 'show_status'):
+                self.main_window.show_status(f"Selected MIDI In: {udp_label}")
+            self.main_window.start_receiving()
+            self.main_window.settings.setValue("last_in_port", port)
+            return
+        else:
+            QApplication.instance().midi_handler.use_udp_midi(False)
+        try:
+            # Always open a new input port before starting the worker
+            QApplication.instance().midi_handler.open_input(port)
+            display_port = re.sub(r'\s*\d+$', '', str(port))
+            if hasattr(self.main_window, 'show_status'):
+                self.main_window.show_status(f"Selected MIDI In: {display_port}")
+            self.main_window.start_receiving()
+            self.main_window.settings.setValue("last_in_port", port)
+        except Exception as e:
+            from dialogs import Dialogs
+            Dialogs.show_error(self.main_window, "MIDI In Error", f"Could not open MIDI In port '{port}': {e}")

@@ -21,19 +21,23 @@ class MIDIReceiveWorker(QThread):
         self.running = True
 
     def run(self):
+        print("[MIDI LOG] MIDIReceiveWorker.run started")
         import logging
         logging.debug('MIDIReceiveWorker.run: started')
         inport = self.midi_handler.inport
-        if inport is None:
-            self.log.emit("No MIDI input port open.")
-            logging.debug('MIDIReceiveWorker.run: no inport, exiting')
+        if inport is None or getattr(inport, 'closed', True):
+            print(f"[MIDI LOG] No MIDI input port open or port is closed. Inport: {inport}")
+            self.log.emit("No MIDI input port open or port is closed.")
+            logging.debug(f'MIDIReceiveWorker.run: no open inport ({inport}), exiting')
             return
+        print(f"[MIDI LOG] MIDIReceiveWorker using inport: {inport}")
         try:
             for msg in inport:
                 if not self.running:
                     logging.debug('MIDIReceiveWorker.run: self.running is False, breaking loop')
                     break
                 # Log every received MIDI message
+                print(f"[MIDI LOG] Incoming: {msg}")
                 self.log.emit(f"Received MIDI: {msg}")
                 if msg.type == 'sysex':
                     self.sysex_received.emit(list(msg.data))
@@ -46,6 +50,7 @@ class MIDIReceiveWorker(QThread):
                 else:
                     self.other_message_received.emit(msg)
         except Exception as e:
+            print(f"[MIDI LOG] Exception in MIDIReceiveWorker.run: {e}")
             self.log.emit(f"MIDI receive error: {e}")
             logging.debug(f'MIDIReceiveWorker.run: exception {e}')
         logging.debug('MIDIReceiveWorker.run: exiting')

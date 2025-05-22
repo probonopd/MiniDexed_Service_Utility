@@ -93,6 +93,15 @@ def setup_menus(main_window):
                 action.setChecked(True)
             action.triggered.connect(lambda checked, p=port: main_window.ui.set_out_port_from_menu(p))
             midi_out_menu.addAction(action)
+        # Add UDP MIDI if available
+        if is_udp_port_open(50007, '127.0.0.1'):
+            udp_label = 'UDP MIDI (127.0.0.1:50007)'
+            action = QAction(udp_label, main_window)
+            action.setCheckable(True)
+            if selected_out == udp_label:
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, p=udp_label: main_window.ui.set_out_port_from_menu(p))
+            midi_out_menu.addAction(action)
     midi_out_menu.aboutToShow.connect(populate_out_menu)
 
     # MIDI In Menu
@@ -110,6 +119,15 @@ def setup_menus(main_window):
             if port == selected_in:
                 action.setChecked(True)
             action.triggered.connect(lambda checked, p=port: main_window.ui.set_in_port_from_menu(p))
+            midi_in_menu.addAction(action)
+        # Add UDP MIDI if available
+        if is_udp_port_open(50007, '127.0.0.1'):
+            udp_label = 'UDP MIDI (127.0.0.1:50007)'
+            action = QAction(udp_label, main_window)
+            action.setCheckable(True)
+            if selected_in == udp_label:
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, p=udp_label: main_window.ui.set_in_port_from_menu(p))
             midi_in_menu.addAction(action)
     midi_in_menu.aboutToShow.connect(populate_in_menu)
 
@@ -364,3 +382,18 @@ def setup_menus(main_window):
         update_action.setEnabled(has_device)
         edit_ini_action.setEnabled(has_device)
     file_menu.aboutToShow.connect(update_file_menu_actions)
+
+    def is_udp_port_open(port, host='127.0.0.1'):
+        import socket
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(0.2)
+            sock.sendto(b'ping', (host, port))
+            try:
+                sock.recvfrom(1024)
+            except Exception:
+                pass
+            sock.close()
+            return True
+        except Exception:
+            return False
