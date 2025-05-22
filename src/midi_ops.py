@@ -65,12 +65,13 @@ class MidiOps:
             self._repeat_blocked = False
             return  # Do not repeat if stopped by user
         if repeat_enabled and self.main_window.file_ops.loaded_midi:
-            if not QApplication.instance().midi_handler.outport:
+            midi_handler = QApplication.instance().midi_handler
+            if not (midi_handler.outport or midi_handler.udp_output_active):
                 from dialogs import Dialogs
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
             self.main_window.show_status("Repeating MIDI file send...")
-            QApplication.instance().midi_handler.send_sysex(self.main_window.file_ops.loaded_midi)
+            midi_handler.send_midi_file(self.main_window.file_ops.loaded_midi, on_finished=self.on_midi_send_finished, on_log=self.main_window.show_status)
 
     def clear_out(self):
         self.main_window.ui.out_text.clear()

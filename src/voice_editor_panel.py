@@ -161,7 +161,7 @@ class VoiceEditorPanel(QWidget):
             parent = None
         super().__init__(parent)
         self.setStyleSheet("background-color: #332b28; color: #e0e0e0;")
-        self.midi_outport = midi_outport
+        self.midi_handler = midi_outport  # Now always the MIDIHandler instance
         self.voice_bytes = voice_bytes or self.init_patch_bytes()
         self.decoder = SingleVoiceDumpDecoder(self.voice_bytes)
         self.decoder.decode()
@@ -820,8 +820,8 @@ class VoiceEditorPanel(QWidget):
         # If this is an operator parameter, send an Operator Select message first
         if op_idx is not None:
             sel_msg = [0xF0, 0x43, 0x10 | (ch & 0x0F), 0x00, 0x15, op_idx, 0xF7]
-            if self.midi_outport:
-                self.midi_outport.send_sysex(sel_msg)
+            if self.midi_handler:
+                self.midi_handler.send_sysex(sel_msg)
         if param_num is not None and value is not None:
             if 0 <= param_num <= 155:
                 group = 0x00
@@ -839,12 +839,12 @@ class VoiceEditorPanel(QWidget):
                 print(f"[VOICE EDITOR PANEL] Unsupported parameter number: {param_num}")
                 return
             sysex = [0xF0, 0x43, 0x10 | (ch & 0x0F), group_byte, param_byte, int(value), 0xF7]
-            if self.midi_outport:
+            if self.midi_handler:
                 import mido
                 msg = mido.Message('sysex', data=sysex[1:-1])
-                self.midi_outport.send_sysex(sysex)
+                self.midi_handler.send_sysex(msg.bytes())
             else:
-                print("[VOICE EDITOR PANEL] midi_outport not set, cannot send SysEx.")
+                print("[VOICE EDITOR PANEL] midi_handler not set, cannot send SysEx.")
         else:
             print(f"[VOICE EDITOR PANEL] No valid param_num for {key} (op_idx={op_idx})")
 
@@ -924,6 +924,41 @@ class VoiceEditorPanel(QWidget):
                 elif isinstance(param_num, int):
                     return param_num
         return None
+
+    def _get_param_num(self, key):
+        """
+        Returns the parameter number for a global (non-operator) parameter, or None if not found.
+        """
+        if hasattr(self, '_vced_param_info') and self._vced_param_info:
+            param_info = self._vced_param_info.get(key)
+            if param_info and 'parameter_number' in param_info:
+                param_num = param_info['parameter_number']
+                if isinstance(param_num, int):
+                    return param_num
+        # Fallback: try to find in GLOBAL_PARAM_DEFS
+        for _short, k, _min, _max, _desc in GLOBAL_PARAM_DEFS:
+            if k == key:
+                # Use index as parameter number if not found in VCED
+                return None  # Or return a default/int if needed
+        return None
+
+    def handle_op_enabled(self):
+        enabled_states = []
+        bitfield = 0
+        for i in range(self.op_count):
+            enabled = self.get_op_param(i, 'E', 1)
+            enabled_states.append(f"Op {i+1}: {'Enabled' if enabled else 'Disabled'}")
+            if enabled:
+                bitfield |= (1 << (5 - i))  # OP1 is bit 5, OP6 is bit 0
+        # Send DX7 operator enable/disable SysEx
+        sysex = [0xF0, 0x43, 0x10, 0x01, 0x1B, bitfield, 0xF7]
+        print(f"[DX7 OP ENABLE] Sending SysEx: {' '.join(f'{b:02X}' for b in sysex)}")
+        if self.midi_handler:
+            import mido
+            msg = mido.Message('sysex', data=sysex[1:-1])
+            self.midi_handler.send_sysex(msg.bytes())
+        else:
+            print("[DX7 OP ENABLE] midi_handler is not set, cannot send SysEx.")
 
 class VoiceEditorPanelDialog(QDialog):
     _instance = None
