@@ -18,17 +18,13 @@ from windows_firewall_checker import WindowsFirewallChecker
 import mido # Added import
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, midi_handler=None):
         super().__init__()
         self.setWindowTitle("MiniDexed Service Utility")
         self.resize(800, 500)
         self.settings = QSettings("MIDISend", "MIDISendApp")
-        
-        # MIDIHandler is now a QObject and needs to be instantiated properly.
-        # It should not be on QApplication.instance() if it's specific to MainWindow logic.
-        # If it truly needs to be globally accessible, a different singleton pattern might be needed.
-        # For now, let's assume it's owned by MainWindow.
-        self.midi_handler = MIDIHandler() 
+        # Use the provided midi_handler or fallback to QApplication instance
+        self.midi_handler = midi_handler or getattr(QApplication.instance(), 'midi_handler', None)
         # Connect MIDIHandler signals to MainWindow slots or other handlers
         # self.midi_handler.log_message.connect(self.show_status) # Or a more specific log handler
         # self.midi_handler.sysex_received.connect(self._maybe_forward_any)

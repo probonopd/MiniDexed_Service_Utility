@@ -46,7 +46,7 @@ if __name__ == "__main__":
     udp_available = is_udp_port_open(udp_port, udp_host)
 
     from main_window import MainWindow
-    window = MainWindow()
+    window = MainWindow(midi_handler=midi_handler)
     if udp_available:
         # Offer UDP Socket as an option in your MIDI input/output selection UI
         # This is a placeholder: you must implement the UI logic in main_window.py or midi_handler.py

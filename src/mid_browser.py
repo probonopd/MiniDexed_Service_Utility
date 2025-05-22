@@ -334,7 +334,12 @@ class MidBrowser(QDialog):
                             new_track.append(msg)
                     new_midi.tracks.append(new_track)
                 mw = self.main_window
-                if mw is None or not hasattr(mw, 'midi_ops') or not hasattr(mw.midi_handler, 'outport') or not mw.midi_handler.outport:
+                # Allow if either a real MIDI outport or UDP output is active
+                midi_handler = getattr(mw, 'midi_handler', None)
+                has_out = False
+                if midi_handler:
+                    has_out = bool(getattr(midi_handler, 'outport', None)) or bool(getattr(midi_handler, 'udp_output_active', False))
+                if mw is None or not hasattr(mw, 'midi_ops') or not has_out:
                     Dialogs.show_error(self, "Error", "No MIDI Out port selected in main window.")
                     return
                 midi_ops = mw.midi_ops

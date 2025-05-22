@@ -85,8 +85,8 @@ class MIDIHandler(QObject):
         self.forward_callback = callback
 
     def open_output(self, port_name):
-        print("[MIDI LOG] open_output called")
-        print(f"[DEBUG] open_output: port_name={port_name!r}")
+        print(f"[MIDI LOG] open_output called")
+        print(f"[DEBUG] open_output: self id={id(self)} port_name={port_name!r}")
         if self.outport:
             self.close_output_worker()
             self.outport.close()
@@ -115,6 +115,7 @@ class MIDIHandler(QObject):
             self.outport = None
             self.udp_output_active = False
             self._current_output_port_name = None
+        print(f"[DEBUG] open_output: udp_output_active={self.udp_output_active}, outport={self.outport}, udp_sock_out={self.udp_sock_out}")
 
     def close_output_worker(self):
         print("[MIDI LOG] close_output_worker called")
@@ -387,10 +388,11 @@ class MIDIHandler(QObject):
             print(f"[FATAL ERROR] send_mido_message exception: {e}")
 
     def send_midi_file(self, midi_file, on_finished=None, on_log=None):
+        print(f"[DEBUG] send_midi_file: self id={id(self)} outport={self.outport}, udp_output_active={self.udp_output_active}")
         self.log_message.emit(f"[MIDI LOG] send_midi_file called: {midi_file}")
         print("[MIDI LOG] send_midi_file called")
         from workers import MidiSendWorker
-        if not self.outport:
+        if not (self.outport or self.udp_output_active):
             raise RuntimeError("No MIDI Out port selected.")
         # Stop any existing worker
         if hasattr(self, '_midi_file_worker') and self._midi_file_worker and self._midi_file_worker.isRunning():
@@ -405,6 +407,15 @@ class MIDIHandler(QObject):
         else:
             desc = 'in-memory MIDI file' if hasattr(midi_file, 'tracks') else str(midi_file)
         print(f"[MIDI LOG] Starting MIDI file send: {desc}")
+        if self.udp_output_active and not self.outport:
+            from workers import UdpMidiSendWorker
+            self._udp_file_worker = UdpMidiSendWorker(self, midi_file)
+            if on_log:
+                self._udp_file_worker.log.connect(on_log)
+            if on_finished:
+                self._udp_file_worker.finished.connect(on_finished)
+            self._udp_file_worker.start()
+            return
         self._midi_file_worker = MidiSendWorker(self.outport, midi_file)
         if on_log:
             self._midi_file_worker.log.connect(on_log)
@@ -415,6 +426,15 @@ class MIDIHandler(QObject):
     def stop_midi_file(self):
         self.log_message.emit("[MIDI LOG] stop_midi_file called")
         print("[MIDI LOG] stop_midi_file called")
+        if hasattr(self, '_udp_file_worker') and self._udp_file_worker and self._udp_file_worker.isRunning():
+            print("[MIDI LOG] Stopping UDP MIDI file send (threaded).")
+            self._udp_file_worker.stop()
+            self._udp_file_worker.wait()
+            return
+        if getattr(self, '_udp_file_sending', False):
+            print("[MIDI LOG] Stopping UDP MIDI file send.")
+            self._udp_file_stop = True
+            return
         if hasattr(self, '_midi_file_worker') and self._midi_file_worker and self._midi_file_worker.isRunning():
             self._midi_file_worker.stop()
             self._midi_file_worker.wait()

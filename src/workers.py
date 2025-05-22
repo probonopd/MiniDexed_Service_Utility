@@ -121,6 +121,28 @@ class MidiSendWorker(QThread):
     def stop(self):
         self._stop = True
 
+class UdpMidiSendWorker(QThread):
+    log = Signal(str)
+    finished = Signal()
+    def __init__(self, midi_handler, midi_file):
+        super().__init__()
+        self.midi_handler = midi_handler
+        self.midi_file = midi_file
+        self._stop = False
+    def run(self):
+        start_time = time.time()
+        for msg in self.midi_file.play():
+            if self._stop:
+                self.log.emit("MIDI sending stopped by user.")
+                break
+            if hasattr(msg, 'bytes'):
+                self.midi_handler.send_mido_message(msg)
+        elapsed = time.time() - start_time
+        self.log.emit(f"MIDI file sent in {elapsed:.2f} seconds.")
+        self.finished.emit()
+    def stop(self):
+        self._stop = True
+
 class SyslogWorker(QThread):
     syslog_message = Signal(str)
     log = Signal(str)

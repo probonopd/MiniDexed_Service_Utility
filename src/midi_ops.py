@@ -92,7 +92,7 @@ class MidiOps:
         def on_loaded(midi, path):
             self.main_window.file_ops.loaded_midi = midi
             self.main_window.show_status(f"Loaded .mid file: {path}")
-            if not self.main_window.midi_handler.outport:
+            if not (self.main_window.midi_handler.outport or self.main_window.midi_handler.udp_output_active):
                 Dialogs.show_error(self.main_window, "Error", "No MIDI Out port selected.")
                 return
             self.send_all_notes_off()
