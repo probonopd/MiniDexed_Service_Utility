@@ -7,11 +7,15 @@ import sys
 class Dialogs:
     @staticmethod
     def get_file_open(parent, filter_str):
-        return QFileDialog.getOpenFileName(parent, "Open File", "", filter_str)[0]
+        options = QFileDialog.Options()
+        options |= QFileDialog.Option.DontUseNativeDialog
+        return QFileDialog.getOpenFileName(parent, "Open File", "", filter_str, options=options)[0]
 
     @staticmethod
     def get_file_save(parent, filter_str):
-        return QFileDialog.getSaveFileName(parent, "Save File", "", filter_str)[0]
+        options = QFileDialog.Options()
+        options |= QFileDialog.Option.DontUseNativeDialog
+        return QFileDialog.getSaveFileName(parent, "Save File", "", filter_str, options=options)[0]
 
     @staticmethod
     def get_text_input(parent, title, label):

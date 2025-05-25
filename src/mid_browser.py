@@ -220,6 +220,7 @@ class MidBrowser(QDialog):
     def download_and_send_mid(self, entry):
         # Use /music/ instead of /chip/ for .mid files
         url = f"https://gifx.co/music{entry['path']}"
+        print(f"URL: {url}")
         file_name = os.path.basename(entry['path'])
         self.set_status(f"Downloading {file_name} ...")
         self.worker = MidFileDownloadWorker(url, file_name)
