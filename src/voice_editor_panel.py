@@ -117,6 +117,27 @@ class DraggableValueLabel(QLabel):
                 self.valueChanged.emit(self._value)
         super().wheelEvent(event)
 
+class SvgWheelWidget(QSvgWidget):
+    def __init__(self, parent=None, alg_combo=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setStyleSheet("background: transparent;")
+        self.setVisible(True)
+        self.alg_combo = alg_combo
+        self.setMouseTracking(True)
+        self.setToolTip("Scroll to change algorithm")
+
+    def wheelEvent(self, event):
+        if self.alg_combo is not None:
+            delta = event.angleDelta().y()
+            if delta != 0:
+                step = 1 if delta > 0 else -1
+                idx = self.alg_combo.currentIndex()
+                new_idx = max(0, min(self.alg_combo.count() - 1, idx + step))
+                if new_idx != idx:
+                    self.alg_combo.setCurrentIndex(new_idx)
+        event.accept()
+
 class VoiceEditorPanel(QWidget):
     _instance = None
 
@@ -662,8 +683,9 @@ class VoiceEditorPanel(QWidget):
         op_table_widget.setLayout(op_grid)
         op_table_widget.setAttribute(Qt.WidgetAttribute.WA_Hover, True)  # Ensure hover events
         op_table_widget.lower()
-        self.svg_overlay = QSvgWidget(op_table_widget)
-        self.svg_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # Use SvgWheelWidget instead of QSvgWidget
+        self.svg_overlay = SvgWheelWidget(op_table_widget, alg_combo=self.alg_combo)
+        self.svg_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self.svg_overlay.setStyleSheet("background: transparent;")
         self.svg_overlay.setVisible(True)
         self.svg_overlay.raise_()
