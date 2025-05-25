@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter
+from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, QWidget, QGridLayout, QFrame, QSizePolicy, QInputDialog, QLCDNumber, QTextEdit, QSplitter, QScrollArea, QPushButton
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtGui import QResizeEvent, QPalette, QColor, QMouseEvent
@@ -6,8 +6,10 @@ from single_voice_dump_decoder import SingleVoiceDumpDecoder
 from envelope_widget import EnvelopeWidget
 from keyboard_scaling_widget import KeyboardScalingWidget
 from param_info_panel import ParamInfoPanel
+from algorithm_gallery_dialog import AlgorithmGalleryDialog
 import os
 import json
+import glob
 
 # --- Static definitions and tables ---
 
@@ -125,7 +127,7 @@ class SvgWheelWidget(QSvgWidget):
         self.setVisible(True)
         self.alg_combo = alg_combo
         self.setMouseTracking(True)
-        self.setToolTip("Scroll to change algorithm")
+        self.setToolTip("Scroll to change algorithm\nClick to show all algorithms")
 
     def wheelEvent(self, event):
         if self.alg_combo is not None:
@@ -137,6 +139,16 @@ class SvgWheelWidget(QSvgWidget):
                 if new_idx != idx:
                     self.alg_combo.setCurrentIndex(new_idx)
         event.accept()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.alg_combo is not None:
+            parent = self.parentWidget()
+            # Find images path
+            images_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "images"))
+            dlg = AlgorithmGalleryDialog(parent, self.alg_combo, images_path)
+            dlg.exec()
+        else:
+            super().mousePressEvent(event)
 
 class VoiceEditorPanel(QWidget):
     _instance = None
