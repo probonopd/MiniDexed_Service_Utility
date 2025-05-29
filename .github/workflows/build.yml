@@ -23,16 +23,16 @@ jobs:
           - os: ubuntu-22.04-arm
             build_type: 'linux-arm64'
           - os: ubuntu-22.04
-            build_type: 'alpine-static'
+            build_type: 'alpine-musl'
           - os: ubuntu-22.04-arm
-            build_type: 'alpine-static-arm64'
+            build_type: 'alpine-musl-arm64'
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
     - name: Install Libraries (Linux only)
-      if: runner.os == 'Linux' && matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
+      if: runner.os == 'Linux' && matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
       run: |
         sudo apt-get update
         sudo apt-get install -y libasound2-dev \
@@ -46,13 +46,13 @@ jobs:
         libxcb-cursor-dev
 
     - name: Set up Python
-      if: matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
+      if: matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
     - name: Install dependencies
-      if: matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
+      if: matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
       run: |
         python -m pip install --upgrade pip
         python -m pip install -U "https://github.com/Nuitka/Nuitka/archive/develop.zip"
@@ -63,9 +63,9 @@ jobs:
       run: pip install comtypes
 
     - name: Build in Alpine Docker Container
-      if: matrix.build_type == 'alpine-static' || matrix.build_type == 'alpine-static-arm64'
+      if: matrix.build_type == 'alpine-musl' || matrix.build_type == 'alpine-musl-arm64'
       run: |
-        if [[ "${{ matrix.build_type }}" == "alpine-static-arm64" ]]; then
+        if [[ "${{ matrix.build_type }}" == "alpine-musl-arm64" ]]; then
           PLATFORM="--platform linux/arm64"
         else
           PLATFORM="--platform linux/amd64"
@@ -106,7 +106,7 @@ jobs:
         "
 
     - name: Build Executable (Nuitka)
-      if: matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
+      if: matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
       run: |
           python -m nuitka --version
           python -m pip list -v
@@ -151,15 +151,15 @@ jobs:
       run: |
         mkdir -p release
         # Debug: Show the actual structure
-        find executables -type f -name "*MiniDexed*" -o -name "*.exe"
+        find executables -type f -name "*MiniDexed*" -o -name "*.exe" -o -name "*.bin"
         
         # Rename and organize files for release
         find executables -name "*MiniDexed Service Utility.exe" -exec cp {} release/MiniDexed-Service-Utility-windows.exe \;
-        find executables -name "*MiniDexed Service Utility" -path "*linux*" -not -path "*alpine*" -not -path "*arm*" -exec cp {} release/MiniDexed-Service-Utility-linux \;
-        find executables -name "*MiniDexed Service Utility" -path "*linux-arm64*" -not -path "*alpine*" -exec cp {} release/MiniDexed-Service-Utility-linux-arm64 \;
-        find executables -name "*MiniDexed Service Utility.app" -o -name "*MiniDexed Service Utility" -path "*macos*" -exec cp {} release/MiniDexed-Service-Utility-macos \;
-        find executables -name "*MiniDexed Service Utility" -path "*alpine-static*" -not -path "*arm*" -exec cp {} release/MiniDexed-Service-Utility-linux-static \;
-        find executables -name "*MiniDexed Service Utility" -path "*alpine-static-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-static-arm64 \;
+        find executables -name "*MiniDexed Service Utility.bin" -path "*linux-X64*" -exec cp {} release/MiniDexed-Service-Utility-linux \;
+        find executables -name "*MiniDexed Service Utility.bin" -path "*linux-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-arm64 \;
+        find executables -name "*MiniDexed Service Utility" -path "*macos*" -exec cp {} release/MiniDexed-Service-Utility-macos \;
+        find executables -name "*MiniDexed Service Utility.bin" -path "*alpine-musl-X64*" -exec cp {} release/MiniDexed-Service-Utility-linux-musl \;
+        find executables -name "*MiniDexed Service Utility.bin" -path "*alpine-musl-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-musl-arm64 \;
         
         # Make Linux/macOS binaries executable (only if they exist)
         find release -name "*linux*" -o -name "*macos*" | xargs -r chmod +x
