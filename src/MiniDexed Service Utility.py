@@ -32,9 +32,35 @@ def is_udp_port_open(port, host='127.0.0.1'):
 
 if __name__ == "__main__":
     import sys
+    import os
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+
+    # Load bundled fonts for Alpine musl builds
+    if hasattr(sys, '_MEIPASS') or os.path.exists('./fonts'):
+        # We're running from a bundled executable, load fonts
+        from PySide6.QtGui import QFontDatabase
+        font_db = QFontDatabase()
+        
+        # Check for bundled fonts directory
+        fonts_dir = './fonts'
+        if os.path.exists(fonts_dir):
+            print(f"Loading bundled fonts from {fonts_dir}")
+            for root, dirs, files in os.walk(fonts_dir):
+                for file in files:
+                    if file.endswith(('.ttf', '.otf')):
+                        font_path = os.path.join(root, file)
+                        font_id = font_db.addApplicationFont(font_path)
+                        if font_id != -1:
+                            families = font_db.applicationFontFamilies(font_id)
+                            print(f"Loaded font: {families}")
+        
+        # Set FONTCONFIG environment variables to use bundled fonts
+        if os.path.exists('./etc/fonts'):
+            os.environ['FONTCONFIG_PATH'] = './etc/fonts'
+        if os.path.exists('./share/fontconfig'):
+            os.environ['FONTCONFIG_FILE'] = './etc/fonts/fonts.conf'
 
     from midi_handler import MIDIHandler
     midi_handler = MIDIHandler()  # or your actual initialization
