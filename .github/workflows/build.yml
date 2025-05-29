@@ -71,7 +71,7 @@ jobs:
           PLATFORM="--platform linux/amd64"
         fi
         
-        docker run $PLATFORM -v ${{ github.workspace }}:/workspace -w /workspace alpine:latest sh -c "
+        docker run $PLATFORM -v ${{ github.workspace }}:/workspace -w /workspace alpine:3.20 sh -c "
           # Install build dependencies including PySide6 from Alpine packages
           apk add --no-cache python3 python3-dev py3-pip build-base git \
           linux-headers musl-dev gcc g++ cmake ninja pkgconfig \
