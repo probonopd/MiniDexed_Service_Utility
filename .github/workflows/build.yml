@@ -121,6 +121,7 @@ jobs:
             --include-data-dir=src/data=data \\
             --include-data-dir=src/images=images \\
             --include-data-files=/usr/lib/libshiboken6*.so*=./ \\
+            --include-data-files=/usr/lib/libpyside6*.so*=./ \\
             --include-data-files=/usr/lib/*Qt6*.so*=./ \\
             --standalone \\
             --prefer-source-code \\
