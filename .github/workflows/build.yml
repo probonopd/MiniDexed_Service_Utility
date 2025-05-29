@@ -121,23 +121,23 @@ jobs:
             'src/MiniDexed Service Utility.py' && \\
           
           # Copy missing shared library dependencies into the dist directory
-          find 'dist_nuitka/MiniDexed Service Utility.dist' -type f -name '*.so*' | while read lib; do
-            ldd "$lib" | awk '/=> \/|=>\t\// {print $3}' | while read dep; do
-              if [ -n "$dep" ] && [ ! -f "dist_nuitka/MiniDexed Service Utility.dist/$(basename "$dep")" ]; then
-                cp -v "$dep" "dist_nuitka/MiniDexed Service Utility.dist/"
-              fi
-            done
-          done
+          find 'dist_nuitka/MiniDexed Service Utility.dist' -type f -name '*.so*' | while read lib; do \\
+            ldd "$lib" | awk '/=> \\/|=>\t\// {print $3}' | while read dep; do \\
+              if [ -n "$dep" ] && [ ! -f "dist_nuitka/MiniDexed Service Utility.dist/$(basename "$dep")" ]; then \\
+                cp -v "$dep" "dist_nuitka/MiniDexed Service Utility.dist/" \\
+              fi \\
+            done \\
+          done && \\
 
           # Create a single executable archive from the standalone build
-          cd 'dist_nuitka/MiniDexed Service Utility.dist' && \
-          tar -czf '../../MiniDexed Service Utility.bin' * && \
-          cd ../.. && \
-          mv 'MiniDexed Service Utility.bin' dist_nuitka/ && \
+          cd 'dist_nuitka/MiniDexed Service Utility.dist' && \\
+          tar -czf '../../MiniDexed Service Utility.bin' * && \\
+          cd ../.. && \\
+          mv 'MiniDexed Service Utility.bin' dist_nuitka/  && \\
           
-          # Clean up build artifacts but keep the .bin file
-          rm -rf dist_nuitka/*build && \
-          rm -rf dist_nuitka/*dist
+          # Clean up build artifacts but keep the .bin file 
+          rm -rf dist_nuitka/*build && \\
+          rm -rf dist_nuitka/*dist && \\
         "
 
     - name: Build Executable (Nuitka)
