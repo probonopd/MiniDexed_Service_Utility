@@ -75,7 +75,7 @@ jobs:
           # Install build dependencies
           apk add --no-cache python3 python3-dev py3-pip build-base git \
           linux-headers musl-dev gcc g++ cmake ninja pkgconfig \
-          alsa-lib-dev \
+          alsa-lib-dev patchelf \
           qt6-qtbase-dev qt6-qtdeclarative-dev qt6-qttools-dev \
           mesa-dev libxkbcommon-dev wayland-dev \
           eudev-dev && \\
@@ -102,11 +102,8 @@ jobs:
           # Create output directory
           mkdir -p dist_nuitka && \\
           
-          # Build with Nuitka - add static linking flags for musl
-          python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile \
-          --static-libpython=yes \
-          --lto=yes \
-          'src/MiniDexed Service Utility.py' && \\
+          # Build with Nuitka using the same options as your working build
+          python -m nuitka --enable-plugin=pyside6 --include-package=zeroconf --include-package=rtmidi --include-package=mido.backends.rtmidi --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --prefer-source-code --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --static-libpython=yes --lto=yes 'src/MiniDexed Service Utility.py' && \\
           
           # Clean up build artifacts
           rm -rf dist_nuitka/*build && \\
