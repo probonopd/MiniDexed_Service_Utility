@@ -71,7 +71,7 @@ jobs:
           PLATFORM="--platform linux/amd64"
         fi
         
-        docker run $PLATFORM -v ${{ github.workspace }}:/workspace -w /workspace alpine:3.20 sh -c "
+        docker run $PLATFORM -v ${{ github.workspace }}:/workspace -w /workspace alpine:latest sh -c "
           # Install build dependencies including PySide6 from Alpine packages
           apk add --no-cache python3 python3-dev py3-pip build-base git \
           linux-headers musl-dev gcc g++ cmake ninja pkgconfig \
@@ -98,7 +98,7 @@ jobs:
           mkdir -p dist_nuitka && \\
           
           # Build with Nuitka using PySide6 plugin
-          python -m nuitka --enable-plugin=pyside6 --include-package=zeroconf --include-package=rtmidi --include-package=mido.backends.rtmidi --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --prefer-source-code --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --static-libpython=yes --lto=yes 'src/MiniDexed Service Utility.py' && \\
+          python -m nuitka --enable-plugin=pyside6 --include-package=zeroconf --include-package=rtmidi --include-package=mido.backends.rtmidi --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --prefer-source-code --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --lto=yes 'src/MiniDexed Service Utility.py' && \\
           
           # Clean up build artifacts
           rm -rf dist_nuitka/*build && \\
