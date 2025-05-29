@@ -107,15 +107,30 @@ jobs:
           # List relevant libraries for debugging
           find /usr/lib -name '*shiboken*' -o -name '*Qt6*' | head -20 && \\
           
+          # Check shiboken6 specifically
+          echo 'Shiboken6 libraries found:' && \\
+          find /usr/lib -name '*shiboken*' && \\
+          echo 'Checking shiboken6 dependencies:' && \\
+          ldd /usr/lib/libshiboken6.abi3.so.6.8 2>/dev/null || echo 'libshiboken6.abi3.so.6.8 not found' && \\
+          find /usr/lib -name 'libshiboken6*' -exec ldd {} \\; && \\
+          
           # Extract unique library dependencies from only the Qt6 libraries we actually use
           QT_DEPS=\$(ldd /usr/lib/libQt6Core.so.6 /usr/lib/libQt6Gui.so.6 /usr/lib/libQt6Widgets.so.6 /usr/lib/libQt6Svg.so.6 /usr/lib/libQt6DBus.so.6 /usr/lib/libQt6Network.so.6 /usr/lib/libQt6OpenGL.so.6 /usr/lib/libQt6WaylandClient.so.6 /usr/lib/libQt6XcbQpa.so.6 2>/dev/null | grep -o '/usr/lib/[^[:space:]]*\\.so[^[:space:]]*' | sort -u) && \\
-          echo 'Required Qt6 dependencies:' && \\
-          echo \"\$QT_DEPS\" && \\
+          
+          # Also add shiboken6 and pyside6 dependencies
+          SHIBOKEN_DEPS=\$(find /usr/lib -name 'libshiboken6*' -exec ldd {} \\; 2>/dev/null | grep -o '/usr/lib/[^[:space:]]*\\.so[^[:space:]]*' | sort -u) && \\
+          PYSIDE_DEPS=\$(find /usr/lib -name 'libpyside6*' -exec ldd {} \\; 2>/dev/null | grep -o '/usr/lib/[^[:space:]]*\\.so[^[:space:]]*' | sort -u) && \\
+          
+          ALL_DEPS=\$(echo \"\$QT_DEPS \$SHIBOKEN_DEPS \$PYSIDE_DEPS\" | tr ' ' '\\n' | sort -u) && \\
+          echo 'All required dependencies:' && \\
+          echo \"\$ALL_DEPS\" && \\
           
           # Build include-data-files flags from discovered dependencies
           INCLUDE_FLAGS='' && \\
-          for lib in \$QT_DEPS; do
-            INCLUDE_FLAGS=\"\$INCLUDE_FLAGS --include-data-files=\$lib=./\"
+          for lib in \$ALL_DEPS; do
+            if [ -f \"\$lib\" ]; then
+              INCLUDE_FLAGS=\"\$INCLUDE_FLAGS --include-data-files=\$lib=./\"
+            fi
           done && \\
           echo \"Include flags: \$INCLUDE_FLAGS\" && \\
           
