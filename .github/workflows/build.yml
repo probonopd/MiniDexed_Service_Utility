@@ -76,7 +76,9 @@ jobs:
           apk add --no-cache python3 python3-dev py3-pip build-base git \
           linux-headers musl-dev gcc g++ cmake ninja pkgconfig \
           alsa-lib-dev patchelf \
-          py3-pyside6 py3-shiboken6 py3-wheel py3-setuptools && \\
+          py3-pyside6 py3-shiboken6 py3-wheel py3-setuptools \
+          fontconfig fontconfig-dev ttf-dejavu ttf-liberation \
+          freetype freetype-dev harfbuzz harfbuzz-dev && \\
           
           # Create virtual environment with system site packages to access PySide6
           python3 -m venv --system-site-packages /opt/venv && \\
@@ -122,7 +124,16 @@ jobs:
             --include-data-dir=src/images=images \\
             --include-data-files=/usr/lib/libshiboken6*.so*=./ \\
             --include-data-files=/usr/lib/libpyside6*.so*=./ \\
-            --include-data-files=/usr/lib/*Qt6*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6Core*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6Widgets*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6Gui*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6Svg*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6DBus*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6Network*.so*=./ \\
+            --include-data-files=/usr/lib/libQt6OpenGL*.so*=./ \\
+            --include-data-dir=/usr/share/fonts=fonts \\
+            --include-data-dir=/etc/fonts=etc/fonts \\
+            --include-data-dir=/usr/share/fontconfig=share/fontconfig \\
             --standalone \\
             --prefer-source-code \\
             --assume-yes-for-downloads \\
