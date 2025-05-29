@@ -76,7 +76,7 @@ jobs:
           apk add --no-cache python3 python3-dev py3-pip build-base git \
           linux-headers musl-dev gcc g++ cmake ninja pkgconfig \
           alsa-lib-dev patchelf \
-          py3-pyside6 py3-wheel py3-setuptools && \\
+          py3-pyside6 py3-shiboken6 py3-wheel py3-setuptools && \\
           
           # Create virtual environment with system site packages to access PySide6
           python3 -m venv --system-site-packages /opt/venv && \\
@@ -91,14 +91,19 @@ jobs:
           # Install other requirements via pip
           pip install mido requests zeroconf python-rtmidi && \\
           
-          # Verify PySide6 is available
+          # Verify PySide6 and shiboken6 are available
           python -c 'import PySide6; print(\"PySide6 version:\", PySide6.__version__)' && \\
+          python -c 'import shiboken6; print(\"shiboken6 available\")' && \\
+          
+          # Find shiboken6 library path for inclusion
+          SHIBOKEN_PATH=\$(python -c 'import shiboken6; import os; print(os.path.dirname(shiboken6.__file__))') && \\
+          echo \"Shiboken6 path: \$SHIBOKEN_PATH\" && \\
           
           # Create output directory
           mkdir -p dist_nuitka && \\
           
-          # Build with Nuitka using PySide6 plugin
-          python -m nuitka --enable-plugin=pyside6 --include-package=zeroconf --include-package=rtmidi --include-package=mido.backends.rtmidi --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --prefer-source-code --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --lto=yes 'src/MiniDexed Service Utility.py' && \\
+          # Build with Nuitka using PySide6 plugin - include shiboken6 and PySide6 sub-modules explicitly
+          python -m nuitka --enable-plugin=pyside6 --include-package=zeroconf --include-package=rtmidi --include-package=mido.backends.rtmidi --include-package=shiboken6 --include-package=PySide6.QtCore --include-package=PySide6.QtWidgets --include-package=PySide6.QtGui --include-package=PySide6.QtSvgWidgets --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --prefer-source-code --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --lto=yes 'src/MiniDexed Service Utility.py' && \\
           
           # Clean up build artifacts
           rm -rf dist_nuitka/*build && \\
