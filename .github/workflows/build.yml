@@ -13,14 +13,26 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-13, windows-2022, ubuntu-22.04-arm]
+        include:
+          - os: ubuntu-22.04
+            build_type: 'linux'
+          - os: macos-13
+            build_type: 'macos'
+          - os: windows-2022
+            build_type: 'windows'
+          - os: ubuntu-22.04-arm
+            build_type: 'linux-arm64'
+          - os: ubuntu-22.04
+            build_type: 'alpine-static'
+          - os: ubuntu-22.04-arm
+            build_type: 'alpine-static-arm64'
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
     - name: Install Libraries (Linux only)
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
       run: |
         sudo apt-get update
         sudo apt-get install -y libasound2-dev \
@@ -34,33 +46,13 @@ jobs:
         libxcb-cursor-dev
 
     - name: Set up Python
+      if: matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
-#    - name: Install dependencies
-#      run: |
-#        python -m pip install --upgrade pip
-#        # pip install pyinstaller
-#        pip install -r src/requirements.txt
-
-#    - name: Build Executable
-#      run: |
-#        pyinstaller --onefile --name "MiniDexed Service Utility" --add-data "src/midi_commands:midi_commands" --add-data "src/data:data" --add-data "src/images:images" --hidden-import mido.backends.rtmidi --hidden-import rtmidi 'src/MiniDexed Service Utility.py' --noconsole
-#      env:
-#        PYINSTALLER_STRIP: 1
-#        PYINSTALLER_UPX: 1
-
-#    - name: Upload Artifact
-#      uses: actions/upload-artifact@v4
-#      with:
-#        name: ${{ runner.os }}-executable
-#        path: |
-#          dist/*.exe
-#          dist/*
-#        retention-days: 1
-
     - name: Install dependencies
+      if: matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
       run: |
         python -m pip install --upgrade pip
         python -m pip install -U "https://github.com/Nuitka/Nuitka/archive/develop.zip"
@@ -70,7 +62,59 @@ jobs:
       if: runner.os == 'Windows'
       run: pip install comtypes
 
+    - name: Build in Alpine Docker Container
+      if: matrix.build_type == 'alpine-static' || matrix.build_type == 'alpine-static-arm64'
+      run: |
+        if [[ "${{ matrix.build_type }}" == "alpine-static-arm64" ]]; then
+          PLATFORM="--platform linux/arm64"
+        else
+          PLATFORM="--platform linux/amd64"
+        fi
+        
+        docker run $PLATFORM -v ${{ github.workspace }}:/workspace -w /workspace alpine:latest sh -c "
+          # Install build dependencies
+          apk add --no-cache python3 python3-dev py3-pip build-base git \
+          linux-headers musl-dev gcc g++ cmake ninja pkgconfig \
+          alsa-lib-dev \
+          qt6-qtbase-dev qt6-qtdeclarative-dev qt6-qttools-dev \
+          mesa-dev libxkbcommon-dev wayland-dev \
+          eudev-dev && \\
+          
+          # Create virtual environment
+          python3 -m venv /opt/venv && \\
+          source /opt/venv/bin/activate && \\
+          
+          # Upgrade pip and install build tools
+          pip install --upgrade pip setuptools wheel && \\
+          
+          # Install Nuitka
+          pip install -U 'https://github.com/Nuitka/Nuitka/archive/develop.zip' && \\
+          
+          # Try to install requirements with fallbacks
+          pip install mido requests zeroconf || true && \\
+          
+          # Try to install PySide6 (may fail, that's ok)
+          pip install PySide6 || echo 'PySide6 installation failed, continuing...' && \\
+          
+          # Try python-rtmidi (may fail, that's ok)  
+          pip install python-rtmidi || echo 'python-rtmidi installation failed, continuing...' && \\
+          
+          # Create output directory
+          mkdir -p dist_nuitka && \\
+          
+          # Build with Nuitka - add static linking flags for musl
+          python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile \
+          --static-libpython=yes \
+          --lto=yes \
+          'src/MiniDexed Service Utility.py' && \\
+          
+          # Clean up build artifacts
+          rm -rf dist_nuitka/*build && \\
+          rm -rf dist_nuitka/*dist
+        "
+
     - name: Build Executable (Nuitka)
+      if: matrix.build_type != 'alpine-static' && matrix.build_type != 'alpine-static-arm64'
       run: |
           python -m nuitka --version
           python -m pip list -v
@@ -91,7 +135,7 @@ jobs:
     - name: Upload Nuitka Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ runner.os }}-${{ runner.arch }}
+        name: ${{ matrix.build_type }}-${{ runner.arch }}
         path: |
           dist_nuitka/*
         retention-days: 1
@@ -100,6 +144,7 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Download Executable
       uses: actions/download-artifact@v4
@@ -107,17 +152,46 @@ jobs:
         path: ./executables/
         # merge-multiple: true
 
+    - name: Display structure of downloaded files
+      run: ls -la executables/
+
+    - name: Prepare release files
+      run: |
+        mkdir -p release
+        # Debug: Show the actual structure
+        find executables -type f -name "*MiniDexed*" -o -name "*.exe"
+        
+        # Rename and organize files for release
+        find executables -name "*MiniDexed Service Utility.exe" -exec cp {} release/MiniDexed-Service-Utility-windows.exe \;
+        find executables -name "*MiniDexed Service Utility" -path "*linux*" -not -path "*alpine*" -not -path "*arm*" -exec cp {} release/MiniDexed-Service-Utility-linux \;
+        find executables -name "*MiniDexed Service Utility" -path "*linux-arm64*" -not -path "*alpine*" -exec cp {} release/MiniDexed-Service-Utility-linux-arm64 \;
+        find executables -name "*MiniDexed Service Utility.app" -o -name "*MiniDexed Service Utility" -path "*macos*" -exec cp {} release/MiniDexed-Service-Utility-macos \;
+        find executables -name "*MiniDexed Service Utility" -path "*alpine-static*" -not -path "*arm*" -exec cp {} release/MiniDexed-Service-Utility-linux-static \;
+        find executables -name "*MiniDexed Service Utility" -path "*alpine-static-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-static-arm64 \;
+        
+        # Make Linux/macOS binaries executable (only if they exist)
+        find release -name "*linux*" -o -name "*macos*" | xargs -r chmod +x
+        
+        # List final release files
+        ls -la release/ || echo "No files found in release directory"
+
     - name: Zip Artifacts
       run: |
-        for d in ./executables/*; do
-          zip -r "$d.zip" "$d"
+        cd release
+        for file in *; do
+          if [ -f "$file" ]; then
+            zip "$file.zip" "$file"
+          fi
         done
-        ls -lh ./executables/*.zip
+        ls -lh *.zip
 
-    - name: Create Release
-      uses: ncipollo/release-action@v1
-      with:
-        artifacts: ./executables/*.zip
-        tag: continuous
-        commit: ${{ github.sha }}
-        allowUpdates: true
+    - name: Upload binaries to release using uploadtool
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        UPLOADTOOL_BODY: "Automated build from commit ${{ github.sha }}\\nBuilt on ${{ github.event.head_commit.timestamp }}\\nBranch: ${{ github.ref_name }}"
+      run: |
+        set -e
+        cd release
+        ls -lh *.zip # Show what we're about to upload
+        wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+        bash upload.sh *.zip
