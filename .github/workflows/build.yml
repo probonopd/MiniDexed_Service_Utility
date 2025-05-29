@@ -112,10 +112,17 @@ jobs:
           echo 'Required Qt6 dependencies:' && \\
           echo \"\$QT_DEPS\" && \\
           
+          # Build include-data-files flags from discovered dependencies
+          INCLUDE_FLAGS='' && \\
+          for lib in \$QT_DEPS; do
+            INCLUDE_FLAGS=\"\$INCLUDE_FLAGS --include-data-files=\$lib=./\"
+          done && \\
+          echo \"Include flags: \$INCLUDE_FLAGS\" && \\
+          
           # Create output directory
           mkdir -p dist_nuitka && \\
           
-          # Build with Nuitka using standalone mode instead of onefile for better library handling
+          # Build with Nuitka using standalone mode and dynamically discovered dependencies
           python -m nuitka --enable-plugin=pyside6 \\
             --include-package=zeroconf \\
             --include-package=rtmidi \\
@@ -128,20 +135,7 @@ jobs:
             --include-data-dir=src/midi_commands=midi_commands \\
             --include-data-dir=src/data=data \\
             --include-data-dir=src/images=images \\
-            --include-data-files=/usr/lib/libshiboken6*.so*=./ \\
-            --include-data-files=/usr/lib/libpyside6*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6Core*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6Widgets*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6Gui*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6Svg*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6DBus*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6Network*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6OpenGL*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6WaylandClient*.so*=./ \\
-            --include-data-files=/usr/lib/libQt6XcbQpa*.so*=./ \\
-            --include-data-files=/usr/lib/libicu*.so*=./ \\
-            --include-data-files=/usr/lib/libGLESv2*.so*=./ \\
-            --include-data-files=/usr/lib/libEGL*.so*=./ \\
+            \$INCLUDE_FLAGS \\
             --include-data-dir=/usr/share/fonts=fonts \\
             --include-data-dir=/etc/fonts=etc/fonts \\
             --include-data-dir=/usr/share/fontconfig=share/fontconfig \\
