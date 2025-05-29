@@ -78,7 +78,8 @@ jobs:
           alsa-lib-dev patchelf \
           py3-pyside6 py3-shiboken6 py3-wheel py3-setuptools \
           fontconfig fontconfig-dev ttf-dejavu ttf-liberation \
-          freetype freetype-dev harfbuzz harfbuzz-dev && \\
+          freetype freetype-dev harfbuzz harfbuzz-dev \
+          icu-libs mesa-gl mesa-gles && \\
           
           # Create virtual environment with system site packages to access PySide6
           python3 -m venv --system-site-packages /opt/venv && \\
@@ -105,6 +106,11 @@ jobs:
           
           # List relevant libraries for debugging
           find /usr/lib -name '*shiboken*' -o -name '*Qt6*' | head -20 && \\
+          
+          # Extract unique library dependencies from only the Qt6 libraries we actually use
+          QT_DEPS=\$(ldd /usr/lib/libQt6Core.so.6 /usr/lib/libQt6Gui.so.6 /usr/lib/libQt6Widgets.so.6 /usr/lib/libQt6Svg.so.6 /usr/lib/libQt6DBus.so.6 /usr/lib/libQt6Network.so.6 /usr/lib/libQt6OpenGL.so.6 /usr/lib/libQt6WaylandClient.so.6 /usr/lib/libQt6XcbQpa.so.6 2>/dev/null | grep -o '/usr/lib/[^[:space:]]*\\.so[^[:space:]]*' | sort -u) && \\
+          echo 'Required Qt6 dependencies:' && \\
+          echo \"\$QT_DEPS\" && \\
           
           # Create output directory
           mkdir -p dist_nuitka && \\
@@ -133,6 +139,9 @@ jobs:
             --include-data-files=/usr/lib/libQt6OpenGL*.so*=./ \\
             --include-data-files=/usr/lib/libQt6WaylandClient*.so*=./ \\
             --include-data-files=/usr/lib/libQt6XcbQpa*.so*=./ \\
+            --include-data-files=/usr/lib/libicu*.so*=./ \\
+            --include-data-files=/usr/lib/libGLESv2*.so*=./ \\
+            --include-data-files=/usr/lib/libEGL*.so*=./ \\
             --include-data-dir=/usr/share/fonts=fonts \\
             --include-data-dir=/etc/fonts=etc/fonts \\
             --include-data-dir=/usr/share/fontconfig=share/fontconfig \\
@@ -203,7 +212,7 @@ jobs:
         find executables -type f -name "*MiniDexed*" -o -name "*.exe" -o -name "*.bin"
         
         # Rename and organize files for release
-        find executables -name "*MiniDexed Service Utility.exe" -exec cp {} release/MiniDexed-Service-Utility-windows.exe \;
+        find executables -name "*MiniDexed Service Utility.exe" -exec cp {} release/MiniDexed-Service-Utility-windows \;
         find executables -name "*MiniDexed Service Utility.bin" -path "*linux-X64*" -exec cp {} release/MiniDexed-Service-Utility-linux \;
         find executables -name "*MiniDexed Service Utility.bin" -path "*linux-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-arm64 \;
         find executables -name "*MiniDexed Service Utility" -path "*macos*" -exec cp {} release/MiniDexed-Service-Utility-macos \;
