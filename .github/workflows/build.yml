@@ -130,9 +130,10 @@ jobs:
             'src/MiniDexed Service Utility.py' && \\
           
           # Create a single executable archive from the standalone build
-          cd dist_nuitka && \\
-          tar -czf '../MiniDexed Service Utility.bin' * && \\
-          cd .. && \\
+          cd 'dist_nuitka/MiniDexed Service Utility.dist' && \\
+          tar -czf '../../MiniDexed Service Utility.bin' * && \\
+          cd ../.. && \\
+          mv 'MiniDexed Service Utility.bin' dist_nuitka/ && \\
           
           # Clean up build artifacts but keep the .bin file
           rm -rf dist_nuitka/*build && \\
