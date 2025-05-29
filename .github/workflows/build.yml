@@ -95,17 +95,46 @@ jobs:
           python -c 'import PySide6; print(\"PySide6 version:\", PySide6.__version__)' && \\
           python -c 'import shiboken6; print(\"shiboken6 available\")' && \\
           
-          # Find shiboken6 library path for inclusion
-          SHIBOKEN_PATH=\$(python -c 'import shiboken6; import os; print(os.path.dirname(shiboken6.__file__))') && \\
-          echo \"Shiboken6 path: \$SHIBOKEN_PATH\" && \\
+          # Find library paths
+          SHIBOKEN_LIB=\$(find /usr/lib -name 'libshiboken6*.so*' 2>/dev/null | head -1) && \\
+          QT6_LIB_DIR=/usr/lib && \\
+          echo \"Shiboken library: \$SHIBOKEN_LIB\" && \\
+          echo \"Qt6 lib directory: \$QT6_LIB_DIR\" && \\
+          
+          # List relevant libraries for debugging
+          find /usr/lib -name '*shiboken*' -o -name '*Qt6*' | head -20 && \\
           
           # Create output directory
           mkdir -p dist_nuitka && \\
           
-          # Build with Nuitka using PySide6 plugin - include shiboken6 and PySide6 sub-modules explicitly
-          python -m nuitka --enable-plugin=pyside6 --include-package=zeroconf --include-package=rtmidi --include-package=mido.backends.rtmidi --include-package=shiboken6 --include-package=PySide6.QtCore --include-package=PySide6.QtWidgets --include-package=PySide6.QtGui --include-package=PySide6.QtSvgWidgets --include-data-dir=src/midi_commands=midi_commands --include-data-dir=src/data=data --include-data-dir=src/images=images --prefer-source-code --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --lto=yes 'src/MiniDexed Service Utility.py' && \\
+          # Build with Nuitka using standalone mode instead of onefile for better library handling
+          python -m nuitka --enable-plugin=pyside6 \\
+            --include-package=zeroconf \\
+            --include-package=rtmidi \\
+            --include-package=mido.backends.rtmidi \\
+            --include-package=shiboken6 \\
+            --include-package=PySide6.QtCore \\
+            --include-package=PySide6.QtWidgets \\
+            --include-package=PySide6.QtGui \\
+            --include-package=PySide6.QtSvgWidgets \\
+            --include-data-dir=src/midi_commands=midi_commands \\
+            --include-data-dir=src/data=data \\
+            --include-data-dir=src/images=images \\
+            --include-data-files=/usr/lib/libshiboken6*.so*=./ \\
+            --include-data-files=/usr/lib/*Qt6*.so*=./ \\
+            --standalone \\
+            --prefer-source-code \\
+            --assume-yes-for-downloads \\
+            --output-dir=dist_nuitka \\
+            --lto=yes \\
+            'src/MiniDexed Service Utility.py' && \\
           
-          # Clean up build artifacts
+          # Create a single executable archive from the standalone build
+          cd dist_nuitka && \\
+          tar -czf '../MiniDexed Service Utility.bin' * && \\
+          cd .. && \\
+          
+          # Clean up build artifacts but keep the .bin file
           rm -rf dist_nuitka/*build && \\
           rm -rf dist_nuitka/*dist
         "
