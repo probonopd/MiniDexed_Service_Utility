@@ -345,9 +345,19 @@ class MidBrowser(QDialog):
                     return
                 midi_ops = mw.midi_ops
                 def start_new_file():
-                    mw.show_status("Sending MIDI file with timing...")
+                    # Save the modified MIDI file to cache before sending
+                    from file_utils import FileUtils
+                    cache_dir = get_mid_cache_dir()
+                    os.makedirs(cache_dir, exist_ok=True)
+                    base, ext = os.path.splitext(file_name)
+                    modified_path = os.path.join(cache_dir, base + '.modified.mid')
+                    FileUtils.save_mid(modified_path, new_midi)
+                    new_midi.filename = modified_path  # So MIDIHandler can use the file path
+                    mw.show_status(f"Saved modified MIDI to {modified_path}")
                     mw.file_ops.loaded_midi = new_midi
-                    QApplication.instance().midi_handler.send_midi_file(new_midi, on_finished=midi_ops.on_midi_send_finished, on_log=mw.show_status)
+                    # Load the file from disk and stream it out timed
+                    midi_to_send = mido.MidiFile(modified_path)
+                    QApplication.instance().midi_handler.send_midi_file(midi_to_send, on_finished=midi_ops.on_midi_send_finished, on_log=mw.show_status)
                 if hasattr(midi_ops, '_repeat_blocked') and getattr(midi_ops, '_repeat_blocked', False):
                     midi_ops._repeat_blocked = False
                 QApplication.instance().midi_handler.stop_midi_file()
