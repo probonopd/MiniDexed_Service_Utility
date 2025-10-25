@@ -141,10 +141,10 @@ jobs:
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --windows-console-mode=attach --include-package=comtypes.client 'src/MiniDexed Service Utility.py' 
           else
-             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile 'src/MiniDexed Service Utility.py'
+             # For Linux, use --standalone to create AppImage-compatible build
+             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --standalone 'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
-          rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
 
       env:
           PYTHONOPTIMIZE: 2
@@ -167,22 +167,34 @@ jobs:
         wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases/expanded_assets/continuous -O - | grep "$ARCH_PATTERN" | head -n 1 | cut -d '"' -f 2)
         chmod +x appimagetool-*.AppImage
         
-        # Create AppDir structure
+        # Find the standalone build directory
+        STANDALONE_DIR=$(find dist_nuitka -maxdepth 1 -name "*.dist" -type d | head -n 1)
+        if [ -z "$STANDALONE_DIR" ]; then
+          echo "ERROR: Could not find standalone build directory"
+          ls -la dist_nuitka/
+          exit 1
+        fi
+        
+        echo "Found standalone build: $STANDALONE_DIR"
+        
+        # Create AppDir structure and copy the entire standalone build
         mkdir -p AppDir/usr/bin
         mkdir -p AppDir/usr/share/applications
         mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
         
-        # Copy the executable (onefile build produces executable without extension)
-        if [ -f "dist_nuitka/MiniDexed Service Utility.bin" ]; then
-          cp "dist_nuitka/MiniDexed Service Utility.bin" "AppDir/usr/bin/minidexed-service-utility"
-        elif [ -f "dist_nuitka/MiniDexed Service Utility" ]; then
-          cp "dist_nuitka/MiniDexed Service Utility" "AppDir/usr/bin/minidexed-service-utility"
-        else
-          echo "ERROR: Could not find executable in dist_nuitka/"
-          ls -la dist_nuitka/
+        # Copy all files from standalone build to AppDir/usr/bin
+        cp -r "$STANDALONE_DIR"/* AppDir/usr/bin/
+        
+        # Find the main executable in the standalone directory
+        MAIN_EXEC=$(find AppDir/usr/bin -maxdepth 1 -name "MiniDexed Service Utility*" -type f -executable | head -n 1)
+        if [ -z "$MAIN_EXEC" ]; then
+          echo "ERROR: Could not find main executable"
+          ls -la AppDir/usr/bin/
           exit 1
         fi
-        chmod +x "AppDir/usr/bin/minidexed-service-utility"
+        
+        # Create a symlink with a simple name for the desktop file
+        ln -s "$(basename "$MAIN_EXEC")" AppDir/usr/bin/minidexed-service-utility
         
         # Copy desktop file and icon
         cp minidexed-service-utility.desktop AppDir/usr/share/applications/
