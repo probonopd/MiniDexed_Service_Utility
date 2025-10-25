@@ -156,8 +156,15 @@ jobs:
         # Get short SHA for version
         SHORT_SHA=$(git rev-parse --short HEAD)
         
+        # Determine architecture for appimagetool download
+        if [[ "${{ matrix.build_type }}" == "linux-arm64" ]]; then
+          ARCH_PATTERN="appimagetool-.*-aarch64.AppImage"
+        else
+          ARCH_PATTERN="appimagetool-.*-x86_64.AppImage"
+        fi
+        
         # Download appimagetool
-        wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases/expanded_assets/continuous -O - | grep "appimagetool-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2)
+        wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases/expanded_assets/continuous -O - | grep "$ARCH_PATTERN" | head -n 1 | cut -d '"' -f 2)
         chmod +x appimagetool-*.AppImage
         
         # Create AppDir structure
