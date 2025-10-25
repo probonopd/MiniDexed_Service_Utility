@@ -43,7 +43,10 @@ jobs:
         libxcb-xkb-dev \
         libxcb-render-util0-dev \
         libxcb-keysyms1-dev \
-        libxcb-cursor-dev
+        libxcb-cursor-dev \
+        libegl1-mesa \
+        libegl1 \
+        libqt6opengl6
 
     - name: Set up Python
       if: matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
@@ -141,14 +144,97 @@ jobs:
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --windows-console-mode=attach --include-package=comtypes.client 'src/MiniDexed Service Utility.py' 
           else
-             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile 'src/MiniDexed Service Utility.py'
+             # For Linux, use --standalone to create AppImage-compatible build
+             python -m nuitka --enable-plugin=pyside6 \
+               --include-package=zeroconf \
+               --include-package=rtmidi \
+               --include-package=mido.backends.rtmidi \
+               --include-package=shiboken6 \
+               --include-package=PySide6.QtCore \
+               --include-package=PySide6.QtWidgets \
+               --include-package=PySide6.QtGui \
+               --include-package=PySide6.QtSvgWidgets \
+               --include-data-dir=src/midi_commands=midi_commands \
+               --include-data-dir=src/data=data \
+               --include-data-dir=src/images=images \
+               --standalone \
+               --assume-yes-for-downloads \
+               --output-dir=dist_nuitka \
+               'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
-          rm -rf dist_nuitka/*dist # --standalone puts the executable in the dist folder
 
       env:
           PYTHONOPTIMIZE: 2
       shell: bash   
+
+    - name: Create AppImage (Linux only)
+      if: matrix.build_type == 'linux' || matrix.build_type == 'linux-arm64'
+      run: |
+        export LD_LIBRARY_PATH=/usr/lib/*-linux-gnu/:$LD_LIBRARY_PATH
+        
+        # Get short SHA for version
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        
+        # Determine architecture for appimagetool download
+        if [[ "${{ matrix.build_type }}" == "linux-arm64" ]]; then
+          ARCH_PATTERN="appimagetool-.*-aarch64.AppImage"
+        else
+          ARCH_PATTERN="appimagetool-.*-x86_64.AppImage"
+        fi
+        
+        # Download appimagetool
+        wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases/expanded_assets/continuous -O - | grep "$ARCH_PATTERN" | head -n 1 | cut -d '"' -f 2)
+        chmod +x appimagetool-*.AppImage
+        
+        # Find the standalone build directory
+        STANDALONE_DIR=$(find dist_nuitka -maxdepth 1 -name "*.dist" -type d | head -n 1)
+        if [ -z "$STANDALONE_DIR" ]; then
+          echo "ERROR: Could not find standalone build directory"
+          ls -la dist_nuitka/
+          exit 1
+        fi
+        
+        echo "Found standalone build: $STANDALONE_DIR"
+        
+        # Create AppDir structure and copy the entire standalone build
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/share/applications
+        mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
+        
+        # Copy all files from standalone build to AppDir/usr/bin
+        cp -r "$STANDALONE_DIR"/* AppDir/usr/bin/
+        
+        # Find the main executable in the standalone directory
+        MAIN_EXEC=$(find AppDir/usr/bin -maxdepth 1 -name "MiniDexed Service Utility*" -type f -executable | head -n 1)
+        if [ -z "$MAIN_EXEC" ]; then
+          echo "ERROR: Could not find main executable"
+          ls -la AppDir/usr/bin/
+          exit 1
+        fi
+        
+        # Create a symlink with a simple name for the desktop file
+        ln -s "$(basename "$MAIN_EXEC")" AppDir/usr/bin/minidexed-service-utility
+        
+        # Copy desktop file and icon
+        cp minidexed-service-utility.desktop AppDir/usr/share/applications/
+        cp minidexed-service-utility.svg AppDir/usr/share/icons/hicolor/scalable/apps/
+        
+        # Bundle dependencies
+        ./appimagetool-*.AppImage -s deploy ./AppDir/usr/share/applications/*.desktop
+        
+        # Create AppImage with short SHA as version
+        VERSION=$SHORT_SHA ./appimagetool-*.AppImage ./AppDir
+        
+        # Move AppImage to dist_nuitka
+        if ls *.AppImage 1> /dev/null 2>&1; then
+          mv *.AppImage dist_nuitka/
+          echo "AppImage created successfully and moved to dist_nuitka/"
+        else
+          echo "WARNING: No AppImage file was created"
+          ls -la
+        fi
+      shell: bash
 
     - name: Upload Nuitka Artifact
       uses: actions/upload-artifact@v4
@@ -177,7 +263,7 @@ jobs:
       run: |
         mkdir -p release
         # Debug: Show the actual structure
-        find executables -type f -name "*MiniDexed*" -o -name "*.exe" -o -name "*.bin"
+        find executables -type f -name "*MiniDexed*" -o -name "*.exe" -o -name "*.bin" -o -name "*.AppImage"
         
         # Rename and organize files for release
         find executables -name "*MiniDexed Service Utility.exe" -exec cp {} release/MiniDexed-Service-Utility-windows \;
@@ -187,8 +273,12 @@ jobs:
         find executables -name "*MiniDexed Service Utility.bin" -path "*alpine-musl-X64*" -exec cp {} release/MiniDexed-Service-Utility-linux-musl \;
         find executables -name "*MiniDexed Service Utility.bin" -path "*alpine-musl-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-musl-arm64 \;
         
+        # Copy AppImage files
+        find executables -name "*.AppImage" -path "*linux-X64*" -exec cp {} release/ \;
+        find executables -name "*.AppImage" -path "*linux-arm64*" -exec cp {} release/ \;
+        
         # Make Linux/macOS binaries executable (only if they exist)
-        find release -name "*linux*" -o -name "*macos*" | xargs -r chmod +x
+        find release -name "*linux*" -o -name "*macos*" -o -name "*.AppImage" | xargs -r chmod +x
         
         # List final release files
         ls -la release/ || echo "No files found in release directory"
@@ -197,11 +287,11 @@ jobs:
       run: |
         cd release
         for file in *; do
-          if [ -f "$file" ]; then
+          if [ -f "$file" ] && [[ "$file" != *.AppImage ]]; then
             zip "$file.zip" "$file"
           fi
         done
-        ls -lh *.zip
+        ls -lh *.zip 2>/dev/null || echo "No zip files created"
 
     - name: Upload binaries to release using uploadtool
       env:
@@ -210,7 +300,9 @@ jobs:
       run: |
         set -e
         cd release
-        ls -lh *.zip # Show what we're about to upload
+        ls -lh *.zip *.AppImage 2>/dev/null || ls -lh # Show what we're about to upload
         wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
 
-        bash upload.sh *.zip
+        bash upload.sh *.zip *.AppImage
+
+
