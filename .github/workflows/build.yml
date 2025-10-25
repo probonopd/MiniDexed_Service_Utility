@@ -171,6 +171,8 @@ jobs:
     - name: Create AppImage (Linux only)
       if: matrix.build_type == 'linux' || matrix.build_type == 'linux-arm64'
       run: |
+        export LD_LIBRARY_PATH=/usr/lib/*-linux-gnu/:$LD_LIBRARY_PATH
+        
         # Get short SHA for version
         SHORT_SHA=$(git rev-parse --short HEAD)
         
@@ -302,4 +304,5 @@ jobs:
         wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
 
         bash upload.sh *.zip *.AppImage
+
 
