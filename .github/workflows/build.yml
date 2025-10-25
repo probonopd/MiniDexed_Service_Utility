@@ -43,7 +43,9 @@ jobs:
         libxcb-xkb-dev \
         libxcb-render-util0-dev \
         libxcb-keysyms1-dev \
-        libxcb-cursor-dev
+        libxcb-cursor-dev \
+        libegl1-mesa \
+        libegl1
 
     - name: Set up Python
       if: matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
@@ -297,4 +299,5 @@ jobs:
         cd release
         ls -lh *.zip *.AppImage 2>/dev/null || ls -lh # Show what we're about to upload
         wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+
         bash upload.sh *.zip *.AppImage
