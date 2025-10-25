@@ -173,7 +173,15 @@ jobs:
         mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
         
         # Copy the executable (onefile build produces executable without extension)
-        cp "dist_nuitka/MiniDexed Service Utility.bin" "AppDir/usr/bin/MiniDexed Service Utility" 2>/dev/null || cp "dist_nuitka/MiniDexed Service Utility" "AppDir/usr/bin/MiniDexed Service Utility"
+        if [ -f "dist_nuitka/MiniDexed Service Utility.bin" ]; then
+          cp "dist_nuitka/MiniDexed Service Utility.bin" "AppDir/usr/bin/MiniDexed Service Utility"
+        elif [ -f "dist_nuitka/MiniDexed Service Utility" ]; then
+          cp "dist_nuitka/MiniDexed Service Utility" "AppDir/usr/bin/MiniDexed Service Utility"
+        else
+          echo "ERROR: Could not find executable in dist_nuitka/"
+          ls -la dist_nuitka/
+          exit 1
+        fi
         chmod +x "AppDir/usr/bin/MiniDexed Service Utility"
         
         # Copy desktop file and icon
@@ -187,7 +195,13 @@ jobs:
         VERSION=$SHORT_SHA ./appimagetool-*.AppImage ./AppDir
         
         # Move AppImage to dist_nuitka
-        mv *.AppImage dist_nuitka/ || true
+        if ls *.AppImage 1> /dev/null 2>&1; then
+          mv *.AppImage dist_nuitka/
+          echo "AppImage created successfully and moved to dist_nuitka/"
+        else
+          echo "WARNING: No AppImage file was created"
+          ls -la
+        fi
       shell: bash
 
     - name: Upload Nuitka Artifact
