@@ -174,15 +174,15 @@ jobs:
         
         # Copy the executable (onefile build produces executable without extension)
         if [ -f "dist_nuitka/MiniDexed Service Utility.bin" ]; then
-          cp "dist_nuitka/MiniDexed Service Utility.bin" "AppDir/usr/bin/MiniDexed Service Utility"
+          cp "dist_nuitka/MiniDexed Service Utility.bin" "AppDir/usr/bin/minidexed-service-utility"
         elif [ -f "dist_nuitka/MiniDexed Service Utility" ]; then
-          cp "dist_nuitka/MiniDexed Service Utility" "AppDir/usr/bin/MiniDexed Service Utility"
+          cp "dist_nuitka/MiniDexed Service Utility" "AppDir/usr/bin/minidexed-service-utility"
         else
           echo "ERROR: Could not find executable in dist_nuitka/"
           ls -la dist_nuitka/
           exit 1
         fi
-        chmod +x "AppDir/usr/bin/MiniDexed Service Utility"
+        chmod +x "AppDir/usr/bin/minidexed-service-utility"
         
         # Copy desktop file and icon
         cp minidexed-service-utility.desktop AppDir/usr/share/applications/
