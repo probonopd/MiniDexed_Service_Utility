@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MiniDexed Service Utility
+Comment=Tool for interacting with MiniDexed and MIDI devices
+Exec=MiniDexed Service Utility
+Icon=minidexed-service-utility
+Categories=AudioVideo;Audio;Midi;
+Terminal=false

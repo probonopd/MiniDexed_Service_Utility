@@ -150,6 +150,39 @@ jobs:
           PYTHONOPTIMIZE: 2
       shell: bash   
 
+    - name: Create AppImage (Linux only)
+      if: matrix.build_type == 'linux' || matrix.build_type == 'linux-arm64'
+      run: |
+        # Get short SHA for version
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        
+        # Download appimagetool
+        wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases/expanded_assets/continuous -O - | grep "appimagetool-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2)
+        chmod +x appimagetool-*.AppImage
+        
+        # Create AppDir structure
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/share/applications
+        mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
+        
+        # Copy the executable (onefile build produces executable without extension)
+        cp "dist_nuitka/MiniDexed Service Utility.bin" "AppDir/usr/bin/MiniDexed Service Utility" 2>/dev/null || cp "dist_nuitka/MiniDexed Service Utility" "AppDir/usr/bin/MiniDexed Service Utility"
+        chmod +x "AppDir/usr/bin/MiniDexed Service Utility"
+        
+        # Copy desktop file and icon
+        cp minidexed-service-utility.desktop AppDir/usr/share/applications/
+        cp minidexed-service-utility.svg AppDir/usr/share/icons/hicolor/scalable/apps/
+        
+        # Bundle dependencies
+        ./appimagetool-*.AppImage -s deploy ./AppDir/usr/share/applications/*.desktop
+        
+        # Create AppImage with short SHA as version
+        VERSION=$SHORT_SHA ./appimagetool-*.AppImage ./AppDir
+        
+        # Move AppImage to dist_nuitka
+        mv *.AppImage dist_nuitka/ || true
+      shell: bash
+
     - name: Upload Nuitka Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -177,7 +210,7 @@ jobs:
       run: |
         mkdir -p release
         # Debug: Show the actual structure
-        find executables -type f -name "*MiniDexed*" -o -name "*.exe" -o -name "*.bin"
+        find executables -type f -name "*MiniDexed*" -o -name "*.exe" -o -name "*.bin" -o -name "*.AppImage"
         
         # Rename and organize files for release
         find executables -name "*MiniDexed Service Utility.exe" -exec cp {} release/MiniDexed-Service-Utility-windows \;
@@ -187,8 +220,12 @@ jobs:
         find executables -name "*MiniDexed Service Utility.bin" -path "*alpine-musl-X64*" -exec cp {} release/MiniDexed-Service-Utility-linux-musl \;
         find executables -name "*MiniDexed Service Utility.bin" -path "*alpine-musl-arm64*" -exec cp {} release/MiniDexed-Service-Utility-linux-musl-arm64 \;
         
+        # Copy AppImage files
+        find executables -name "*.AppImage" -path "*linux-X64*" -exec cp {} release/ \;
+        find executables -name "*.AppImage" -path "*linux-arm64*" -exec cp {} release/ \;
+        
         # Make Linux/macOS binaries executable (only if they exist)
-        find release -name "*linux*" -o -name "*macos*" | xargs -r chmod +x
+        find release -name "*linux*" -o -name "*macos*" -o -name "*.AppImage" | xargs -r chmod +x
         
         # List final release files
         ls -la release/ || echo "No files found in release directory"
@@ -197,11 +234,11 @@ jobs:
       run: |
         cd release
         for file in *; do
-          if [ -f "$file" ]; then
+          if [ -f "$file" ] && [[ "$file" != *.AppImage ]]; then
             zip "$file.zip" "$file"
           fi
         done
-        ls -lh *.zip
+        ls -lh *.zip 2>/dev/null || echo "No zip files created"
 
     - name: Upload binaries to release using uploadtool
       env:
@@ -210,6 +247,6 @@ jobs:
       run: |
         set -e
         cd release
-        ls -lh *.zip # Show what we're about to upload
+        ls -lh *.zip *.AppImage 2>/dev/null || ls -lh # Show what we're about to upload
         wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
-        bash upload.sh *.zip
+        bash upload.sh *.zip *.AppImage
