@@ -142,7 +142,22 @@ jobs:
             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --onefile --windows-console-mode=attach --include-package=comtypes.client 'src/MiniDexed Service Utility.py' 
           else
              # For Linux, use --standalone to create AppImage-compatible build
-             python -m nuitka --assume-yes-for-downloads --output-dir=dist_nuitka --standalone 'src/MiniDexed Service Utility.py'
+             python -m nuitka --enable-plugin=pyside6 \
+               --include-package=zeroconf \
+               --include-package=rtmidi \
+               --include-package=mido.backends.rtmidi \
+               --include-package=shiboken6 \
+               --include-package=PySide6.QtCore \
+               --include-package=PySide6.QtWidgets \
+               --include-package=PySide6.QtGui \
+               --include-package=PySide6.QtSvgWidgets \
+               --include-data-dir=src/midi_commands=midi_commands \
+               --include-data-dir=src/data=data \
+               --include-data-dir=src/images=images \
+               --standalone \
+               --assume-yes-for-downloads \
+               --output-dir=dist_nuitka \
+               'src/MiniDexed Service Utility.py'
           fi
           rm -rf dist_nuitka/*build
 
