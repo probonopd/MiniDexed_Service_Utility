@@ -45,7 +45,8 @@ jobs:
         libxcb-keysyms1-dev \
         libxcb-cursor-dev \
         libegl1-mesa \
-        libegl1
+        libegl1 \
+        libqt6opengl6
 
     - name: Set up Python
       if: matrix.build_type != 'alpine-musl' && matrix.build_type != 'alpine-musl-arm64'
@@ -301,3 +302,4 @@ jobs:
         wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
 
         bash upload.sh *.zip *.AppImage
+
